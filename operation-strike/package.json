@@ -1,0 +1,20 @@
+{
+  "name": "operation-strike",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OPERATION STRIKE - FPS competitivo 5v5 em Babylon.js + TypeScript, para navegador e Android",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babylonjs/core": "9.32.1"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.3.3"
+  }
+}

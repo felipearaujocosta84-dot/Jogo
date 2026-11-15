@@ -1,3 +1,5 @@
+> **Novo projeto:** o FPS **OPERATION STRIKE** está na pasta [`operation-strike/`](operation-strike/README.md).
+
 # STREET FOOTBALL 3D
 
 Futebol de rua 3D (3 contra 3) feito com **Babylon.js + JavaScript + Vite**, pensado para rodar no navegador de celulares Android.

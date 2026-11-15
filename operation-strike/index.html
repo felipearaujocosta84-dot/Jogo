@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d10" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="screen-orientation" content="landscape" />
+    <title>Operation Strike</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./src/interface/style.css" />
+  </head>
+  <body>
+    <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="crosshair" class="crosshair"><i class="l"></i><i class="r"></i><i class="t"></i><i class="b"></i><i class="dot"></i></div>
+      <canvas id="radar"></canvas>
+      <div id="hudZone" class="zone"></div>
+      <div class="topbar">
+        <div class="mode">TREINO</div>
+        <div id="hudTimer" class="timer">0:00</div>
+        <div class="mapname">DUST ZONE</div>
+      </div>
+      <div class="vitals">
+        <div class="vital"><span class="ico">✚</span><b id="hudHealth">100</b></div>
+        <div class="vital"><span class="ico">⛨</span><b id="hudArmor">0</b></div>
+      </div>
+      <div class="ammo">
+        <div id="hudWeapon" class="wname"></div>
+        <div><b id="hudAmmo">30</b><span id="hudReserve">/ 90</span></div>
+      </div>
+      <div id="hudPrompt" class="prompt hidden"></div>
+      <div id="hudToast" class="toast hidden"></div>
+      <div id="hudFps" class="fps hidden"></div>
+      <button id="btnPause" class="pausebtn" aria-label="Pausar">❚❚</button>
+    </div>
+
+    <!-- Controles de toque -->
+    <div id="touchControls" class="hidden"></div>
+    <div id="layoutEditor" class="layout-editor hidden">
+      <span>Arraste os botões. Selecionado: <b id="layoutSelected"></b></span>
+      <label>Tamanho <input id="layoutSize" type="range" min="0.06" max="0.4" step="0.01" /></label>
+      <button id="layoutHide" class="btn small">Mostrar/ocultar</button>
+      <button id="layoutReset" class="btn small">Padrão</button>
+      <button id="layoutDone" class="btn small primary">Salvar</button>
+    </div>
+
+    <!-- Carregamento -->
+    <div id="loading" class="screen">
+      <div class="logo"><span>OPERATION</span><b>STRIKE</b></div>
+      <div class="bar"><div id="loadingFill"></div></div>
+      <p id="loadingText">Carregando…</p>
+    </div>
+
+    <!-- Menu principal -->
+    <div id="mainMenu" class="screen menu hidden">
+      <div class="logo"><span>OPERATION</span><b>STRIKE</b></div>
+      <p class="stage">Etapa 1 · Treino livre em Dust Zone</p>
+      <div class="menu-buttons">
+        <button class="btn primary" data-action="play-t">TREINO · LADO TR</button>
+        <button class="btn primary ct" data-action="play-ct">TREINO · LADO CT</button>
+        <button class="btn" data-action="layout">CONTROLES DE TOQUE</button>
+        <button class="btn" data-action="settings">CONFIGURAÇÕES</button>
+      </div>
+      <p class="roadmap">Próximas etapas: arsenal completo, bots 5v5, bomba e economia, multiplayer online, ranking e perfil.</p>
+      <ul class="howto">
+        <li class="pc"><b>PC:</b> WASD mover · Mouse olhar · Espaço pular · Ctrl/C agachar · Shift andar · Clique atirar · Botão direito mirar · R recarregar · Q/1/2 trocar · E usar · F inspecionar · Esc pausa</li>
+        <li class="mobile"><b>Celular:</b> polegar esquerdo move (pouco = andar silencioso) · arraste à direita para olhar · arraste o botão ATIRAR para mirar enquanto atira</li>
+      </ul>
+    </div>
+
+    <!-- Pausa -->
+    <div id="pauseMenu" class="screen menu hidden">
+      <h2>PAUSA</h2>
+      <div class="menu-buttons">
+        <button class="btn primary" data-action="resume">CONTINUAR</button>
+        <button class="btn" data-action="respawn-t">REAPARECER NA BASE TR</button>
+        <button class="btn" data-action="respawn-ct">REAPARECER NA BASE CT</button>
+        <button class="btn" data-action="settings">CONFIGURAÇÕES</button>
+        <button class="btn" data-action="layout">CONTROLES DE TOQUE</button>
+        <button class="btn" data-action="menu">MENU PRINCIPAL</button>
+      </div>
+    </div>
+
+    <!-- Configurações -->
+    <div id="settingsMenu" class="screen menu hidden">
+      <h2>CONFIGURAÇÕES</h2>
+      <div class="settings">
+        <label>Qualidade gráfica
+          <select data-setting="quality">
+            <option value="auto">Automática</option>
+            <option value="low">Baixa</option>
+            <option value="medium">Média</option>
+            <option value="high">Alta</option>
+          </select>
+        </label>
+        <label>Distância de renderização <output></output>
+          <input type="range" data-setting="renderDistance" min="50" max="220" step="10" />
+        </label>
+        <label>Campo de visão (FOV) <output></output>
+          <input type="range" data-setting="fov" min="60" max="100" step="1" />
+        </label>
+        <label>Sensibilidade do toque <output></output>
+          <input type="range" data-setting="touchSensitivity" min="0.2" max="3" step="0.05" />
+        </label>
+        <label>Sensibilidade do mouse <output></output>
+          <input type="range" data-setting="mouseSensitivity" min="0.2" max="3" step="0.05" />
+        </label>
+        <label>Sensibilidade ao mirar <output></output>
+          <input type="range" data-setting="aimSensitivity" min="0.2" max="1.5" step="0.05" />
+        </label>
+        <label>Opacidade dos botões <output></output>
+          <input type="range" data-setting="buttonOpacity" min="0.15" max="1" step="0.05" />
+        </label>
+        <label>Volume <output></output>
+          <input type="range" data-setting="volume" min="0" max="1" step="0.05" />
+        </label>
+        <label>Limite de FPS
+          <select data-setting="fpsCap">
+            <option value="60">60</option>
+            <option value="30">30 (economia de bateria)</option>
+            <option value="0">Sem limite</option>
+          </select>
+        </label>
+        <label>Cor da mira
+          <select data-setting="crosshairColor">
+            <option value="#5dff8a">Verde</option>
+            <option value="#ffffff">Branca</option>
+            <option value="#ffe14d">Amarela</option>
+            <option value="#4de1ff">Ciano</option>
+            <option value="#ff4dd2">Rosa</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" data-setting="crouchToggle" /> Agachar alterna (toque)</label>
+        <label class="check"><input type="checkbox" data-setting="invertY" /> Inverter eixo vertical</label>
+        <label class="check"><input type="checkbox" data-setting="showFps" /> Mostrar FPS</label>
+      </div>
+      <div class="menu-buttons row">
+        <button class="btn" data-action="settings-reset">PADRÃO</button>
+        <button class="btn primary" data-action="settings-back">VOLTAR</button>
+      </div>
+    </div>
+
+    <div id="rotateHint" class="rotate-hint"><div>⟳</div><p>Gire o celular para a horizontal</p></div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
