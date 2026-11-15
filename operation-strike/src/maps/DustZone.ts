@@ -137,6 +137,7 @@ boxes.push({ min: [-6, 6.0, -26], max: [6, 6.06, -25.94], mat: 'dark', collide: 
 export const DUST_ZONE: MapDefinition = {
   id: 'dust_zone',
   name: 'Dust Zone',
+  description: 'Vila desértica com corredores estreitos, Longo A, Meio com portas e Túneis B.',
   cell: 4,
   originX: -50,
   originZ: 58,
@@ -191,6 +192,11 @@ export const DUST_ZONE: MapDefinition = {
     { name: 'LONGO A', min: [30, -34], max: [46, 22] },
     { name: 'BASE TR', min: [-30, -54], max: [30, -30] }
   ],
+  tactics: {
+    A: { tStage: [[40, 8], [42, 4], [12, 16]], ctHold: [[30, 37, 190], [24, 36, -146], [36, 30, 153]] },
+    B: { tStage: [[-36, 10], [-38, 14], [-12, 14]], ctHold: [[-30, 38, -159], [-24, 34, 141], [-40, 30, 158]] },
+    ctMid: [[0, 30, 180], [0, 36, 180]]
+  },
   ambience: {
     sky: ['#2f6fb8', '#8fc0e6', '#e9d9b8'],
     fog: '#dccaa6',

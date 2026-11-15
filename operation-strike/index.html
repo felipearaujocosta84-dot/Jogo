@@ -6,7 +6,6 @@
     <meta name="theme-color" content="#0b0d10" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="screen-orientation" content="landscape" />
     <title>Operation Strike</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -15,28 +14,59 @@
   <body>
     <canvas id="renderCanvas" touch-action="none"></canvas>
 
-    <!-- HUD -->
+    <!-- ================================================================ HUD -->
     <div id="hud" class="hidden">
+      <div id="flashOverlay" class="flash-overlay"></div>
+      <div id="damageOverlay" class="damage-overlay"></div>
+      <div id="scopeOverlay" class="scope-overlay hidden"><div class="lens"></div><i class="h"></i><i class="v"></i></div>
       <div id="crosshair" class="crosshair"><i class="l"></i><i class="r"></i><i class="t"></i><i class="b"></i><i class="dot"></i></div>
+      <div id="hitmarker" class="hitmarker"></div>
+      <div id="damageDir" class="damage-dir"></div>
+      <div id="nameTags" class="name-tags"></div>
       <canvas id="radar"></canvas>
       <div id="hudZone" class="zone"></div>
       <div class="topbar">
-        <div class="mode">TREINO</div>
-        <div id="hudTimer" class="timer">0:00</div>
-        <div class="mapname">DUST ZONE</div>
+        <div id="aliveT" class="alive t"></div>
+        <div class="score t"><b id="scoreT">0</b><small>TR</small></div>
+        <div class="clock"><div id="hudTimer" class="timer">0:00</div><div id="hudRound" class="round">RODADA 1</div><div id="bombIcon" class="bomb-icon hidden">💣</div></div>
+        <div class="score ct"><small>CT</small><b id="scoreCT">0</b></div>
+        <div id="aliveCT" class="alive ct"></div>
       </div>
+      <div id="hudMoney" class="money">$ 800</div>
+      <div id="buyHint" class="buy-hint hidden">[B] COMPRAR</div>
       <div class="vitals">
         <div class="vital"><span class="ico">✚</span><b id="hudHealth">100</b></div>
-        <div class="vital"><span class="ico">⛨</span><b id="hudArmor">0</b></div>
+        <div class="vital"><span class="ico">⛨</span><b id="hudArmor">0</b><i id="hudHelmet" class="helmet hidden">⛑</i></div>
+        <div id="hudKit" class="vital kit hidden">✂</div>
+        <div id="hudC4" class="vital c4 hidden">C4</div>
       </div>
       <div class="ammo">
         <div id="hudWeapon" class="wname"></div>
         <div><b id="hudAmmo">30</b><span id="hudReserve">/ 90</span></div>
+        <div id="hudSlots" class="slots"></div>
       </div>
+      <div id="killfeed" class="killfeed"></div>
+      <div id="progress" class="progress hidden"><span id="progressLabel"></span><div class="bar"><div id="progressFill"></div></div></div>
       <div id="hudPrompt" class="prompt hidden"></div>
       <div id="hudToast" class="toast hidden"></div>
+      <div id="banner" class="banner hidden"><b id="bannerTitle"></b><span id="bannerSub"></span></div>
+      <div id="spectate" class="spectate hidden"></div>
       <div id="hudFps" class="fps hidden"></div>
+      <div id="netInfo" class="netinfo hidden"></div>
       <button id="btnPause" class="pausebtn" aria-label="Pausar">❚❚</button>
+    </div>
+
+    <!-- Placar -->
+    <div id="scoreboard" class="overlay-panel scoreboard hidden">
+      <div class="sb-head"><span id="sbTitle">PLACAR</span><span id="sbInfo"></span></div>
+      <div class="sb-team ct"><div class="sb-score" id="sbScoreCT">0</div><table id="sbCT"></table></div>
+      <div class="sb-team t"><div class="sb-score" id="sbScoreT">0</div><table id="sbT"></table></div>
+    </div>
+
+    <!-- Loja -->
+    <div id="buyMenu" class="overlay-panel buy hidden">
+      <div class="buy-head"><b>LOJA</b><span id="buyMoney">$ 0</span><span id="buyTime"></span><button id="buyClose" class="btn small">FECHAR</button></div>
+      <div class="buy-body"><div id="buyCats" class="buy-cats"></div><div id="buyItems" class="buy-items"></div></div>
     </div>
 
     <!-- Controles de toque -->
@@ -49,103 +79,149 @@
       <button id="layoutDone" class="btn small primary">Salvar</button>
     </div>
 
-    <!-- Carregamento -->
-    <div id="loading" class="screen">
+    <!-- ================================================================ TELAS -->
+    <div id="loading" class="screen center">
       <div class="logo"><span>OPERATION</span><b>STRIKE</b></div>
       <div class="bar"><div id="loadingFill"></div></div>
       <p id="loadingText">Carregando…</p>
     </div>
 
-    <!-- Menu principal -->
     <div id="mainMenu" class="screen menu hidden">
       <div class="logo"><span>OPERATION</span><b>STRIKE</b></div>
-      <p class="stage">Etapa 1 · Treino livre em Dust Zone</p>
+      <p class="stage" id="menuRank"></p>
       <div class="menu-buttons">
-        <button class="btn primary" data-action="play-t">TREINO · LADO TR</button>
-        <button class="btn primary ct" data-action="play-ct">TREINO · LADO CT</button>
-        <button class="btn" data-action="layout">CONTROLES DE TOQUE</button>
-        <button class="btn" data-action="settings">CONFIGURAÇÕES</button>
+        <button class="btn primary" data-go="playMenu">JOGAR</button>
+        <button class="btn" data-go="trainingMenu">TREINAMENTO</button>
+        <button class="btn" data-go="arsenalScreen">ARSENAL</button>
+        <button class="btn" data-go="profileScreen">PERFIL</button>
+        <button class="btn" data-go="rankingScreen">RANKING</button>
+        <button class="btn" data-go="settingsMenu">CONFIGURAÇÕES</button>
       </div>
-      <p class="roadmap">Próximas etapas: arsenal completo, bots 5v5, bomba e economia, multiplayer online, ranking e perfil.</p>
       <ul class="howto">
-        <li class="pc"><b>PC:</b> WASD mover · Mouse olhar · Espaço pular · Ctrl/C agachar · Shift andar · Clique atirar · Botão direito mirar · R recarregar · Q/1/2 trocar · E usar · F inspecionar · Esc pausa</li>
-        <li class="mobile"><b>Celular:</b> polegar esquerdo move (pouco = andar silencioso) · arraste à direita para olhar · arraste o botão ATIRAR para mirar enquanto atira</li>
+        <li class="pc"><b>PC:</b> WASD · Mouse · Espaço pular · Ctrl agachar · Shift andar · Clique atirar · Botão direito mirar/luneta · R recarregar · 1-5 armas · Q trocar · E usar/plantar/desarmar · B loja · Tab placar · F inspecionar</li>
+        <li class="mobile"><b>Celular:</b> polegar esquerdo move · arraste à direita para olhar · USAR (segurar) planta e desarma · COMPRAR abre a loja</li>
       </ul>
     </div>
 
-    <!-- Pausa -->
-    <div id="pauseMenu" class="screen menu hidden">
-      <h2>PAUSA</h2>
-      <div class="menu-buttons">
-        <button class="btn primary" data-action="resume">CONTINUAR</button>
-        <button class="btn" data-action="respawn-t">REAPARECER NA BASE TR</button>
-        <button class="btn" data-action="respawn-ct">REAPARECER NA BASE CT</button>
-        <button class="btn" data-action="settings">CONFIGURAÇÕES</button>
-        <button class="btn" data-action="layout">CONTROLES DE TOQUE</button>
-        <button class="btn" data-action="menu">MENU PRINCIPAL</button>
+    <div id="playMenu" class="screen menu hidden">
+      <h2>JOGAR</h2>
+      <div class="tabs"><button class="tab active" data-tab="bots">CONTRA BOTS</button><button class="tab" data-tab="online">ONLINE</button></div>
+      <div class="tab-body" data-tab-body="bots">
+        <div class="field"><span>Modo</span>
+          <div class="seg" data-pick="mode"><button data-v="competitive" class="on">Competitivo 5v5 (MR12)</button><button data-v="casual">Casual</button></div></div>
+        <div class="field"><span>Mapa</span><div class="maps" data-pick="map"></div></div>
+        <div class="field"><span>Dificuldade dos bots</span>
+          <div class="seg" data-pick="difficulty"><button data-v="easy">Fácil</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Difícil</button></div></div>
+        <div class="field"><span>Lado inicial</span>
+          <div class="seg" data-pick="side"><button data-v="T" class="on">Terroristas</button><button data-v="CT">Contraterroristas</button><button data-v="random">Aleatório</button></div></div>
+        <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button><button class="btn primary" data-action="start-bots">INICIAR PARTIDA</button></div>
+      </div>
+      <div class="tab-body hidden" data-tab-body="online">
+        <div class="field"><span>Status do servidor: <b id="netStatus">desconectado</b> <small id="netPing"></small></span></div>
+        <div class="menu-buttons">
+          <button class="btn primary" data-action="quick-competitive">ENCONTRAR PARTIDA COMPETITIVA</button>
+          <button class="btn primary ct" data-action="quick-casual">ENCONTRAR PARTIDA CASUAL</button>
+        </div>
+        <div class="field row"><input id="joinCode" maxlength="5" placeholder="CÓDIGO" /><button class="btn" data-action="join-code">ENTRAR NA SALA</button></div>
+        <div class="field"><span>Criar sala (usa mapa, modo e dificuldade da aba "Contra bots")</span>
+          <div class="row"><label class="check"><input type="checkbox" id="roomPublic" checked /> Pública</label><button class="btn" data-action="create-room">CRIAR SALA</button></div></div>
+        <div class="field"><span>Salas públicas <button class="btn small" data-action="refresh-rooms">ATUALIZAR</button></span><div id="roomList" class="room-list"></div></div>
+        <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button></div>
       </div>
     </div>
 
-    <!-- Configurações -->
+    <div id="lobbyScreen" class="screen menu hidden">
+      <h2>SALA <span id="lobbyCode"></span></h2>
+      <p class="stage" id="lobbyInfo"></p>
+      <div class="lobby">
+        <div class="lobby-team t"><h3>TERRORISTAS</h3><ul id="lobbyT"></ul><button class="btn small" data-action="team-T">ENTRAR NOS TR</button></div>
+        <div class="lobby-team ct"><h3>CONTRATERRORISTAS</h3><ul id="lobbyCT"></ul><button class="btn small" data-action="team-CT">ENTRAR NOS CT</button></div>
+      </div>
+      <p class="roadmap">Vagas vazias são preenchidas por bots. Compartilhe o código para chamar amigos.</p>
+      <div class="menu-buttons row"><button class="btn" data-action="leave-room">SAIR</button><button class="btn primary" id="btnStartRoom" data-action="start-room">INICIAR</button></div>
+    </div>
+
+    <div id="trainingMenu" class="screen menu hidden">
+      <h2>TREINAMENTO</h2>
+      <p class="roadmap">Explore o mapa, teste todas as armas (dinheiro infinito, compre em qualquer lugar) e pratique a mira em bots-alvo que não atiram. Plantio e desarme liberados.</p>
+      <div class="field"><span>Mapa</span><div class="maps" data-pick="tmap"></div></div>
+      <div class="field"><span>Lado</span><div class="seg" data-pick="tside"><button data-v="T" class="on">Terroristas</button><button data-v="CT">Contraterroristas</button></div></div>
+      <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button><button class="btn primary" data-action="start-training">COMEÇAR</button></div>
+    </div>
+
+    <div id="arsenalScreen" class="screen menu hidden">
+      <h2>ARSENAL</h2>
+      <div id="arsenalList" class="arsenal"></div>
+      <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button></div>
+    </div>
+
+    <div id="profileScreen" class="screen menu hidden">
+      <h2>PERFIL</h2>
+      <div class="tabs"><button class="tab active" data-ptab="local">OFFLINE</button><button class="tab" data-ptab="online">ONLINE</button></div>
+      <div id="profileBody" class="profile"></div>
+      <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button></div>
+    </div>
+
+    <div id="rankingScreen" class="screen menu hidden">
+      <h2>RANKING ONLINE</h2>
+      <div id="rankingBody" class="ranking"></div>
+      <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button><button class="btn" data-action="refresh-ranking">ATUALIZAR</button></div>
+    </div>
+
+    <div id="pauseMenu" class="screen menu hidden">
+      <h2>PAUSA</h2>
+      <p class="stage" id="pauseInfo"></p>
+      <div class="menu-buttons">
+        <button class="btn primary" data-action="resume">CONTINUAR</button>
+        <button class="btn" data-action="open-settings">CONFIGURAÇÕES</button>
+        <button class="btn" data-action="layout">CONTROLES DE TOQUE</button>
+        <button class="btn" data-action="quit-match">SAIR DA PARTIDA</button>
+      </div>
+    </div>
+
+    <div id="endScreen" class="screen menu hidden">
+      <h2 id="endTitle">FIM DE PARTIDA</h2>
+      <p class="stage" id="endScore"></p>
+      <div id="endStats" class="end-stats"></div>
+      <div id="endProfile" class="end-profile"></div>
+      <div class="menu-buttons row"><button class="btn primary" data-action="end-menu">MENU PRINCIPAL</button></div>
+    </div>
+
     <div id="settingsMenu" class="screen menu hidden">
       <h2>CONFIGURAÇÕES</h2>
       <div class="settings">
+        <label>Nome do jogador <input type="text" data-setting="playerName" maxlength="16" /></label>
         <label>Qualidade gráfica
-          <select data-setting="quality">
-            <option value="auto">Automática</option>
-            <option value="low">Baixa</option>
-            <option value="medium">Média</option>
-            <option value="high">Alta</option>
-          </select>
+          <select data-setting="quality"><option value="auto">Automática</option><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option></select>
         </label>
-        <label>Distância de renderização <output></output>
-          <input type="range" data-setting="renderDistance" min="50" max="220" step="10" />
-        </label>
-        <label>Campo de visão (FOV) <output></output>
-          <input type="range" data-setting="fov" min="60" max="100" step="1" />
-        </label>
-        <label>Sensibilidade do toque <output></output>
-          <input type="range" data-setting="touchSensitivity" min="0.2" max="3" step="0.05" />
-        </label>
-        <label>Sensibilidade do mouse <output></output>
-          <input type="range" data-setting="mouseSensitivity" min="0.2" max="3" step="0.05" />
-        </label>
-        <label>Sensibilidade ao mirar <output></output>
-          <input type="range" data-setting="aimSensitivity" min="0.2" max="1.5" step="0.05" />
-        </label>
-        <label>Opacidade dos botões <output></output>
-          <input type="range" data-setting="buttonOpacity" min="0.15" max="1" step="0.05" />
-        </label>
-        <label>Volume <output></output>
-          <input type="range" data-setting="volume" min="0" max="1" step="0.05" />
-        </label>
+        <label>Distância de renderização <output></output><input type="range" data-setting="renderDistance" min="50" max="220" step="10" /></label>
+        <label>Campo de visão (FOV) <output></output><input type="range" data-setting="fov" min="60" max="100" step="1" /></label>
+        <label>Sensibilidade do toque <output></output><input type="range" data-setting="touchSensitivity" min="0.2" max="3" step="0.05" /></label>
+        <label>Sensibilidade do mouse <output></output><input type="range" data-setting="mouseSensitivity" min="0.2" max="3" step="0.05" /></label>
+        <label>Sensibilidade ao mirar <output></output><input type="range" data-setting="aimSensitivity" min="0.2" max="1.5" step="0.05" /></label>
+        <label>Opacidade dos botões <output></output><input type="range" data-setting="buttonOpacity" min="0.15" max="1" step="0.05" /></label>
+        <label>Volume <output></output><input type="range" data-setting="volume" min="0" max="1" step="0.05" /></label>
         <label>Limite de FPS
-          <select data-setting="fpsCap">
-            <option value="60">60</option>
-            <option value="30">30 (economia de bateria)</option>
-            <option value="0">Sem limite</option>
-          </select>
+          <select data-setting="fpsCap"><option value="60">60</option><option value="30">30 (economia de bateria)</option><option value="0">Sem limite</option></select>
         </label>
         <label>Cor da mira
-          <select data-setting="crosshairColor">
-            <option value="#5dff8a">Verde</option>
-            <option value="#ffffff">Branca</option>
-            <option value="#ffe14d">Amarela</option>
-            <option value="#4de1ff">Ciano</option>
-            <option value="#ff4dd2">Rosa</option>
-          </select>
+          <select data-setting="crosshairColor"><option value="#5dff8a">Verde</option><option value="#ffffff">Branca</option><option value="#ffe14d">Amarela</option><option value="#4de1ff">Ciano</option><option value="#ff4dd2">Rosa</option></select>
         </label>
+        <label>Servidor online (vazio = mesmo endereço do jogo) <input type="text" data-setting="serverUrl" placeholder="wss://seu-servidor/ws" /></label>
         <label class="check"><input type="checkbox" data-setting="crouchToggle" /> Agachar alterna (toque)</label>
         <label class="check"><input type="checkbox" data-setting="invertY" /> Inverter eixo vertical</label>
         <label class="check"><input type="checkbox" data-setting="showFps" /> Mostrar FPS</label>
+        <label class="check"><input type="checkbox" data-setting="nameTags" /> Nomes dos companheiros</label>
       </div>
       <div class="menu-buttons row">
+        <button class="btn" data-action="layout">CONTROLES DE TOQUE</button>
         <button class="btn" data-action="settings-reset">PADRÃO</button>
         <button class="btn primary" data-action="settings-back">VOLTAR</button>
       </div>
     </div>
 
     <div id="rotateHint" class="rotate-hint"><div>⟳</div><p>Gire o celular para a horizontal</p></div>
+    <div id="menuToast" class="menu-toast hidden"></div>
 
     <script type="module" src="./src/main.ts"></script>
   </body>

@@ -12,7 +12,12 @@ const KEYMAP: Record<string, ActionName> = {
   KeyE: 'interact',
   KeyQ: 'switch',
   Digit1: 'slot1',
-  Digit2: 'slot2'
+  Digit2: 'slot2',
+  Digit3: 'slot3',
+  Digit4: 'slot4',
+  Digit5: 'slot5',
+  KeyB: 'buy',
+  Tab: 'score'
 };
 
 export class KeyboardMouse {
@@ -43,7 +48,7 @@ export class KeyboardMouse {
     document.addEventListener('pointerlockchange', () => {
       if (!this.locked) {
         this.releaseAll();
-        if (this.enabled) this.onPointerLockLost?.();
+        if (this.enabled && !this.uiOpen) this.onPointerLockLost?.();
       }
     });
   }
@@ -79,14 +84,20 @@ export class KeyboardMouse {
     this.updateMove();
   }
 
+  /** Interface aberta (loja): cliques vão para os menus, não para a arma. */
+  uiOpen = false;
+
   private onMouse(e: MouseEvent, down: boolean): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.uiOpen) return;
     if (down && !this.locked) {
       this.requestLock();
       return;
     }
     if (e.button === 0) this.input.set('fire', down, 'mouse');
-    if (e.button === 2) this.input.set('aim', down, 'mouse');
+    if (e.button === 2) {
+      this.input.set('aim', down, 'mouse');
+      this.input.set('zoom', down, 'mouse');
+    }
   }
 
   private updateMove(): void {
@@ -101,6 +112,7 @@ export class KeyboardMouse {
     for (const a of Object.values(KEYMAP)) for (const code of Object.keys(KEYMAP)) this.input.set(a, false, 'key:' + code);
     this.input.set('fire', false, 'mouse');
     this.input.set('aim', false, 'mouse');
+    this.input.set('zoom', false, 'mouse');
     this.updateMove();
   }
 }

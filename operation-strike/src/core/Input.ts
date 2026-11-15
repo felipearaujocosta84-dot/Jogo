@@ -12,7 +12,14 @@ export type ActionName =
   | 'interact'
   | 'inspect'
   | 'slot1'
-  | 'slot2';
+  | 'slot2'
+  | 'slot3'
+  | 'slot4'
+  | 'slot5'
+  | 'zoom'
+  | 'buy'
+  | 'score'
+  | 'drop';
 
 export class InputState {
   /** Movimento por fonte (teclado, joystick), somado e limitado a magnitude 1. */

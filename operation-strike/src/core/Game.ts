@@ -1,53 +1,72 @@
-// Núcleo do jogo: motor 3D, cena, mapa, jogador, câmera, arma, efeitos, HUD e laço principal.
-// Etapa 1: treino livre no mapa Dust Zone com movimentação completa, câmera, arma de treino e controles Android.
-import { Engine, Scene, Vector3 } from './babylon';
+// Núcleo do jogo no navegador: motor 3D, cena, sessão (local ou online), mapa, personagens,
+// câmera, arma em primeira pessoa, efeitos, áudio, HUD, loja, placar e laço principal.
+import { Engine, Scene, Vector3, Matrix } from './babylon';
 import { InputState } from './Input';
 import { KeyboardMouse } from './KeyboardMouse';
 import { Quality } from './Quality';
 import type { Settings } from './Settings';
-import { MapBuilder, type Door, type MapInstance } from '../maps/MapBuilder';
+import type { Session, ViewState } from './Session';
+import { MapBuilder, type MapVisual } from '../maps/MapBuilder';
+import { MapRuntime } from '../maps/MapRuntime';
 import { MAPS, DEFAULT_MAP } from '../maps/maps';
-import type { Team } from '../maps/MapTypes';
-import { PlayerController, PLAYER } from '../player/PlayerController';
 import { FirstPersonCamera } from '../camera/FirstPersonCamera';
 import { ViewModel } from '../weapons/ViewModel';
-import { WeaponSystem, type WeaponContext } from '../weapons/WeaponSystem';
 import { ImpactEffects } from '../combat/ImpactEffects';
+import { Effects } from '../combat/Effects';
 import { AudioManager } from '../audio/AudioManager';
 import { Hud } from '../interface/Hud';
 import { TouchControls } from '../interface/TouchControls';
+import { Scoreboard } from '../interface/Scoreboard';
+import { BuyMenu } from '../interface/BuyMenu';
+import { CharacterModel } from '../player/CharacterModel';
+import { WEAPONS } from '../weapons/WeaponData';
+import { PLAYER } from '../player/PlayerController';
+import { BTN, type PlayerView, type SimEvent, type Team, type UserCmd } from '../sim/types';
+import type { SurfaceKind } from '../physics/CollisionWorld';
+import type { RadarDot } from '../interface/Radar';
 
 const DEG = Math.PI / 180;
-const MAX_STEP = 1 / 120;
 
 export class Game {
   engine!: Engine;
   scene!: Scene;
   quality!: Quality;
-  map!: MapInstance;
-  player!: PlayerController;
   camera!: FirstPersonCamera;
   view!: ViewModel;
-  weapons!: WeaponSystem;
-  effects!: ImpactEffects;
+  decals!: ImpactEffects;
+  fx!: Effects;
   readonly input = new InputState();
   readonly audio = new AudioManager();
   readonly hud = new Hud();
+  readonly scoreboard = new Scoreboard();
+  readonly buyMenu = new BuyMenu();
   keyboard!: KeyboardMouse;
   touch!: TouchControls;
 
+  session: Session | null = null;
   paused = true;
-  team: Team = 'T';
-  private mapId = DEFAULT_MAP;
-  private ctx!: WeaponContext;
+  private mapVisual: MapVisual | null = null;
+  private mapRuntime: MapRuntime | null = null;
+  private visualMapId = '';
+  private chars = new Map<string, { model: CharacterModel; team: Team; variant: number; step: number; reloadAt: number; reloadDur: number; lastX: number; lastZ: number }>();
+  private look = { yaw: 0, pitch: 0 };
+  private wasAlive = false;
+  private spectateIdx = 0;
   private lastTime = 0;
   private sinceRender = 0;
-  private sessionTime = 0;
-  private spawnIndex = 0;
   private fpsTimer = 0;
   private touchMode: boolean;
-  /** Chamado quando o jogo pausa sozinho (perda do ponteiro, troca de app). */
+  private lastWeapon = '';
+  private lastPhase = '';
+  private beepT = 0;
+  private plantSoundT = 0;
+  private seenEnemy = new Map<string, number>();
+  private cmdsThisFrame = 0;
+  private time = 0;
+  private lastState: ViewState | null = null;
+  private landWatch = { ground: true, vy: 0 };
   onAutoPause: (() => void) | null = null;
+  onMatchOver: ((s: Session) => void) | null = null;
 
   constructor(private canvas: HTMLCanvasElement, private settings: Settings) {
     this.touchMode = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -71,43 +90,36 @@ export class Game {
     this.quality = new Quality(this.engine, this.settings.get('quality'));
     this.scene = new Scene(this.engine);
     this.scene.skipPointerMovePicking = true;
-    this.scene.autoClear = true;
-    this.scene.autoClearDepthAndStencil = true;
     await nextFrame();
-
-    onProgress(20, 'Construindo o mapa Dust Zone');
     this.camera = new FirstPersonCamera(this.scene);
-    this.map = new MapBuilder(this.scene, MAPS[this.mapId], this.quality.preset).build();
-    await nextFrame();
-
-    onProgress(60, 'Preparando o operador');
-    this.player = new PlayerController(this.map.world, {
-      onFootstep: s => this.audio.footstep(s),
-      onJump: () => this.audio.play('jump'),
-      onLand: (impact, s) => {
-        this.audio.land(impact, s);
-        this.camera.land(impact);
-      }
-    });
     this.view = new ViewModel(this.scene, this.camera.camera);
-    this.effects = new ImpactEffects(this.scene, this.quality.preset.decals, this.quality.preset.particles);
-    this.ctx = { player: this.player, camera: this.camera, world: this.map.world, effects: this.effects, audio: this.audio, view: this.view };
-    this.weapons = new WeaponSystem(this.ctx);
+    this.decals = new ImpactEffects(this.scene, this.quality.preset.decals, this.quality.preset.particles);
+    this.fx = new Effects(this.scene, this.quality.preset.particles);
+    onProgress(25, 'Construindo o cenário');
+    this.loadMapVisual(DEFAULT_MAP);
     await nextFrame();
-
-    onProgress(80, 'Configurando controles');
+    onProgress(70, 'Configurando controles');
     this.keyboard = new KeyboardMouse(this.canvas, this.input);
     this.keyboard.onPointerLockLost = () => {
-      if (!this.paused && !this.touchMode) {
+      if (!this.paused && !this.touchMode && !this.buyMenu.open) {
         this.pause();
         this.onAutoPause?.();
       }
     };
     this.touch = new TouchControls(document.getElementById('touchControls')!, this.input);
-    this.hud.setMap(this.map);
+    this.buyMenu.onBuy = item => {
+      const err = this.session?.buy(item);
+      if (err) {
+        this.hud.message(err, 1.5);
+        this.audio.play('error');
+      }
+    };
+    this.buyMenu.onClose = () => {
+      this.keyboard.uiOpen = false;
+      if (!this.paused && !this.touchMode) this.keyboard.requestLock();
+    };
     this.applySettings();
     this.settings.onChange(() => this.applySettings());
-
     window.addEventListener('resize', () => this.engine.resize());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && !this.paused) {
@@ -115,11 +127,10 @@ export class Game {
         this.onAutoPause?.();
       }
     });
-
-    this.respawn('T');
-    onProgress(95, 'Compilando shaders');
-    // Primeiro quadro (compila shaders antes de mostrar o menu)
-    this.camera.update(0, this.player);
+    // vista do menu
+    this.camera.update(0, { x: 0, y: 4, z: -30 }, 0.3, 0.05, 0, true);
+    this.view.setVisible(false);
+    onProgress(90, 'Compilando shaders');
     this.scene.render();
     await this.scene.whenReadyAsync();
     this.engine.runRenderLoop(() => this.frame());
@@ -128,9 +139,13 @@ export class Game {
 
   applySettings(): void {
     const s = this.settings.data;
-    if (this.quality.setMode(s.quality)) this.rebuildMap();
+    if (this.quality.setMode(s.quality) && this.visualMapId) {
+      const id = this.visualMapId;
+      this.visualMapId = '';
+      this.loadMapVisual(id, this.session?.map);
+    }
     this.camera.baseFov = s.fov;
-    this.map.setRenderDistance(s.renderDistance);
+    this.mapVisual?.setRenderDistance(s.renderDistance);
     this.keyboard.sensitivity = s.mouseSensitivity;
     this.keyboard.invertY = s.invertY;
     this.touch.sensitivity = s.touchSensitivity;
@@ -138,36 +153,59 @@ export class Game {
     this.touch.crouchToggle = s.crouchToggle;
     this.touch.setOpacity(s.buttonOpacity);
     this.audio.setVolume(s.volume);
-    this.effects.setLimits(this.quality.preset.decals, this.quality.preset.particles);
+    this.decals.setLimits(this.quality.preset.decals, this.quality.preset.particles);
+    this.fx.setMaxParticles(this.quality.preset.particles);
     this.hud.setFps(s.showFps ? this.quality.averageFps : null);
   }
 
-  /** Reconstrói o mapa com outro nível de qualidade (texturas, sombras, detalhes). */
-  private rebuildMap(): void {
-    if (!this.map) return;
-    const pos = { ...this.player.position };
-    this.map.dispose();
-    this.map = new MapBuilder(this.scene, MAPS[this.mapId], this.quality.preset).build();
-    this.player.setWorld(this.map.world);
-    this.ctx.world = this.map.world;
-    this.hud.setMap(this.map);
-    this.player.position.x = pos.x;
-    this.player.position.y = pos.y + 0.05;
-    this.player.position.z = pos.z;
+  private loadMapVisual(mapId: string, runtime?: MapRuntime): void {
+    if (this.visualMapId === mapId && runtime === this.mapRuntime) return;
+    if (this.visualMapId !== mapId || !this.mapVisual) {
+      this.mapVisual?.dispose();
+      this.mapRuntime = runtime ?? new MapRuntime(MAPS[mapId]);
+      this.mapVisual = new MapBuilder(this.scene, this.mapRuntime, this.quality.preset).build();
+      this.visualMapId = mapId;
+      this.mapVisual.setRenderDistance(this.settings.get('renderDistance'));
+    } else if (runtime) {
+      // mesmo mapa, novo runtime (portas da sessão)
+      this.mapRuntime = runtime;
+      this.mapVisual.dispose();
+      this.mapVisual = new MapBuilder(this.scene, runtime, this.quality.preset).build();
+      this.mapVisual.setRenderDistance(this.settings.get('renderDistance'));
+    }
+    this.hud.setMap(this.mapRuntime!);
   }
 
-  respawn(team: Team = this.team): void {
-    this.team = team;
-    const sp = this.map.spawn(team, this.spawnIndex++);
-    this.player.teleport({ x: sp.x, y: 0.2, z: sp.z }, sp.yaw * DEG);
-    this.weapons.refill();
-    this.hud.message(team === 'T' ? 'Você nasceu na BASE TR' : 'Você nasceu na BASE CT', 2);
-  }
+  // ------------------------------------------------------------------ sessões
 
-  start(): void {
+  startSession(s: Session): void {
+    this.endSession();
+    this.session = s;
+    this.visualMapId = '';
+    this.loadMapVisual(s.map.def.id, s.map);
+    this.hud.clearFeed();
+    this.wasAlive = false;
+    this.lastPhase = '';
+    this.lastWeapon = '';
+    this.seenEnemy.clear();
     this.audio.unlock();
     this.audio.startAmbient();
     this.resume();
+  }
+
+  endSession(): void {
+    for (const c of this.chars.values()) c.model.dispose();
+    this.chars.clear();
+    this.fx.clearRound();
+    this.session?.dispose();
+    this.session = null;
+    this.buyMenu.toggle(false);
+    this.scoreboard.toggle(false);
+    this.view.setVisible(false);
+    this.hud.show(false);
+    this.touch.show(false);
+    this.audio.stopAmbient();
+    this.scene.render(); // tira a arma da tela imediatamente (fundo dos menus)
   }
 
   resume(): void {
@@ -178,7 +216,6 @@ export class Game {
     this.touch.enabled = true;
     this.touch.show(this.touchMode);
     this.hud.show(true);
-    this.view.setVisible(true);
     if (!this.touchMode) this.keyboard.requestLock();
     this.lastTime = performance.now();
   }
@@ -190,134 +227,548 @@ export class Game {
     this.keyboard.exitLock();
     this.touch.enabled = false;
     this.touch.releaseAll();
-    this.audio.suspend();
+    this.buyMenu.toggle(false);
+    this.scoreboard.toggle(false);
+    // online a partida continua no servidor; offline ela congela
+    if (!this.session?.online) this.audio.suspend();
   }
 
-  /** Mostra o cenário atrás dos menus. */
   setMenuView(): void {
     this.hud.show(false);
     this.touch.show(false);
   }
 
-  // ------------------------------------------------------------ laço principal
+  // ------------------------------------------------------------------ laço
 
   private frame(): void {
     const now = performance.now();
     let dt = (now - (this.lastTime || now)) / 1000;
     this.lastTime = now;
     if (dt > 0.1) dt = 0.1;
-
+    const s = this.session;
     if (this.paused) {
-      // Nos menus o cenário fica parado; desenha devagar para economizar bateria
+      // menus: offline a cena fica parada; online a simulação segue (sem comandos)
+      if (s?.online) s.update(dt, () => this.idleCmd());
       this.sinceRender += dt;
-      if (this.sinceRender < 0.25) return;
+      if (this.sinceRender < (s?.online ? 0.05 : 0.25)) return;
       this.sinceRender = 0;
+      if (s) this.updateWorld(0.05, s.view(), s.drainEvents());
       this.scene.render();
       return;
     }
-
-    // Limite de FPS opcional (economia de bateria)
     const cap = this.settings.get('fpsCap');
     this.sinceRender += dt;
     if (cap && this.sinceRender < 1 / cap - 0.002) return;
     const frameDt = Math.min(0.1, this.sinceRender);
     this.sinceRender = 0;
-
     this.update(frameDt);
     this.scene.render();
     this.quality.update(frameDt, cap || 60);
   }
 
-  private update(dt: number): void {
-    const s = this.settings.data;
-    this.sessionTime += dt;
-    const input = this.input;
+  private idleCmd(): UserCmd {
+    return { seq: 0, mx: 0, my: 0, yaw: this.look.yaw, pitch: this.look.pitch, buttons: 0, sel: 0 };
+  }
 
-    // Câmera (mouse/toque) — sensibilidade reduzida ao mirar
-    const zoomScale = this.weapons.aiming ? s.aimSensitivity * this.camera.currentZoom : 1;
+  private makeCmd = (): UserCmd => {
+    this.cmdsThisFrame++;
+    const i = this.input;
+    const ui = this.buyMenu.open;
+    let b = 0;
+    if (!ui && i.isDown('fire')) b |= BTN.FIRE;
+    if (!ui && i.isDown('aim')) b |= BTN.AIM;
+    if (i.consume('reload')) b |= BTN.RELOAD;
+    if (i.isDown('jump') || i.consume('jump')) b |= BTN.JUMP;
+    if (i.isDown('crouch')) b |= BTN.CROUCH;
+    if (i.isDown('walk')) b |= BTN.WALK;
+    if (i.isDown('interact') || i.consume('interact')) b |= BTN.USE;
+    if (i.consume('zoom')) b |= BTN.ZOOM;
+    if (i.consume('switch')) b |= BTN.NEXT;
+    let sel = 0;
+    if (i.consume('slot1')) sel = 1;
+    else if (i.consume('slot2')) sel = 2;
+    else if (i.consume('slot3')) sel = 3;
+    else if (i.consume('slot4')) sel = 4;
+    else if (i.consume('slot5')) sel = 5;
+    return { seq: 0, mx: i.moveX, my: i.moveY, yaw: this.look.yaw, pitch: this.look.pitch, buttons: b, sel };
+  };
+
+  private update(dt: number): void {
+    const s = this.session;
+    if (!s) return;
+    this.time += dt;
+    const set = this.settings.data;
+    const local = s.local();
+    const i = this.input;
+
+    // interface (loja / placar / inspeção)
+    if (i.consume('buy')) this.toggleBuy();
+    const sbHeld = i.isDown('score');
+    if (sbHeld !== this.scoreboard.open) this.scoreboard.toggle(sbHeld);
+    if (i.consume('inspect')) this.view.inspect();
+
+    // mira (sensibilidade menor com zoom)
+    const zoomScale = this.camera.currentZoom < 0.98 ? set.aimSensitivity * this.camera.currentZoom : 1;
     this.keyboard.lookScale = zoomScale;
     this.touch.lookScale = zoomScale;
-    const look = input.takeLook();
-    this.player.look(look.yaw, look.pitch);
-    this.view.addLook(look.yaw, look.pitch);
+    const look = i.takeLook();
+    if (local?.alive) {
+      this.look.yaw += look.yaw;
+      this.look.pitch = Math.max(-1.53, Math.min(1.53, this.look.pitch + look.pitch));
+      if (this.look.yaw > Math.PI) this.look.yaw -= Math.PI * 2;
+      else if (this.look.yaw < -Math.PI) this.look.yaw += Math.PI * 2;
+      this.view.addLook(look.yaw, look.pitch);
+    } else if (look.yaw > 0.15 || i.consume('fire')) {
+      this.spectateIdx++;
+    }
 
-    // Física em subpassos fixos (estável em qualquer taxa de quadros)
-    const steps = Math.max(1, Math.ceil(dt / MAX_STEP));
-    const h = dt / steps;
-    for (let i = 0; i < steps; i++) this.player.update(h, input, input.isDown('crouch'));
+    // simulação / previsão
+    this.cmdsThisFrame = 0;
+    s.update(dt, this.makeCmd);
+    if (this.cmdsThisFrame > 0) i.endFrame();
+    const st = s.view();
+    this.updateWorld(dt, st, s.drainEvents());
+  }
 
-    const p = this.player.position;
-    const r = PLAYER.radius;
-    this.map.update(dt, [{ x: p.x - r, y: p.y, z: p.z - r }, { x: p.x + r, y: p.y + this.player.height, z: p.z + r }]);
+  private toggleBuy(): void {
+    const st = this.lastState;
+    if (!this.buyMenu.open && !st?.you?.canBuy) {
+      this.hud.message(st?.round.mode === 'training' ? 'Loja indisponível' : 'Só é possível comprar na base, no início da rodada', 1.6);
+      return;
+    }
+    this.buyMenu.toggle();
+    if (this.buyMenu.open) {
+      this.keyboard.uiOpen = true;
+      this.keyboard.exitLock();
+      this.input.set('fire', false, 'mouse');
+    }
+  }
 
-    this.weapons.update(dt, input);
-    if (input.isDown('switch') && this.touch.isToggled('aim')) this.touch.clearToggle('aim');
-    this.handleInteraction();
+  /** Atualiza tudo o que é desenhado a partir do estado da partida. */
+  private updateWorld(dt: number, st: ViewState, events: SimEvent[]): void {
+    const s = this.session!;
+    this.lastState = st;
+    const local = s.local();
+    const me = st.players.find(p => p.id === s.localId) ?? null;
+    const set = this.settings.data;
 
-    this.camera.update(dt, this.player);
-    const bob = this.camera.bob;
-    this.view.update(dt, {
-      aiming: this.weapons.aiming,
-      crouched: this.player.crouched,
-      speed: this.player.horizontalSpeed,
-      onGround: this.player.onGround,
-      bobPhase: bob.phase,
-      bobAmount: bob.amount,
-      landDip: bob.dip
-    });
+    // renascimento: a mira volta para a direção do ponto de nascimento
+    if (local && local.alive && !this.wasAlive) {
+      this.look.yaw = local.ctrl.yaw;
+      this.look.pitch = 0;
+      this.lastWeapon = '';
+      this.camera.setZoom(1, true);
+      this.view.setTeam(local.team);
+    }
+    this.wasAlive = !!local?.alive;
+
+    // mudança de fase
+    if (st.round.phase !== this.lastPhase) this.onPhase(st, me);
+
+    for (const e of events) this.handleEvent(e, st, me);
+
+    // câmera
+    const alive = !!(local && local.alive);
+    let camX = 0, camZ = 0, camYaw = this.look.yaw;
+    if (alive && local) {
+      const c = local.ctrl;
+      const a = s.alpha;
+      const eye = { x: s.prevPos.x + (c.position.x - s.prevPos.x) * a, y: s.prevPos.y + (c.eyeY - s.prevPos.y) * a, z: s.prevPos.z + (c.position.z - s.prevPos.z) * a };
+      const you = st.you;
+      const punchP = (you?.punchPitch ?? 0) * DEG, punchY = (you?.punchYaw ?? 0) * DEG;
+      // aterrissagem
+      if (c.onGround && !this.landWatch.ground && this.landWatch.vy < -3) {
+        this.camera.land(-this.landWatch.vy);
+        this.audio.land(-this.landWatch.vy, c.groundSurface);
+      }
+      this.landWatch = { ground: c.onGround, vy: c.velocity.y };
+      this.camera.update(dt, eye, this.look.yaw + punchY, this.look.pitch + punchP, c.horizontalSpeed, c.onGround);
+      camX = eye.x;
+      camZ = eye.z;
+      // zoom: luneta ou mira
+      const w = local.weapon;
+      const scoped = w.scope && (you?.scope ?? 0) > 0;
+      if (scoped) this.camera.setZoom(w.zoom[(you!.scope - 1) | 0] ?? 0.4);
+      else if (local.input.isDown('aim') && w.cls !== 'knife' && w.cls !== 'grenade' && w.cls !== 'c4' && !w.scope) this.camera.setZoom(w.zoom[0]);
+      else this.camera.setZoom(1);
+      this.hud.setScope(scoped);
+      // arma em primeira pessoa
+      const wid = local.weaponId();
+      if (wid !== this.lastWeapon) {
+        this.lastWeapon = wid;
+        this.view.setWeapon(wid, w.drawTime);
+        if (this.lastPhase !== '') this.audio.play('draw');
+      }
+      this.view.plant(local.act === 2 || local.act === 3);
+      this.view.setVisible(!scoped);
+      const bob = this.camera.bob;
+      this.view.update(dt, { aiming: local.input.isDown('aim') && !w.scope, crouched: c.crouched, speed: c.horizontalSpeed, onGround: c.onGround, bobPhase: bob.phase, bobAmount: bob.amount, landDip: bob.dip });
+      // passos do próprio jogador
+      const ch = this.footstepTracker('local', c.horizontalSpeed, c.onGround, dt);
+      if (ch) this.audio.footstep(c.groundSurface);
+      this.hud.setSpectate(null);
+    } else {
+      // espectador
+      this.view.setVisible(false);
+      this.hud.setScope(false);
+      const myTeam = me?.team ?? 'T';
+      const pool = st.players.filter(p => p.alive && p.team === myTeam);
+      const list = pool.length ? pool : st.players.filter(p => p.alive);
+      const target = list.length ? list[this.spectateIdx % list.length] : null;
+      if (target) {
+        this.camera.spectate(dt, target, target.yaw, target.pitch, s.map.world);
+        camX = target.x;
+        camZ = target.z;
+        camYaw = target.yaw;
+        this.hud.setSpectate(target.name);
+      } else {
+        this.camera.spectate(dt, me ?? { x: 0, y: 0, z: 0 }, this.look.yaw, -0.3, s.map.world);
+        this.hud.setSpectate(null);
+      }
+    }
+    this.audio.setListener(this.camera.camera.position.x, this.camera.camera.position.y, this.camera.camera.position.z, camYaw);
+
+    // personagens
+    const seen = new Set<string>();
+    for (const p of st.players) {
+      seen.add(p.id);
+      let c = this.chars.get(p.id);
+      if (!c || c.team !== p.team || c.variant !== p.variant) {
+        c?.model.dispose();
+        const model = new CharacterModel(this.scene, p.team, p.variant, this.mapVisual?.shadow ?? null);
+        c = { model, team: p.team, variant: p.variant, step: 0, reloadAt: -10, reloadDur: 1, lastX: p.x, lastZ: p.z };
+        this.chars.set(p.id, c);
+      }
+      const isMe = p.id === s.localId;
+      c.model.setVisible(!(isMe && alive));
+      if (isMe && alive) continue;
+      const reloadT = this.time - c.reloadAt < c.reloadDur ? (this.time - c.reloadAt) / c.reloadDur : 0;
+      c.model.update(dt, p, reloadT);
+      // passos dos outros (som espacial)
+      if (p.alive && this.footstepTracker(p.id, Math.hypot(p.vx, p.vz), p.ground, dt)) {
+        const surf: SurfaceKind = s.map.zoneAt(p.x, p.z) ? 'stone' : 'sand';
+        this.audio.footstep(surf, { x: p.x, y: p.y, z: p.z });
+      }
+    }
+    for (const [id, c] of this.chars) if (!seen.has(id)) {
+      c.model.dispose();
+      this.chars.delete(id);
+    }
+
+    // mapa, efeitos e bomba
+    if (s.online) s.map.update(dt, []);
+    this.mapVisual?.update();
+    this.fx.sync(st.nades, st.bomb, !!local?.c4 && alive);
+    this.fx.update(dt);
+    if (st.bomb.state === 'planted') {
+      this.beepT -= dt;
+      const interval = st.bomb.timeLeft > 20 ? 1 : st.bomb.timeLeft > 10 ? 0.6 : st.bomb.timeLeft > 5 ? 0.3 : 0.15;
+      if (this.beepT <= 0) {
+        this.beepT = interval;
+        this.audio.beep(st.bomb, st.bomb.timeLeft < 10);
+      }
+    }
 
     // HUD
-    const w = this.weapons.current;
-    this.hud.setVitals(100, 0);
-    this.hud.setAmmo(w.def.name, w.ammo, w.reserve, this.weapons.reloading);
-    this.hud.setTimer(this.sessionTime);
-    this.hud.setZone(this.map.zoneAt(p.x, p.z));
-    const fovRad = this.camera.camera.fov;
-    const gap = 4 + (Math.tan(this.weapons.spread * DEG) / Math.tan(fovRad / 2)) * (window.innerHeight / 2);
-    this.hud.setCrosshair(Math.min(60, gap), s.crosshairColor, this.weapons.aiming && w.def.model === 'rifle' && this.camera.currentZoom < 0.8);
-    this.hud.update(dt, p.x, p.z, this.player.yaw);
+    if (me) {
+      this.hud.setVitals(me.hp, me.armor, me.helmet, me.kit, me.bomb, me.money);
+    }
+    const you = st.you;
+    if (you && local) {
+      this.hud.setAmmo(local.weaponId(), you.ammo, you.reserve, you.reloading, you.slots, you.active);
+      const fovRad = this.camera.camera.fov;
+      const gap = 4 + (Math.tan(you.spread * DEG) / Math.tan(fovRad / 2)) * (window.innerHeight / 2);
+      const scoped = local.weapon.scope && you.scope > 0;
+      const hideCross = !alive || scoped || (local.weapon.scope && !scoped) || (local.input.isDown('aim') && local.weapon.cls !== 'pistol' && local.weapon.cls !== 'knife' && local.weapon.cls !== 'grenade' && this.camera.currentZoom < 0.9);
+      this.hud.setCrosshair(Math.min(60, gap), set.crosshairColor, hideCross);
+      this.hud.setFlash(you.flash);
+      if (you.plantProgress > 0) this.hud.setProgress('PLANTANDO A BOMBA', you.plantProgress);
+      else if (you.defuseProgress > 0) this.hud.setProgress(me?.kit ? 'DESARMANDO (KIT)' : 'DESARMANDO', you.defuseProgress);
+      else this.hud.setProgress(null, 0);
+      if (you.plantProgress > 0 || you.defuseProgress > 0) {
+        this.plantSoundT -= dt;
+        if (this.plantSoundT <= 0) {
+          this.plantSoundT = 0.25;
+          if (you.plantProgress > 0) this.audio.plantTick();
+          else this.audio.defuseTick();
+        }
+      }
+      const buyLabel = this.touchMode ? 'COMPRAR' : '[B] COMPRAR';
+      this.hud.setBuyHint(you.canBuy && st.round.mode !== 'training' ? `${buyLabel} · ${Math.ceil(st.round.buyTimeLeft)}s` : null);
+      this.buyMenu.update(
+        {
+          team: local.team, money: me?.money ?? 0, primary: local.primary?.id, secondary: local.secondary?.id,
+          armor: me?.armor ?? 0, helmet: !!me?.helmet, kit: !!me?.kit, nades: { ...local.nades }
+        },
+        you.canBuy,
+        st.round.mode === 'training' ? 999 : st.round.buyTimeLeft
+      );
+    }
+    this.hud.setRound(st.round, st.bomb.state === 'planted');
+    this.hud.setAlive(st.players);
+    this.hud.setZone(alive && local ? s.map.zoneAt(local.ctrl.position.x, local.ctrl.position.z) : '');
+    this.updatePrompt(st, me);
+    this.scoreboard.update(st.players, st.round, s.localId, me?.team ?? 'T', s.online);
+    this.hud.update(dt, camX, camZ, camYaw, this.radarDots(st, me));
+    if (set.nameTags) this.updateTags(st, me);
+    else this.hud.setTags([]);
     this.fpsTimer += dt;
-    if (s.showFps && this.fpsTimer > 0.5) {
+    if (set.showFps && this.fpsTimer > 0.5) {
       this.fpsTimer = 0;
       this.hud.setFps(this.quality.averageFps);
     }
-    input.endFrame();
+    if (s.online) {
+      const net = (s as unknown as { net: { rtt: number; status: string } }).net;
+      this.hud.setNet(net.status === 'conectado' ? `ping ${Math.round(net.rtt)} ms` : net.status);
+    } else this.hud.setNet(null);
+
+    if (st.round.phase === 'over' && s.result && this.onMatchOver) {
+      const cb = this.onMatchOver;
+      this.onMatchOver = null;
+      setTimeout(() => cb(s), 2500);
+    }
   }
 
-  /** Portas e avisos de interação (botão USAR / tecla E). */
-  private handleInteraction(): void {
-    const p = this.player.position;
-    const fwd = new Vector3(Math.sin(this.player.yaw), 0, Math.cos(this.player.yaw));
-    let door: Door | null = null;
-    let best = 3.2;
-    for (const d of this.map.doors) {
-      const dx = d.center.x - p.x, dz = d.center.z - p.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist > best) continue;
-      // precisa estar olhando mais ou menos na direção da porta
-      if (dist > 0.8 && (dx * fwd.x + dz * fwd.z) / dist < 0.2) continue;
-      best = dist;
-      door = d;
-    }
-    const site = this.map.siteAt(p.x, p.z);
-    const label = this.touchMode ? 'USAR' : 'E';
-    if (door) this.hud.setPrompt(`[${label}] ${door.open ? 'Fechar' : 'Abrir'} porta`);
-    else if (site) this.hud.setPrompt(`Ponto de bomba ${site} — o plantio chega na Etapa 5`);
-    else this.hud.setPrompt(null);
+  private footsteps = new Map<string, number>();
 
-    if (this.input.consume('interact')) {
-      if (door) {
-        const r = PLAYER.radius;
-        const ok = this.map.toggleDoor(door, [
-          { x: p.x - r, y: p.y, z: p.z - r },
-          { x: p.x + r, y: p.y + this.player.height, z: p.z + r }
-        ]);
-        if (ok) this.audio.play('door');
-        else this.hud.message('Saia do vão da porta para fechá-la', 1.5);
-      } else {
-        this.hud.message('Nada para usar aqui', 1.2);
+  /** Acumula a distância percorrida e avisa quando é hora de um passo audível. */
+  private footstepTracker(id: string, speed: number, ground: boolean, dt: number): boolean {
+    if (!ground || speed < PLAYER.quietSpeed) {
+      this.footsteps.set(id, PLAYER.stepDistance * 0.5);
+      return false;
+    }
+    const acc = (this.footsteps.get(id) ?? 0) + speed * dt;
+    if (acc >= PLAYER.stepDistance) {
+      this.footsteps.set(id, 0);
+      return true;
+    }
+    this.footsteps.set(id, acc);
+    return false;
+  }
+
+  private onPhase(st: ViewState, me: PlayerView | null): void {
+    const prev = this.lastPhase;
+    this.lastPhase = st.round.phase;
+    if (st.round.mode === 'training') return;
+    if (st.round.phase === 'freeze') {
+      this.fx.clearRound();
+      this.hud.banner(`RODADA ${st.round.number}`, st.round.halftime && st.round.number === 13 ? 'TROCA DE LADOS' : 'Tempo de compra', 'info', 2.5);
+    } else if (st.round.phase === 'live' && prev === 'freeze') {
+      this.hud.banner('VALENDO!', me?.team === 'T' ? 'Plante a bomba ou elimine os CT' : 'Defenda os locais de bomba', 'info', 1.8);
+      if (this.buyMenu.open && !st.you?.canBuy) this.buyMenu.toggle(false);
+    }
+  }
+
+  private handleEvent(e: SimEvent, st: ViewState, me: PlayerView | null): void {
+    const s = this.session!;
+    const localId = s.localId;
+    const pos = (x: unknown, y: unknown, z: unknown) => ({ x: x as number, y: y as number, z: z as number });
+    switch (e.type) {
+      case 'shot': {
+        const isLocal = e.pid === localId;
+        const def = WEAPONS[e.w as string];
+        const serverEcho = s.online && isLocal && !e.local;
+        const from = new Vector3(e.ox as number, e.oy as number, e.oz as number);
+        const to = new Vector3(e.hx as number, e.hy as number, e.hz as number);
+        if (!serverEcho) {
+          if (isLocal) {
+            this.view.fire();
+            this.audio.shot(def?.sound ?? 'rifle');
+            if (def?.cls !== 'knife') this.fx.tracer(this.view.muzzleWorld, to);
+          } else {
+            const c = this.chars.get(e.pid as string);
+            c?.model.fire();
+            this.audio.shot(def?.sound ?? 'rifle', from);
+            if (def?.cls !== 'knife') this.fx.tracer(from.add(to.subtract(from).normalize().scale(0.8)), to);
+            this.seenEnemy.set(e.pid as string, this.time);
+          }
+          if (e.surface && !e.hit) this.decals.spawn({ x: to.x, y: to.y, z: to.z }, { x: e.nx as number, y: e.ny as number, z: e.nz as number }, e.surface as SurfaceKind);
+        }
+        if (e.hit && !e.local) {
+          const dir = from.subtract(to).normalize();
+          this.fx.bloodAt(to, dir);
+          if (isLocal) {
+            this.hud.hit(e.region === 'head');
+            this.audio.hitmarker(e.region === 'head');
+          }
+        }
+        break;
+      }
+      case 'damage':
+        if (e.pid === localId) {
+          const ang = Math.atan2((e.fx as number) - (me?.x ?? 0), (e.fz as number) - (me?.z ?? 0)) - this.look.yaw;
+          this.hud.damage(ang);
+          this.audio.hurt();
+          this.camera.addShake(0.3);
+        }
+        break;
+      case 'kill': {
+        const killer = st.players.find(p => p.id === e.killer);
+        const victim = st.players.find(p => p.id === e.victim);
+        if (victim) this.hud.kill(killer?.name ?? null, killer?.team ?? null, victim.name, victim.team, e.weapon as string, !!e.hs, e.killer === localId || e.victim === localId);
+        if (e.killer === localId && e.victim !== localId) this.hud.message(e.hs ? 'ABATE NA CABEÇA!' : 'ABATE!', 1);
+        if (e.victim === localId) {
+          this.hud.message(killer ? `Morto por ${killer.name}` : 'Você morreu', 2.5);
+          this.scoreboard.toggle(false);
+        }
+        break;
+      }
+      case 'reload': {
+        const c = this.chars.get(e.pid as string);
+        if (c) {
+          c.reloadAt = this.time;
+          c.reloadDur = e.time as number;
+        }
+        if (e.pid === localId) {
+          this.view.reload(e.time as number);
+          this.audio.reload(e.time as number);
+        }
+        break;
+      }
+      case 'dry':
+        if (e.pid === localId) this.audio.play('dry');
+        break;
+      case 'throw':
+        if (e.pid === localId) this.view.fire();
+        break;
+      case 'bounce':
+        this.audio.bounce(pos(e.x, e.y, e.z));
+        break;
+      case 'detonate': {
+        const p = new Vector3(e.x as number, e.y as number, e.z as number);
+        if (e.nade === 'he') {
+          this.fx.explosion(p);
+          this.audio.explosion(p);
+          const d = Vector3.Distance(p, this.camera.camera.position);
+          if (d < 15) this.camera.addShake((15 - d) / 15);
+        } else if (e.nade === 'flash') {
+          this.fx.flashbang(p);
+          this.audio.flashbang(p, 0);
+        } else this.audio.smokePop(p);
+        break;
+      }
+      case 'flashed':
+        if (e.pid === localId) this.audio.flashbang(this.camera.camera.position, (e.dur as number) * (e.strength as number));
+        break;
+      case 'explode': {
+        const p = new Vector3(e.x as number, e.y as number, e.z as number);
+        this.fx.explosion(p, true);
+        this.audio.explosion(p, true);
+        this.camera.addShake(1.4);
+        break;
+      }
+      case 'planted':
+        this.hud.banner('BOMBA PLANTADA', `Local ${e.site}`, 'warn', 2.5);
+        this.audio.beep(pos(e.x, e.y, e.z), true);
+        break;
+      case 'defused':
+        this.hud.banner('BOMBA DESARMADA', '', 'ct', 2);
+        break;
+      case 'bomb_pickup':
+        if (e.pid === localId) {
+          this.hud.message('Você pegou a bomba', 1.5);
+          this.audio.play('pickup');
+        }
+        break;
+      case 'bomb_drop':
+        if (me?.team === 'T') this.hud.message('A bomba caiu!', 1.5);
+        break;
+      case 'door':
+        this.audio.play('door');
+        break;
+      case 'buy':
+        if (e.pid === localId) this.audio.buy();
+        break;
+      case 'round_end': {
+        const winner = e.winner as Team;
+        const reasons: Record<string, string> = { elimination: 'Todos os inimigos eliminados', bomb: 'A bomba explodiu', defuse: 'A bomba foi desarmada', time: 'O tempo acabou' };
+        const mvp = st.players.find(p => p.id === e.mvp);
+        this.hud.banner(winner === 'T' ? 'TERRORISTAS VENCERAM' : 'CONTRATERRORISTAS VENCERAM', `${reasons[e.reason as string] ?? ''}${mvp ? ' · MVP: ' + mvp.name : ''}`, winner === 'T' ? 't' : 'ct', 5);
+        if (me) this.audio.stinger(me.team === winner);
+        break;
+      }
+      case 'halftime':
+        this.hud.banner('INTERVALO', 'Os times trocaram de lado', 'info', 3);
+        break;
+      case 'join':
+        if (s.online && e.pid !== localId && !e.bot) this.hud.message(`${e.name} entrou`, 2);
+        break;
+    }
+  }
+
+  private updatePrompt(st: ViewState, me: PlayerView | null): void {
+    const s = this.session!;
+    const local = s.local();
+    if (!local || !local.alive || !me) return this.hud.setPrompt(null);
+    const p = local.ctrl.position;
+    const use = this.touchMode ? 'USAR' : 'E';
+    const live = st.round.phase === 'live';
+    if (me.team === 'T' && me.bomb && live) {
+      const site = s.map.siteAt(p.x, p.z);
+      if (site) return this.hud.setPrompt(`Segure [${use}] para plantar a bomba no local ${site}`);
+    }
+    if (me.team === 'CT' && st.bomb.state === 'planted' && live) {
+      const d = Math.hypot(p.x - st.bomb.x, p.z - st.bomb.z);
+      if (d < 1.7) return this.hud.setPrompt(`Segure [${use}] para desarmar${me.kit ? ' (kit: 5s)' : ' (10s)'}`);
+      if (d < 6) return this.hud.setPrompt('A bomba está aqui perto!');
+    }
+    for (const d of s.map.doors) {
+      const dist = Math.hypot(d.center.x - p.x, d.center.z - p.z);
+      if (dist < 3) return this.hud.setPrompt(`[${use}] ${d.open ? 'Fechar' : 'Abrir'} porta`);
+    }
+    this.hud.setPrompt(null);
+  }
+
+  private radarDots(st: ViewState, me: PlayerView | null): RadarDot[] {
+    const dots: RadarDot[] = [];
+    const s = this.session!;
+    const myTeam = me?.team ?? 'T';
+    const cam = this.camera.camera.position;
+    for (const p of st.players) {
+      if (p.id === s.localId) continue;
+      if (p.team === myTeam) dots.push({ x: p.x, z: p.z, color: myTeam === 'T' ? '#f0b040' : '#5ab0ff', dead: !p.alive });
+      else if (p.alive) {
+        // inimigo aparece se está à vista ou atirou há pouco
+        let visible = this.time - (this.seenEnemy.get(p.id) ?? -9) < 1.5;
+        if (!visible) {
+          const dir = { x: p.x - cam.x, y: p.y + 1.4 - cam.y, z: p.z - cam.z };
+          const d = Math.hypot(dir.x, dir.y, dir.z);
+          if (d < 60) {
+            const hit = s.map.world.raycast(cam, dir, d);
+            visible = !hit || hit.distance > d - 0.5;
+            if (visible) this.seenEnemy.set(p.id, this.time - 1);
+          }
+        }
+        if (visible) dots.push({ x: p.x, z: p.z, color: '#ff4040' });
       }
     }
+    const b = st.bomb;
+    if (b.state === 'planted' || (myTeam === 'T' && (b.state === 'dropped' || (b.state === 'carried' && b.carrier !== s.localId)))) {
+      dots.push({ x: b.x, z: b.z, color: b.state === 'planted' ? '#ff3020' : '#ffcc40', bomb: true });
+    }
+    return dots;
+  }
+
+  private updateTags(st: ViewState, me: PlayerView | null): void {
+    if (!me) return this.hud.setTags([]);
+    const cam = this.camera.camera;
+    const engine = this.engine;
+    const w = engine.getRenderWidth(), h = engine.getRenderHeight();
+    const scale = window.innerWidth / w;
+    const vp = cam.viewport.toGlobal(w, h);
+    const tm = this.scene.getTransformMatrix();
+    const tags: { x: number; y: number; name: string; hp: number }[] = [];
+    for (const p of st.players) {
+      if (p.id === me.id || p.team !== me.team || !p.alive) continue;
+      const pos = new Vector3(p.x, p.y + (p.crouch ? 1.45 : 2.05), p.z);
+      const d = Vector3.Distance(pos, cam.position);
+      if (d > 45) continue;
+      const fwd = cam.getDirection(Vector3.Forward());
+      if (Vector3.Dot(fwd, pos.subtract(cam.position)) <= 0) continue;
+      const sp = Vector3.Project(pos, Matrix.IdentityReadOnly, tm, vp);
+      tags.push({ x: sp.x * scale, y: sp.y * scale, name: p.name, hp: p.hp });
+    }
+    this.hud.setTags(tags);
   }
 }
 

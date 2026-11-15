@@ -10,9 +10,10 @@ export { InstancedMesh } from '@babylonjs/core/Meshes/instancedMesh';
 export { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 export { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData';
 export { TransformNode } from '@babylonjs/core/Meshes/transformNode';
-export { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
-export { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder';
-export { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
+export { CreateBox, CreateBoxVertexData } from '@babylonjs/core/Meshes/Builders/boxBuilder';
+export { CreateCylinder, CreateCylinderVertexData } from '@babylonjs/core/Meshes/Builders/cylinderBuilder';
+export { CreateCapsuleVertexData } from '@babylonjs/core/Meshes/Builders/capsuleBuilder';
+export { CreateSphere, CreateSphereVertexData } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
 export { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder';
 export { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 export { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
@@ -23,6 +24,10 @@ export { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 export { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 export { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
 export { Camera } from '@babylonjs/core/Cameras/camera';
+export { Skeleton } from '@babylonjs/core/Bones/skeleton';
+export { Bone } from '@babylonjs/core/Bones/bone';
+export { Space } from '@babylonjs/core/Maths/math.axis';
+export { PointLight } from '@babylonjs/core/Lights/pointLight';
 export { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
 
 // Módulos de efeito colateral (registram funcionalidades na cena)

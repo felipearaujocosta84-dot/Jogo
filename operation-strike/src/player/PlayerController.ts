@@ -27,6 +27,17 @@ export const PLAYER = {
   stepDistance: 2.1
 };
 
+export interface ControllerState {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  onGround: boolean;
+  crouched: boolean;
+}
+
 export interface PlayerEvents {
   onFootstep?: (surface: SurfaceKind, speed: number) => void;
   onJump?: () => void;
@@ -61,6 +72,31 @@ export class PlayerController {
 
   constructor(private world: CollisionWorld, public events: PlayerEvents = {}) {}
 
+  /** Estado completo (para reconciliação da previsão no cliente online). */
+  getState(): ControllerState {
+    return {
+      x: this.position.x, y: this.position.y, z: this.position.z,
+      vx: this.velocity.x, vy: this.velocity.y, vz: this.velocity.z,
+      onGround: this.onGround, crouched: this.crouched
+    };
+  }
+
+  setState(s: ControllerState, smooth = true): void {
+    const oldEye = this.eyeY;
+    this.position.x = s.x;
+    this.position.y = s.y;
+    this.position.z = s.z;
+    this.velocity.x = s.vx;
+    this.velocity.y = s.vy;
+    this.velocity.z = s.vz;
+    this.onGround = s.onGround;
+    if (s.crouched !== this.crouched) {
+      this.crouched = s.crouched;
+      this.height = s.crouched ? PLAYER.crouchHeight : PLAYER.standHeight;
+    }
+    if (smooth) this.stepOffset = Math.max(-0.6, Math.min(0.6, this.stepOffset + oldEye - this.eyeY));
+  }
+
   /** Troca o mundo de colisão (mapa reconstruído ou trocado). */
   setWorld(world: CollisionWorld): void {
     this.world = world;
@@ -69,6 +105,11 @@ export class PlayerController {
   /** Altura atual dos olhos no mundo (já suavizada). */
   get eyeY(): number {
     return this.position.y + this.eyeHeight + this.stepOffset;
+  }
+
+  /** Altura exata dos olhos (sem suavização) usada para os disparos. */
+  get eyeExact(): number {
+    return this.position.y + (this.crouched ? PLAYER.eyeCrouch : PLAYER.eyeStand);
   }
 
   get horizontalSpeed(): number {

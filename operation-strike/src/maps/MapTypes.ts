@@ -4,11 +4,12 @@
 //  - pontos de nascimento, locais de bomba e zonas nomeadas (radar e HUD).
 // Isso facilita criar e equilibrar novos mapas (Factory, Skyscraper) sem mexer no motor.
 import type { SurfaceKind } from '../physics/CollisionWorld';
-import type { TextureName } from './textures';
+import type { Team } from '../sim/types';
+export type { Team } from '../sim/types';
 
-export type MaterialName = TextureName;
-
-export type Team = 'T' | 'CT';
+export type MaterialName =
+  | 'sand' | 'sandstone' | 'plaster' | 'concrete' | 'crate' | 'metal' | 'container' | 'roof' | 'trim' | 'tile' | 'door' | 'dark'
+  | 'brick' | 'asphalt' | 'glass' | 'carpet' | 'steel' | 'grass';
 
 export interface CellKind {
   /** solid = bloco alto (prédio/muro); floor = piso aberto; roofed = piso com teto (túnel) */
@@ -17,6 +18,8 @@ export interface CellKind {
   /** Altura (solid) ou altura do teto (roofed). Intervalo [min,max] sorteado por bloco. */
   height?: [number, number];
   floor?: MaterialName;
+  /** Material do teto (roofed). */
+  roof?: MaterialName;
 }
 
 export interface BoxDef {
@@ -61,6 +64,23 @@ export interface BombSite {
   max: [number, number];
 }
 
+/** Dicas táticas para os bots (coordenadas x, z; yaw em graus). */
+export interface SiteTactics {
+  /** Pontos de reunião dos TR antes de invadir o local. */
+  tStage: [number, number][];
+  /** Posições de defesa CT com direção de vigia. */
+  ctHold: [number, number, number][];
+}
+
+export interface FloorDef {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  y: number;
+  mat: MaterialName;
+}
+
 export interface MapDefinition {
   id: string;
   name: string;
@@ -76,6 +96,9 @@ export interface MapDefinition {
   spawns: Record<Team, SpawnPoint[]>;
   sites: BombSite[];
   zones: Zone[];
+  tactics: { A: SiteTactics; B: SiteTactics; ctMid: [number, number, number][] };
+  /** Descrição curta para o menu. */
+  description: string;
   ambience: {
     sky: [string, string, string];
     fog: string;
@@ -100,7 +123,13 @@ export const MATERIAL_SURFACE: Record<MaterialName, SurfaceKind> = {
   trim: 'stone',
   tile: 'stone',
   door: 'metal',
-  dark: 'concrete'
+  dark: 'concrete',
+  brick: 'stone',
+  asphalt: 'concrete',
+  glass: 'metal',
+  carpet: 'wood',
+  steel: 'metal',
+  grass: 'sand'
 };
 
 /** Metros por repetição de textura. */
@@ -116,5 +145,11 @@ export const MATERIAL_SCALE: Record<MaterialName, number> = {
   trim: 2,
   tile: 4,
   door: 2,
-  dark: 2
+  dark: 2,
+  brick: 3,
+  asphalt: 6,
+  glass: 4,
+  carpet: 4,
+  steel: 2,
+  grass: 4
 };

@@ -1,7 +1,6 @@
-// Constrói um mapa a partir da MapDefinition:
-//  - geometria 3D com UVs em coordenadas de mundo (texturas na escala certa em qualquer tamanho de caixa);
-//  - malhas agrupadas por material e por bloco do mapa (poucas chamadas de desenho + recorte por visibilidade);
-//  - colisores do mundo físico, iluminação, sombras, céu, neblina, portas e marcações dos pontos de bomba.
+// Parte visual do mapa (Babylon): geometria com UVs em coordenadas de mundo, malhas agrupadas por material
+// e por bloco (poucas chamadas de desenho + recorte por visibilidade), iluminação, sombras, céu, neblina,
+// portas animadas e marcações dos pontos de bomba. A colisão fica no MapRuntime (compartilhado com o servidor).
 import {
   Color3,
   Color4,
@@ -19,19 +18,11 @@ import {
   VertexData,
   type Scene
 } from '../core/babylon';
-import { CollisionWorld, type Collider, type Vec3 } from '../physics/CollisionWorld';
 import type { QualityPreset } from '../core/Quality';
 import { getTexture, paintedTexture } from './textures';
-import {
-  MATERIAL_SCALE,
-  MATERIAL_SURFACE,
-  type BoxDef,
-  type DoorDef,
-  type MapDefinition,
-  type MaterialName,
-  type SpawnPoint,
-  type Team
-} from './MapTypes';
+import { expandMap } from './MapLayout';
+import type { MapRuntime } from './MapRuntime';
+import { MATERIAL_SCALE, type BoxDef, type MapDefinition, type MaterialName } from './MapTypes';
 
 const CHUNK = 32;
 
@@ -44,37 +35,14 @@ interface GeoBucket {
   shadow: boolean;
 }
 
-export interface Door {
-  def: DoorDef;
-  open: boolean;
-  /** 0 = fechada, 1 = aberta */
-  t: number;
-  leaves: { mesh: Mesh; collider: Collider; closedMin: Vec3; closedMax: Vec3; openOffset: number }[];
-  center: Vec3;
-}
-
-export interface MapInstance {
-  def: MapDefinition;
-  world: CollisionWorld;
-  doors: Door[];
+export interface MapVisual {
   shadow: ShadowGenerator | null;
   meshes: Mesh[];
-  /** Grade de ocupação para o radar: true = bloqueado. */
-  solidAt(x: number, z: number): boolean;
-  zoneAt(x: number, z: number): string;
-  siteAt(x: number, z: number): 'A' | 'B' | null;
-  spawn(team: Team, index: number): SpawnPoint;
-  bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+  sun: DirectionalLight;
   setRenderDistance(d: number): void;
-  update(dt: number, playerBox?: [Vec3, Vec3]): void;
-  toggleDoor(door: Door, playerBox?: [Vec3, Vec3]): boolean;
+  /** Atualiza as portas a partir do estado do runtime. */
+  update(): void;
   dispose(): void;
-}
-
-function hash(a: number, b: number, c = 0): number {
-  let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 function hex(c: string): Color3 {
@@ -83,41 +51,29 @@ function hex(c: string): Color3 {
 
 export class MapBuilder {
   private buckets = new Map<string, GeoBucket>();
-  private world = new CollisionWorld();
   private materials = new Map<MaterialName, StandardMaterial>();
+  private def: MapDefinition;
 
-  constructor(private scene: Scene, private def: MapDefinition, private quality: QualityPreset) {}
+  constructor(private scene: Scene, private runtime: MapRuntime, private quality: QualityPreset) {
+    this.def = runtime.def;
+  }
 
-  build(): MapInstance {
+  build(): MapVisual {
     const { def, scene } = this;
-    const cols = def.grid[0].length;
-    const rows = def.grid.length;
-    const minX = def.originX, maxX = def.originX + cols * def.cell;
-    const maxZ = def.originZ, minZ = def.originZ - rows * def.cell;
-
-    this.buildGrid();
-    for (const b of def.boxes) {
-      if (b.detail && !this.quality.props) {
-        // Sem o detalhe visual, mas a colisão continua igual em todas as qualidades (justiça competitiva)
-        if (b.collide !== false) this.addCollider(b);
-        continue;
-      }
+    const { minX, maxX, minZ, maxZ } = this.runtime.bounds;
+    const layout = expandMap(def);
+    for (const f of layout.floors) this.addQuadTop(f.x0, f.z0, f.x1, f.z1, f.y, f.mat);
+    for (const b of layout.boxes) {
+      if (b.detail && !this.quality.props) continue;
       this.addBox(b);
     }
-
-    // Chão (colisor único) e limites invisíveis do cenário
-    this.world.add({ x: minX - 10, y: -2, z: minZ - 10 }, { x: maxX + 10, y: 0, z: maxZ + 10 }, 'sand');
-    const H = 40, T = 2;
-    const inv = { blocksBullets: false };
-    this.world.add({ x: minX - T, y: 0, z: minZ - T }, { x: minX, y: H, z: maxZ + T }, 'stone', inv);
-    this.world.add({ x: maxX, y: 0, z: minZ - T }, { x: maxX + T, y: H, z: maxZ + T }, 'stone', inv);
-    this.world.add({ x: minX, y: 0, z: minZ - T }, { x: maxX, y: H, z: minZ }, 'stone', inv);
-    this.world.add({ x: minX, y: 0, z: maxZ }, { x: maxX, y: H, z: maxZ + T }, 'stone', inv);
-    this.world.add({ x: minX, y: H, z: minZ }, { x: maxX, y: H + T, z: maxZ }, 'stone', inv);
-
+    // chão fora da área jogável (visual)
+    this.addQuadTop(minX - 40, minZ - 40, maxX + 40, minZ, 0, layoutGround(def));
+    this.addQuadTop(minX - 40, maxZ, maxX + 40, maxZ + 40, 0, layoutGround(def));
+    this.addQuadTop(minX - 40, minZ, minX, maxZ, 0, layoutGround(def));
+    this.addQuadTop(maxX, minZ, maxX + 40, maxZ, 0, layoutGround(def));
     const meshes = this.flush();
 
-    // Iluminação
     const amb = def.ambience;
     const hemi = new HemisphericLight('ambient', new Vector3(0, 1, 0), scene);
     hemi.diffuse = hex(amb.ambient);
@@ -155,53 +111,33 @@ export class MapBuilder {
         if (m.metadata?.shadow) shadow.addShadowCaster(m, false);
         m.receiveShadows = true;
       }
-      // O cenário é estático: o mapa de sombras é desenhado uma vez só (economia enorme no celular)
+      // Cenário estático: o mapa de sombras é desenhado uma vez só
       const rt = shadow.getShadowMap();
       if (rt) rt.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
     }
 
-    // Céu e neblina
     const sky = this.createSky();
     meshes.push(sky);
-    scene.fogMode = 3; // linear
+    scene.fogMode = 3;
     scene.fogColor = hex(amb.fog);
     scene.clearColor = Color4.FromColor3(hex(amb.fog), 1);
     scene.ambientColor = new Color3(0.25, 0.22, 0.2);
 
     this.createSiteMarkers(meshes);
-    const doors = this.createDoors(meshes, shadow);
-
-    const world = this.world;
-    const def2 = def;
-    const solid = (x: number, z: number): boolean => {
-      const c = Math.floor((x - def2.originX) / def2.cell);
-      const r = Math.floor((def2.originZ - z) / def2.cell);
-      const row = def2.grid[r];
-      if (!row || c < 0 || c >= row.length) return true;
-      const k = def2.legend[row[c]];
-      return !k || k.type === 'solid';
+    const doorMeshes = this.createDoors(meshes);
+    const runtime = this.runtime;
+    const updateDoors = () => {
+      for (const dm of doorMeshes) {
+        const [min, max] = runtime.leafBox(runtime.doors[dm.door], dm.leaf);
+        dm.mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
+      }
     };
+    updateDoors();
 
-    const instance: MapInstance = {
-      def,
-      world,
-      doors,
+    return {
       shadow,
       meshes,
-      bounds: { minX, maxX, minZ, maxZ },
-      solidAt: solid,
-      zoneAt(x, z) {
-        for (const zn of def2.zones) if (x >= zn.min[0] && x <= zn.max[0] && z >= zn.min[1] && z <= zn.max[1]) return zn.name;
-        return '';
-      },
-      siteAt(x, z) {
-        for (const s of def2.sites) if (x >= s.min[0] && x <= s.max[0] && z >= s.min[1] && z <= s.max[1]) return s.name;
-        return null;
-      },
-      spawn(team, index) {
-        const list = def2.spawns[team];
-        return list[((index % list.length) + list.length) % list.length];
-      },
+      sun,
       setRenderDistance: (d: number) => {
         scene.fogStart = d * 0.45;
         scene.fogEnd = d;
@@ -209,8 +145,7 @@ export class MapBuilder {
         if (cam) cam.maxZ = d + 20;
         sky.scaling.setAll(Math.max(30, d * 0.9) / 100);
       },
-      update: (dt: number, playerBox?: [Vec3, Vec3]) => this.updateDoors(doors, dt, playerBox),
-      toggleDoor: (door, playerBox) => this.toggleDoor(door, playerBox),
+      update: updateDoors,
       dispose: () => {
         for (const m of meshes) m.dispose(false, true);
         shadow?.dispose();
@@ -219,76 +154,6 @@ export class MapBuilder {
         for (const mat of this.materials.values()) mat.dispose(true, false);
       }
     };
-    return instance;
-  }
-
-  // -------------------------------------------------------------- grade
-
-  private buildGrid(): void {
-    const { def } = this;
-    const rows = def.grid.length, cols = def.grid[0].length;
-    const used: boolean[][] = def.grid.map(r => Array.from(r, () => false));
-    const cs = def.cell;
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (used[r][c]) continue;
-        const ch = def.grid[r][c];
-        const kind = def.legend[ch];
-        if (!kind) throw new Error(`Mapa ${def.id}: símbolo desconhecido '${ch}' na linha ${r}`);
-        // Retângulo guloso de células iguais (prédios limitados a 3x3 para variar a silhueta)
-        const maxW = kind.type === 'solid' ? 3 : cols;
-        const maxH = kind.type === 'solid' ? 3 : rows;
-        let w = 1;
-        while (c + w < cols && w < maxW && !used[r][c + w] && def.grid[r][c + w] === ch) w++;
-        let h = 1;
-        outer: while (r + h < rows && h < maxH) {
-          for (let k = 0; k < w; k++) if (used[r + h][c + k] || def.grid[r + h][c + k] !== ch) break outer;
-          h++;
-        }
-        for (let i = 0; i < h; i++) for (let k = 0; k < w; k++) used[r + i][c + k] = true;
-
-        const x0 = def.originX + c * cs, x1 = x0 + w * cs;
-        const z1 = def.originZ - r * cs, z0 = z1 - h * cs;
-        const rnd = hash(r, c, ch.charCodeAt(0));
-        if (kind.type === 'solid') {
-          const [hMin, hMax] = kind.height ?? [6, 8];
-          const height = Math.round((hMin + (hMax - hMin) * rnd) * 2) / 2;
-          this.addBox({ min: [x0, 0, z0], max: [x1, height, z1], mat: kind.material });
-          if (kind.material === 'plaster') this.decorateBuilding(x0, z0, x1, z1, height, r, c);
-        } else {
-          this.addQuadTop(x0, z0, x1, z1, 0, kind.floor ?? kind.material);
-          if (kind.type === 'roofed') {
-            const [y] = kind.height ?? [3.6, 3.6];
-            this.addBox({ min: [x0, y, z0], max: [x1, y + 0.4, z1], mat: 'roof' });
-          }
-        }
-      }
-    }
-  }
-
-  /** Beiral no topo e janelas nos prédios de reboco (apenas visual). */
-  private decorateBuilding(x0: number, z0: number, x1: number, z1: number, h: number, r: number, c: number): void {
-    const o = 0.12;
-    this.addBox({ min: [x0 - o, h - 0.35, z0 - o], max: [x1 + o, h, z1 + o], mat: 'trim', collide: false, shadow: false });
-    if (!this.quality.props || h < 5) return;
-    const sides: [number, number, number, number, 'x' | 'z', number][] = [
-      [x0, z0 - 0.06, x1, z0, 'x', -1],
-      [x0, z1, x1, z1 + 0.06, 'x', 1],
-      [x0 - 0.06, z0, x0, z1, 'z', -1],
-      [x1, z0, x1 + 0.06, z1, 'z', 1]
-    ];
-    sides.forEach(([ax0, az0, ax1, az1, axis], si) => {
-      const len = axis === 'x' ? ax1 - ax0 : az1 - az0;
-      const n = Math.floor(len / 4);
-      for (let i = 0; i < n; i++) {
-        if (hash(r * 31 + si, c * 17 + i, 5) < 0.45) continue;
-        const centre = (axis === 'x' ? ax0 : az0) + (i + 0.5) * (len / n);
-        const y0 = 3.1, y1 = 4.5;
-        if (axis === 'x') this.addBox({ min: [centre - 0.6, y0, az0], max: [centre + 0.6, y1, az1], mat: 'dark', collide: false, shadow: false });
-        else this.addBox({ min: [ax0, y0, centre - 0.6], max: [ax1, y1, centre + 0.6], mat: 'dark', collide: false, shadow: false });
-      }
-    });
   }
 
   // -------------------------------------------------------------- geometria
@@ -300,17 +165,7 @@ export class MapBuilder {
     return b;
   }
 
-  private addCollider(b: BoxDef): void {
-    this.world.add(
-      { x: b.min[0], y: b.min[1], z: b.min[2] },
-      { x: b.max[0], y: b.max[1], z: b.max[2] },
-      MATERIAL_SURFACE[b.mat],
-      { blocksBullets: b.bullets !== false }
-    );
-  }
-
   addBox(b: BoxDef): void {
-    if (b.collide !== false) this.addCollider(b);
     const [x0, y0, z0] = b.min;
     const [x1, y1, z1] = b.max;
     const bucket = this.bucket(b.mat, (x0 + x1) / 2, (z0 + z1) / 2, b.shadow !== false);
@@ -346,7 +201,7 @@ export class MapBuilder {
       for (let cz = z0; cz < z1; cz += CHUNK) {
         const ex = Math.min(x1, cx + CHUNK), ez = Math.min(z1, cz + CHUNK);
         const s = MATERIAL_SCALE[mat] || 4;
-        const bucket = this.bucket(mat, (cx + ex) / 2, (cz + ez) / 2, false);
+        const bucket = this.bucket(mat, (cx + ex) / 2, (cz + ez) / 2, y > 0.05);
         this.pushQuad(bucket, [[cx, y, cz], [cx, y, ez], [ex, y, ez], [ex, y, cz]], [0, 1, 0],
           [[cx / s, cz / s], [cx / s, ez / s], [ex / s, ez / s], [ex / s, cz / s]]);
       }
@@ -375,7 +230,8 @@ export class MapBuilder {
     if (m) return m;
     m = new StandardMaterial('mat_' + name, this.scene);
     m.diffuseTexture = getTexture(this.scene, name, this.quality.textureSize);
-    m.specularColor = name === 'metal' || name === 'container' || name === 'door' ? new Color3(0.25, 0.25, 0.25) : new Color3(0.04, 0.04, 0.04);
+    m.specularColor = name === 'glass' ? new Color3(0.8, 0.8, 0.8) : name === 'metal' || name === 'container' || name === 'door' || name === 'steel' ? new Color3(0.25, 0.25, 0.25) : new Color3(0.04, 0.04, 0.04);
+    if (name === 'glass') m.specularPower = 96;
     m.specularPower = 32;
     if (name === 'dark') m.emissiveColor = new Color3(0.02, 0.025, 0.03);
     this.materials.set(name, m);
@@ -488,78 +344,28 @@ export class MapBuilder {
     }
   }
 
-  private createDoors(meshes: Mesh[], shadow: ShadowGenerator | null): Door[] {
-    const doors: Door[] = [];
+  private createDoors(meshes: Mesh[]): { mesh: Mesh; door: number; leaf: number }[] {
+    const out: { mesh: Mesh; door: number; leaf: number }[] = [];
     const mat = this.material('door');
-    for (const d of this.def.doors) {
-      const [x0, y0, z0] = d.min;
-      const [x1, y1, z1] = d.max;
-      const along = d.axis === 'x' ? x1 - x0 : z1 - z0;
-      const half = along / 2;
-      const door: Door = { def: d, open: d.open, t: d.open ? 1 : 0, leaves: [], center: { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2 } };
-      for (const side of [-1, 1]) {
-        const lmin: Vec3 = d.axis === 'x' ? { x: side < 0 ? x0 : x0 + half, y: y0, z: z0 } : { x: x0, y: y0, z: side < 0 ? z0 : z0 + half };
-        const lmax: Vec3 = d.axis === 'x' ? { x: side < 0 ? x0 + half : x1, y: y1, z: z1 } : { x: x1, y: y1, z: side < 0 ? z0 + half : z1 };
-        const mesh = CreateBox('door_' + d.id + side, {
-          width: lmax.x - lmin.x - 0.02,
-          height: lmax.y - lmin.y,
-          depth: lmax.z - lmin.z - 0.02
+    for (const door of this.runtime.doors) {
+      door.leaves.forEach((leaf, li) => {
+        const mesh = CreateBox('door_' + door.def.id + li, {
+          width: leaf.closedMax.x - leaf.closedMin.x - 0.02,
+          height: leaf.closedMax.y - leaf.closedMin.y,
+          depth: leaf.closedMax.z - leaf.closedMin.z - 0.02
         }, this.scene);
         mesh.material = mat;
         mesh.isPickable = false;
         mesh.receiveShadows = true;
-        shadow?.addShadowCaster(mesh, false);
-        const collider = this.world.add(lmin, lmax, 'metal', { tag: 'door:' + d.id });
-        door.leaves.push({ mesh, collider, closedMin: lmin, closedMax: lmax, openOffset: side * (half - 0.08) });
         meshes.push(mesh);
-      }
-      this.applyDoor(door);
-      doors.push(door);
+        out.push({ mesh, door: door.index, leaf: li });
+      });
     }
-    return doors;
+    return out;
   }
+}
 
-  private applyDoor(door: Door): void {
-    for (const leaf of door.leaves) {
-      const off = leaf.openOffset * door.t;
-      const ax = door.def.axis;
-      const min = { ...leaf.closedMin }, max = { ...leaf.closedMax };
-      min[ax] += off;
-      max[ax] += off;
-      // Aberta: a folha fica dentro do batente; o colisor encolhe para não atrapalhar a passagem
-      this.world.move(leaf.collider, min, max);
-      leaf.collider.enabled = door.t < 0.98;
-      leaf.mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
-    }
-  }
-
-  private doorBlocked(door: Door, playerBox?: [Vec3, Vec3]): boolean {
-    if (!playerBox) return false;
-    const [pm, pM] = playerBox;
-    for (const leaf of door.leaves) {
-      const a = leaf.closedMin, b = leaf.closedMax;
-      if (pM.x > a.x && pm.x < b.x && pM.y > a.y && pm.y < b.y && pM.z > a.z && pm.z < b.z) return true;
-    }
-    return false;
-  }
-
-  private toggleDoor(door: Door, playerBox?: [Vec3, Vec3]): boolean {
-    // Não fecha a porta em cima do jogador
-    if (door.open && this.doorBlocked(door, playerBox)) return false;
-    door.open = !door.open;
-    return true;
-  }
-
-  private updateDoors(doors: Door[], dt: number, playerBox?: [Vec3, Vec3]): void {
-    for (const d of doors) {
-      // Alguém entrou no vão enquanto a porta fechava: ela volta a abrir
-      if (!d.open && d.t > 0 && this.doorBlocked(d, playerBox)) d.open = true;
-      const target = d.open ? 1 : 0;
-      if (d.t === target) continue;
-      d.t += Math.sign(target - d.t) * dt * 1.8;
-      d.t = Math.max(0, Math.min(1, d.t));
-      if (Math.abs(d.t - target) < 0.01) d.t = target;
-      this.applyDoor(d);
-    }
-  }
+function layoutGround(def: MapDefinition): MaterialName {
+  const f = def.legend['.'];
+  return (f?.floor ?? f?.material ?? 'sand') as MaterialName;
 }

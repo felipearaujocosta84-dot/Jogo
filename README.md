@@ -1,4 +1,4 @@
-> **Novo projeto:** o FPS **OPERATION STRIKE** está na pasta [`operation-strike/`](operation-strike/README.md).
+> **Novo projeto:** o FPS **OPERATION STRIKE** (5v5 com bots e multiplayer online) está na pasta [`operation-strike/`](operation-strike/README.md).
 
 # STREET FOOTBALL 3D
 

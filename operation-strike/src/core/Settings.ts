@@ -21,6 +21,9 @@ export interface SettingsData {
   /** Agachar: segurar (false) ou alternar (true). No toque, alternar é mais confortável. */
   crouchToggle: boolean;
   crosshairColor: string;
+  playerName: string;
+  serverUrl: string;
+  nameTags: boolean;
 }
 
 const DEFAULTS: SettingsData = {
@@ -36,7 +39,10 @@ const DEFAULTS: SettingsData = {
   volume: 0.8,
   buttonOpacity: 0.55,
   crouchToggle: true,
-  crosshairColor: '#5dff8a'
+  crosshairColor: '#5dff8a',
+  playerName: 'Operador' + Math.floor(100 + Math.random() * 900),
+  serverUrl: '',
+  nameTags: true
 };
 
 type Listener = (s: SettingsData) => void;

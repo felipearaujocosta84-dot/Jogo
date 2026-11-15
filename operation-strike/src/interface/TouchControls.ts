@@ -39,7 +39,11 @@ const BUTTONS: ButtonSpec[] = [
   { id: 'crouch', action: 'crouch', label: 'AGACHAR', icon: '⤓', toggle: true },
   { id: 'switch', action: 'switch', label: 'TROCAR', icon: '⇄' },
   { id: 'interact', action: 'interact', label: 'USAR', icon: '✋' },
-  { id: 'inspect', action: 'inspect', label: 'INSPECIONAR', icon: '👁' }
+  { id: 'inspect', action: 'inspect', label: 'INSPECIONAR', icon: '👁' },
+  { id: 'nade', action: 'slot4', label: 'GRANADA', icon: '●' },
+  { id: 'knife', action: 'slot3', label: 'FACA', icon: '⟋' },
+  { id: 'buy', action: 'buy', label: 'COMPRAR', icon: '$' },
+  { id: 'score', action: 'score', label: 'PLACAR', icon: '☰', toggle: true }
 ];
 
 const DEFAULT_LAYOUT: Layout = {
@@ -52,7 +56,11 @@ const DEFAULT_LAYOUT: Layout = {
   crouch: { x: 0.94, y: 0.92, size: 0.11 },
   switch: { x: 0.61, y: 0.9, size: 0.1 },
   interact: { x: 0.72, y: 0.4, size: 0.1 },
-  inspect: { x: 0.85, y: 0.3, size: 0.08 }
+  inspect: { x: 0.85, y: 0.3, size: 0.08, hidden: true },
+  nade: { x: 0.5, y: 0.9, size: 0.09 },
+  knife: { x: 0.4, y: 0.9, size: 0.08 },
+  buy: { x: 0.215, y: 0.12, size: 0.085 },
+  score: { x: 0.215, y: 0.235, size: 0.075 }
 };
 
 type PointerRole =
@@ -136,7 +144,7 @@ export class TouchControls {
   }
 
   private loadLayout(): Layout {
-    const saved = Storage.load<Layout>('touchLayout', {});
+    const saved = Storage.load<Layout>('touchLayout2', {});
     const out: Layout = structuredClone(DEFAULT_LAYOUT);
     for (const k of Object.keys(out)) if (saved[k]) out[k] = { ...out[k], ...saved[k] };
     return out;
@@ -225,6 +233,10 @@ export class TouchControls {
       this.pointers.set(e.pointerId, { kind: 'button', spec, lx: x, ly: y });
       const el = this.buttons.get(id)!;
       const toggle = spec.toggle && (spec.action !== 'crouch' || this.crouchToggle);
+      if (spec.action === 'aim') {
+        this.input.set('zoom', true, 'touch:zoom');
+        this.input.set('zoom', false, 'touch:zoom');
+      }
       if (toggle) {
         if (this.toggles.has(id)) {
           this.toggles.delete(id);
@@ -364,7 +376,7 @@ export class TouchControls {
     this.root.classList.remove('editing');
     this.editorBar.classList.add('hidden');
     this.refreshEditorBar();
-    Storage.save('touchLayout', this.layout);
+    Storage.save('touchLayout2', this.layout);
     const cb = this.onEditorClose;
     this.onEditorClose = null;
     cb?.();

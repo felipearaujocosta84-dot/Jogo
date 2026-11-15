@@ -246,6 +246,76 @@ const PAINTERS: Record<string, Painter> = {
     stains(g, s, rnd, 12, 'rgba(120,70,35,0.45)', s * 0.15);
     noise(g, s, rnd, s * 12, 0.2, false);
   },
+  brick(g, s, rnd) {
+    g.fillStyle = '#5a3a2c';
+    g.fillRect(0, 0, s, s);
+    const rows = 12, rh = s / rows, bw = s / 4;
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * bw / 2;
+      for (let c = -1; c <= 4; c++) {
+        const sh = 0.75 + rnd() * 0.35;
+        g.fillStyle = `rgb(${150 * sh},${70 * sh},${50 * sh})`;
+        g.fillRect(c * bw + off + 1.5, r * rh + 1.5, bw - 3, rh - 3);
+      }
+    }
+    stains(g, s, rnd, 8, 'rgba(30,25,20,0.3)', s * 0.2);
+    noise(g, s, rnd, s * 14, 0.2, false);
+  },
+  asphalt(g, s, rnd) {
+    g.fillStyle = '#3b3c3e';
+    g.fillRect(0, 0, s, s);
+    noise(g, s, rnd, s * 40, 0.3, true, 1.5);
+    noise(g, s, rnd, s * 30, 0.3, false, 2);
+    stains(g, s, rnd, 10, 'rgba(15,15,15,0.35)', s * 0.25);
+    g.fillStyle = 'rgba(230,200,60,0.75)';
+    g.fillRect(s * 0.48, 0, s * 0.04, s * 0.45);
+  },
+  glass(g, s, rnd) {
+    const grd = g.createLinearGradient(0, 0, s, s);
+    grd.addColorStop(0, '#2a4a66');
+    grd.addColorStop(0.5, '#6d93b3');
+    grd.addColorStop(1, '#1d3550');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, s, s);
+    g.fillStyle = '#9aa3aa';
+    for (let i = 0; i <= 4; i++) {
+      g.fillRect(i * (s / 4) - 3, 0, 6, s);
+      g.fillRect(0, i * (s / 4) - 3, s, 6);
+    }
+    g.fillStyle = 'rgba(255,255,255,0.12)';
+    for (let i = 0; i < 6; i++) g.fillRect(rnd() * s, 0, 10 + rnd() * 30, s);
+  },
+  carpet(g, s, rnd) {
+    g.fillStyle = '#4b5560';
+    g.fillRect(0, 0, s, s);
+    noise(g, s, rnd, s * 50, 0.18, true, 1);
+    noise(g, s, rnd, s * 50, 0.2, false, 1);
+    g.strokeStyle = 'rgba(0,0,0,0.25)';
+    g.strokeRect(0, 0, s, s);
+  },
+  steel(g, s, rnd) {
+    g.fillStyle = '#7d858c';
+    g.fillRect(0, 0, s, s);
+    for (let y = 0; y < s; y += 2) {
+      g.fillStyle = `rgba(255,255,255,${rnd() * 0.06})`;
+      g.fillRect(0, y, s, 1);
+    }
+    g.fillStyle = 'rgba(40,40,40,0.5)';
+    for (const [x, y] of [[8, 8], [s - 8, 8], [8, s - 8], [s - 8, s - 8]]) {
+      g.beginPath();
+      g.arc(x, y, 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    stains(g, s, rnd, 5, 'rgba(120,70,30,0.2)', s * 0.15);
+  },
+  grass(g, s, rnd) {
+    g.fillStyle = '#5c7a3a';
+    g.fillRect(0, 0, s, s);
+    for (let i = 0; i < s * 30; i++) {
+      g.fillStyle = `rgba(${60 + rnd() * 60},${90 + rnd() * 70},${30 + rnd() * 30},0.7)`;
+      g.fillRect(rnd() * s, rnd() * s, 1, 2 + rnd() * 3);
+    }
+  },
   dark(g, s, rnd) {
     g.fillStyle = '#26221e';
     g.fillRect(0, 0, s, s);

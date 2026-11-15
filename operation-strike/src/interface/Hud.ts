@@ -1,90 +1,244 @@
-// HUD de FPS competitivo: mira dinâmica, vida, colete, munição, cronômetro, local no mapa,
-// radar, avisos de interação, mensagens e contador de FPS.
-import type { MapInstance } from '../maps/MapBuilder';
-import { Radar } from './Radar';
+// HUD de FPS competitivo.
+import type { MapRuntime } from '../maps/MapRuntime';
+import { Radar, type RadarDot } from './Radar';
+import type { PlayerView, RoundView, Team } from '../sim/types';
+import { WEAPONS } from '../weapons/WeaponData';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
+export const SLOT_LABEL: Record<string, string> = { primary: '1', secondary: '2', knife: '3', he: '4', flash: '4', smoke: '4', c4: '5' };
+
 export class Hud {
   private root = $('hud');
-  private health = $('hudHealth');
-  private armor = $('hudArmor');
-  private ammo = $('hudAmmo');
-  private reserve = $('hudReserve');
-  private weapon = $('hudWeapon');
-  private timer = $('hudTimer');
-  private zone = $('hudZone');
-  private fps = $('hudFps');
-  private prompt = $('hudPrompt');
-  private toast = $('hudToast');
-  private cross = $('crosshair');
   private radar: Radar | null = null;
-  private toastTimer = 0;
   private last: Record<string, string> = {};
+  private toastTimer = 0;
+  private bannerTimer = 0;
+  private hitTimer = 0;
+  private dmgTimer = 0;
+  private feed: { el: HTMLElement; t: number }[] = [];
+  private tags: HTMLElement[] = [];
 
   show(v: boolean): void {
     this.root.classList.toggle('hidden', !v);
   }
 
-  setMap(map: MapInstance): void {
+  setMap(map: MapRuntime): void {
     this.radar = new Radar($('radar') as HTMLCanvasElement, map);
   }
 
-  private text(el: HTMLElement, key: string, value: string): void {
-    if (this.last[key] === value) return;
-    this.last[key] = value;
-    el.textContent = value;
+  private text(id: string, value: string): void {
+    if (this.last[id] === value) return;
+    this.last[id] = value;
+    $(id).textContent = value;
   }
 
-  setVitals(health: number, armor: number): void {
-    this.text(this.health, 'hp', String(Math.ceil(health)));
-    this.text(this.armor, 'ar', String(Math.ceil(armor)));
+  private toggle(id: string, show: boolean): void {
+    const key = id + ':vis';
+    const v = show ? '1' : '0';
+    if (this.last[key] === v) return;
+    this.last[key] = v;
+    $(id).classList.toggle('hidden', !show);
   }
 
-  setAmmo(name: string, ammo: number, reserve: number, reloading: boolean): void {
-    this.text(this.weapon, 'wn', name);
-    this.text(this.ammo, 'am', reloading ? '··' : String(ammo));
-    this.text(this.reserve, 'rs', '/ ' + reserve);
-    this.ammo.classList.toggle('low', ammo <= 5);
+  setVitals(hp: number, armor: number, helmet: boolean, kit: boolean, c4: boolean, money: number): void {
+    this.text('hudHealth', String(Math.max(0, Math.ceil(hp))));
+    this.text('hudArmor', String(Math.ceil(armor)));
+    this.toggle('hudHelmet', helmet);
+    this.toggle('hudKit', kit);
+    this.toggle('hudC4', c4);
+    this.text('hudMoney', '$ ' + money);
+    $('hudHealth').classList.toggle('low', hp <= 25);
   }
 
-  setTimer(seconds: number): void {
-    const m = Math.floor(seconds / 60), s = Math.floor(seconds % 60);
-    this.text(this.timer, 'tm', `${m}:${s.toString().padStart(2, '0')}`);
+  setAmmo(weaponId: string, ammo: number, reserve: number, reloading: boolean, slots: { slot: string; id: string; ammo: number }[], active: string): void {
+    const def = WEAPONS[weaponId];
+    this.text('hudWeapon', def?.name.toUpperCase() ?? '');
+    const showAmmo = def && (def.magazine > 0 || def.cls === 'grenade');
+    this.text('hudAmmo', !showAmmo ? '—' : reloading ? '··' : String(ammo));
+    this.text('hudReserve', def && def.magazine > 0 ? '/ ' + reserve : def?.cls === 'grenade' ? 'x' : '');
+    $('hudAmmo').classList.toggle('low', !!def && def.magazine > 0 && ammo <= Math.ceil(def.magazine * 0.2));
+    const key = slots.map(s => s.slot + s.id + (s.slot === active ? '*' : '')).join(',');
+    if (this.last.slots !== key) {
+      this.last.slots = key;
+      $('hudSlots').innerHTML = slots
+        .map(s => `<span class="${s.slot === active ? 'on' : ''}"><i>${SLOT_LABEL[s.slot]}</i>${WEAPONS[s.id]?.name ?? s.id}${WEAPONS[s.id]?.cls === 'grenade' ? ' x' + s.ammo : ''}</span>`)
+        .join('');
+    }
+  }
+
+  setRound(r: RoundView, bombPlanted: boolean): void {
+    const t = Math.max(0, r.timeLeft);
+    const m = Math.floor(t / 60), s = Math.floor(t % 60);
+    this.text('hudTimer', r.mode === 'training' ? 'TREINO' : `${m}:${s.toString().padStart(2, '0')}`);
+    $('hudTimer').classList.toggle('urgent', bombPlanted || (r.phase === 'live' && t < 10));
+    const phase = r.phase === 'freeze' ? 'COMPRA' : r.phase === 'end' ? 'FIM DA RODADA' : r.phase === 'over' ? 'FIM DE JOGO' : `RODADA ${r.number}/${r.maxRounds}`;
+    this.text('hudRound', r.mode === 'training' ? 'LIVRE' : phase);
+    this.text('scoreT', String(r.scoreT));
+    this.text('scoreCT', String(r.scoreCT));
+    this.toggle('bombIcon', bombPlanted);
+  }
+
+  setAlive(players: PlayerView[]): void {
+    for (const team of ['T', 'CT'] as Team[]) {
+      const list = players.filter(p => p.team === team);
+      const key = list.map(p => (p.alive ? '1' : '0') + Math.round(p.hp / 10)).join('');
+      if (this.last['alive' + team] === key) continue;
+      this.last['alive' + team] = key;
+      $('alive' + team).innerHTML = list.map(p => `<i class="${p.alive ? '' : 'dead'}" title="${p.name}"><b style="height:${p.alive ? p.hp : 0}%"></b></i>`).join('');
+    }
   }
 
   setZone(name: string): void {
-    this.text(this.zone, 'zn', name);
+    this.text('hudZone', name);
   }
 
   setFps(v: number | null): void {
-    this.fps.classList.toggle('hidden', v === null);
-    if (v !== null) this.text(this.fps, 'fps', Math.round(v) + ' FPS');
+    this.toggle('hudFps', v !== null);
+    if (v !== null) this.text('hudFps', Math.round(v) + ' FPS');
+  }
+
+  setNet(text: string | null): void {
+    this.toggle('netInfo', !!text);
+    if (text) this.text('netInfo', text);
   }
 
   setPrompt(text: string | null): void {
-    this.prompt.classList.toggle('hidden', !text);
-    if (text) this.text(this.prompt, 'pr', text);
+    this.toggle('hudPrompt', !!text);
+    if (text) this.text('hudPrompt', text);
   }
 
-  /** Mira dinâmica: abre com a dispersão da arma. */
+  setBuyHint(text: string | null): void {
+    this.toggle('buyHint', !!text);
+    if (text) this.text('buyHint', text);
+  }
+
+  setProgress(label: string | null, v: number): void {
+    this.toggle('progress', !!label);
+    if (!label) return;
+    this.text('progressLabel', label);
+    $('progressFill').style.width = Math.round(Math.min(1, v) * 100) + '%';
+  }
+
+  setSpectate(name: string | null): void {
+    this.toggle('spectate', !!name);
+    if (name) this.text('spectate', 'ASSISTINDO: ' + name);
+  }
+
   setCrosshair(gapPx: number, color: string, hidden: boolean): void {
-    this.cross.style.setProperty('--gap', gapPx.toFixed(1) + 'px');
-    this.cross.style.setProperty('--cross-color', color);
-    this.cross.classList.toggle('hidden', hidden);
+    const c = $('crosshair');
+    c.style.setProperty('--gap', gapPx.toFixed(1) + 'px');
+    c.style.setProperty('--cross-color', color);
+    this.toggle('crosshair', !hidden);
+  }
+
+  setScope(on: boolean): void {
+    this.toggle('scopeOverlay', on);
+  }
+
+  setFlash(v: number): void {
+    const o = Math.max(0, Math.min(1, v)).toFixed(2);
+    if (this.last.flash !== o) {
+      this.last.flash = o;
+      $('flashOverlay').style.opacity = o;
+    }
+  }
+
+  hit(head: boolean): void {
+    const el = $('hitmarker');
+    el.classList.toggle('head', head);
+    el.classList.add('on');
+    this.hitTimer = 0.18;
+  }
+
+  damage(angle: number): void {
+    const el = $('damageDir');
+    el.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+    el.classList.add('on');
+    $('damageOverlay').classList.add('on');
+    this.dmgTimer = 0.6;
   }
 
   message(text: string, seconds = 2.5): void {
-    this.toast.textContent = text;
-    this.toast.classList.remove('hidden');
+    $('hudToast').textContent = text;
+    $('hudToast').classList.remove('hidden');
     this.toastTimer = seconds;
   }
 
-  update(dt: number, x: number, z: number, yaw: number): void {
+  banner(title: string, sub: string, cls: string, seconds = 4): void {
+    $('bannerTitle').textContent = title;
+    $('bannerSub').textContent = sub;
+    const b = $('banner');
+    b.className = 'banner ' + cls;
+    this.bannerTimer = seconds;
+  }
+
+  kill(killer: string | null, killerTeam: Team | null, victim: string, victimTeam: Team, weapon: string, hs: boolean, local: boolean): void {
+    const el = document.createElement('div');
+    el.className = 'kf' + (local ? ' local' : '');
+    const w = WEAPONS[weapon]?.name ?? (weapon === 'c4' ? 'Bomba' : weapon);
+    el.innerHTML = `${killer ? `<b class="${killerTeam}">${esc(killer)}</b>` : ''}<span class="w">${esc(w)}${hs ? ' ◎' : ''}</span><b class="${victimTeam}">${esc(victim)}</b>`;
+    $('killfeed').prepend(el);
+    this.feed.unshift({ el, t: 6 });
+    while (this.feed.length > 5) this.feed.pop()!.el.remove();
+  }
+
+  /** Nomes sobre os companheiros (posições de tela já calculadas). */
+  setTags(tags: { x: number; y: number; name: string; hp: number }[]): void {
+    const box = $('nameTags');
+    while (this.tags.length < tags.length) {
+      const el = document.createElement('div');
+      el.className = 'tag';
+      box.appendChild(el);
+      this.tags.push(el);
+    }
+    this.tags.forEach((el, i) => {
+      const t = tags[i];
+      if (!t) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'block';
+      el.style.transform = `translate(${t.x.toFixed(0)}px, ${t.y.toFixed(0)}px) translate(-50%, -100%)`;
+      const txt = `${t.name}`;
+      if (el.textContent !== txt) el.textContent = txt;
+    });
+  }
+
+  update(dt: number, x: number, z: number, yaw: number, dots: RadarDot[]): void {
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
-      if (this.toastTimer <= 0) this.toast.classList.add('hidden');
+      if (this.toastTimer <= 0) $('hudToast').classList.add('hidden');
     }
-    this.radar?.draw(x, z, yaw);
+    if (this.bannerTimer > 0) {
+      this.bannerTimer -= dt;
+      if (this.bannerTimer <= 0) $('banner').classList.add('hidden');
+    }
+    if (this.hitTimer > 0) {
+      this.hitTimer -= dt;
+      if (this.hitTimer <= 0) $('hitmarker').classList.remove('on');
+    }
+    if (this.dmgTimer > 0) {
+      this.dmgTimer -= dt;
+      if (this.dmgTimer <= 0) {
+        $('damageDir').classList.remove('on');
+        $('damageOverlay').classList.remove('on');
+      }
+    }
+    for (const f of this.feed) {
+      f.t -= dt;
+      if (f.t <= 0) f.el.remove();
+    }
+    this.feed = this.feed.filter(f => f.t > 0);
+    this.radar?.draw(x, z, yaw, dots);
   }
+
+  clearFeed(): void {
+    for (const f of this.feed) f.el.remove();
+    this.feed = [];
+  }
+}
+
+export function esc(s: string): string {
+  return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }

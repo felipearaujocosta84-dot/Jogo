@@ -8,12 +8,19 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
-    "typecheck": "tsc --noEmit"
+    "start": "tsx server/index.ts",
+    "server": "tsx server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test:sim": "tsx scripts/simtest.ts"
   },
   "dependencies": {
-    "@babylonjs/core": "9.32.1"
+    "@babylonjs/core": "9.32.1",
+    "ws": "8.18.3",
+    "tsx": "4.20.6"
   },
   "devDependencies": {
+    "@types/node": "22.15.30",
+    "@types/ws": "8.18.1",
     "typescript": "5.9.3",
     "vite": "8.3.3"
   }
