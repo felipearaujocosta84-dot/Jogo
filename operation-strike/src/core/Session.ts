@@ -44,6 +44,7 @@ export class LocalSession implements Session {
   alpha = 0;
   prevPos = { x: 0, y: 0, z: 0 };
   private acc = 0;
+  private seq = 0;
   private events: SimEvent[] = [];
 
   constructor(config: MatchConfig, name: string, team: Team) {
@@ -75,7 +76,10 @@ export class LocalSession implements Session {
         const p = me.ctrl.position;
         this.prevPos = { x: p.x, y: me.ctrl.eyeY, z: p.z };
       }
-      this.sim.pushCmd(this.localId, makeCmd());
+      // cada comando precisa de número de sequência crescente (a simulação descarta repetidos)
+      const cmd = makeCmd();
+      cmd.seq = ++this.seq;
+      this.sim.pushCmd(this.localId, cmd);
       this.sim.step();
       for (const e of this.sim.takeEvents()) this.events.push(e);
     }
