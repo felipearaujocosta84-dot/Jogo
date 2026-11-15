@@ -1,0 +1,2 @@
+Pasta para texturas (opcional). As texturas atuais (detalhe do terreno, água,
+partículas) são geradas por código para não precisar baixar nada.

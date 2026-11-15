@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#120e0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="description" content="Reinos Esquecidos — RPG de ação e aventura 3D em fantasia medieval." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <title>Reinos Esquecidos</title>
+  </head>
+  <body>
+    <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    <div id="loading" class="overlay">
+      <div class="logo"><small>— crônicas de —</small><h1>REINOS<br />ESQUECIDOS</h1></div>
+      <div class="loadbar"><div id="loadingFill"></div></div>
+      <p id="loadingText">Carregando…</p>
+    </div>
+
+    <div id="hud" class="hidden"></div>
+    <div id="menus"></div>
+    <div id="rotate" class="overlay"><p>↻ Gire o celular para jogar na horizontal</p></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

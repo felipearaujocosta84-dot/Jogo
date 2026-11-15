@@ -1,0 +1,9 @@
+{
+  "appId": "com.reinosesquecidos.jogo",
+  "appName": "Reinos Esquecidos",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#120e0a"
+  }
+}

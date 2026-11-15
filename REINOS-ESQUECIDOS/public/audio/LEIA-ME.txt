@@ -1,0 +1,5 @@
+Pasta para arquivos de áudio reais (opcional).
+Hoje todos os sons são sintetizados por código (src/systems/audio.js).
+Para trocar um som por um arquivo: coloque, por exemplo, hit.mp3 aqui e chame
+  game.audio.loadFile('hit', 'audio/hit.mp3')
+Nomes suportados: swing, hit.

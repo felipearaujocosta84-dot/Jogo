@@ -1,0 +1,20 @@
+{
+  "name": "reinos-esquecidos",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reinos Esquecidos - RPG de acao e aventura 3D em Babylon.js para navegadores Android",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@babylonjs/core": "9.32.1",
+    "@babylonjs/loaders": "9.32.1",
+    "meshoptimizer": "0.22.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.3"
+  }
+}
