@@ -18,6 +18,7 @@ export class Ball {
     this.lastTouch = null;
     this.listeners = {};
     this.lastStep = 1 / 60;
+    this.freeTimer = 0;            // > 0: jogadores não tocam na bola (após dividida/espirrada)
 
     const mesh = MeshBuilder.CreateSphere('ball', { diameter: this.radius * 2, segments: 16 }, scene);
     const m = new StandardMaterial('ballMat', scene);
@@ -60,6 +61,7 @@ export class Ball {
     this.velocity.setAll(0);
     this.spin.setAll(0);
     this.owner = null;
+    this.freeTimer = 0;
     this.syncMesh();
   }
 
@@ -89,6 +91,7 @@ export class Ball {
    * @param {{resolveBallCollisions:Function}} arena
    */
   step(dt, arena) {
+    this.freeTimer = Math.max(0, this.freeTimer - dt);
     const speed = this.velocity.length();
     const sub = Math.min(8, Math.max(1, Math.ceil((speed * dt) / (this.radius * 0.6))));
     const h = dt / sub;

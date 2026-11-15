@@ -34,8 +34,8 @@ export const BALL = {
 };
 
 export const TEAMS = {
-  home: { name: 'CASA', short: 'CAS', color: '#e8412c', attacksPositiveX: true },
-  away: { name: 'VISITANTE', short: 'VIS', color: '#1f7ae0', attacksPositiveX: false }
+  home: { name: 'CASA', short: 'CAS', color: '#e8412c', shorts: '#f2f2f2', socks: '#e8412c', keeperColor: '#1f9e5a', attacksPositiveX: true },
+  away: { name: 'VISITANTE', short: 'VIS', color: '#1f7ae0', shorts: '#14213d', socks: '#f2f2f2', keeperColor: '#f2c230', attacksPositiveX: false }
 };
 
 export const QUALITY = {

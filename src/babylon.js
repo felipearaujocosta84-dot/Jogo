@@ -25,3 +25,6 @@ import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
 import '@babylonjs/core/Particles/particleSystemComponent';
 import '@babylonjs/core/Meshes/instancedMesh';
 import '@babylonjs/core/Culling/ray';
+export { Skeleton } from '@babylonjs/core/Bones/skeleton';
+export { Bone } from '@babylonjs/core/Bones/bone';
+export { Space } from '@babylonjs/core/Maths/math.axis';

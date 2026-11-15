@@ -2,13 +2,13 @@
 
 Futebol de rua 3D (3 contra 3) feito com **Babylon.js + JavaScript + Vite**, pensado para rodar no navegador de celulares Android.
 
-## Estado atual — ETAPA 1 concluída
+## Estado atual — ETAPA 2 concluída
 
 | Etapa | Status |
 |---|---|
 | 1. Base 3D, quadra, gols, bola e câmera | ✅ pronta e testada |
-| 2. Seis jogadores e movimentação | ⏳ próxima |
-| 3. Física, posse, passe e chute dos jogadores | ⏳ |
+| 2. Seis jogadores e movimentação | ✅ pronta e testada |
+| 3. Física, posse, passe e chute dos jogadores | ⏳ próxima |
 | 4. IA dos times e goleiros | ⏳ |
 | 5. Controles virtuais Android | ⏳ |
 | 6. Menu, placar, cronômetro e resultado | ⏳ |
@@ -28,11 +28,24 @@ Futebol de rua 3D (3 contra 3) feito com **Babylon.js + JavaScript + Vite**, pen
 - **Desempenho**: resolução adaptável pelo FPS, níveis de qualidade (auto/alta/média/baixa), limite de 30 FPS opcional,
   sombras econômicas, texturas procedurais (zero downloads de imagens), pausa automática ao trocar de app.
 
-### Como jogar a Etapa 1 (modo treino)
-- **Toque rápido** na quadra → passe rasteiro até o ponto tocado.
-- **Segure e solte** → chute; quanto mais tempo segurando, mais forte e mais alto (barra de FORÇA).
-- **Arraste** enquanto segura para ajustar a mira.
-- ⟲ recoloca a bola; ❚❚ pausa e abre as configurações.
+### Etapa 2 — jogadores
+- **6 jogadores humanos 3D** (goleiro + 2 de linha por time) com **esqueleto real** (15 ossos, skinning suave no tronco),
+  uniformes por time, goleiros com cor própria e luvas, variação de pele, cabelo, altura e porte.
+- **Animações procedurais**: parado, andar, correr, sprint (amplitude e inclinação crescem com a velocidade),
+  postura de goleiro, chute, passe, carrinho, defesa em mergulho, comemoração e tropeço (já prontas para as próximas etapas).
+- **Movimento arcade**: aceleração, frenagem, giro suave, três velocidades (andar/correr/sprint), **fôlego** que gasta no sprint.
+- **Colisões**: jogador × jogador, jogador × muretas e redes, jogador × bola (condução por toque de pé, rebote no corpo).
+- **IA de movimentação** (base para a Etapa 4): goleiros acompanham a bola na linha e saem do gol; um jogador de cada time
+  disputa a bola e conduz para o gol adversário; os outros se posicionam (atacante oferece linha de passe, defensor cobre o gol),
+  sem se amontoar. Regra de saída de bola, dividida (bola espirra quando os dois times travam a disputa) e "puxada com a sola" na parede.
+- **Controles**: joystick analógico dinâmico (multitoque), botões CORRIDA, CHUTE e TROCAR. Teclado no PC: WASD/setas, Shift, Espaço, Q.
+- **Pronto para modelos GLB**: `src/player/ModelFactory.js` → coloque `public/models/player.glb` e ajuste `MODEL_CONFIG.url`.
+  O animador GLB usa as animações do arquivo (Idle/Walk/Run/Kick…); sem o arquivo, o personagem procedural é usado.
+
+### Como jogar
+- **Polegar esquerdo**: joystick (aparece onde tocar). **CORRIDA** (segurar): sprint.
+- **CHUTE**: chuta na direção do joystick (ou para onde o jogador olha). Encoste na bola para conduzir.
+- **TROCAR**: controla o companheiro mais perto da bola. ⟲ reinicia as posições; ❚❚ pausa e configurações.
 
 ## Como executar
 
@@ -60,11 +73,17 @@ src/stadium/StreetArena.js arena urbana (colisões de mureta inclusas)
 src/stadium/Goal.js        gols, redes animadas, colisão com traves
 src/stadium/arenas.js      registro de arenas (para adicionar novas)
 src/stadium/textures.js    texturas procedurais (quadra, grafite, torcida, bola…)
+src/player/Player.js       jogador: movimento, fôlego, colisões, contato com a bola
+src/player/PlayerAI.js     IA (posicionamento, perseguição, goleiro)
+src/player/PlayerAnimation.js  animação procedural + animador para GLB
+src/player/ProceduralHumanoid.js  personagem provisório com esqueleto
+src/player/ModelFactory.js troca transparente entre GLB e personagem provisório
+src/player/Team.js         times, uniformes, posições de saída
+src/controls/MobileControls.js  joystick + botões (multitoque) + teclado
 src/audio/AudioManager.js  sons (sintetizados ou arquivos)
 src/effects/Effects.js     partículas de chute e confete
 src/core/Performance.js    resolução adaptável e FPS
 src/core/Settings.js       preferências salvas
 ```
 
-Os arquivos `src/player/*`, `src/controls/MobileControls.js`, `src/match/*` e `src/ui/Menu.js`
-serão criados nas etapas correspondentes (2 a 6).
+Os arquivos `src/match/*` e `src/ui/Menu.js` serão criados na Etapa 6.

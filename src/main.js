@@ -30,9 +30,12 @@ const ui = {
   hideGoal() {
     $('goalBanner').classList.add('hidden');
   },
-  setCharge(v) {
-    $('charge').classList.toggle('on', v > 0);
-    $('chargeFill').style.width = `${Math.round(v * 100)}%`;
+  setControlled(player) {
+    $('playerNum').textContent = player.number;
+    $('playerName').textContent = player.name;
+  },
+  setStamina(v) {
+    $('staminaFill').style.width = `${Math.round(v * 100)}%`;
   },
   setFps(fps, dpr) {
     $('fps').textContent = `${fps.toFixed(0)} FPS · ${dpr.toFixed(2)}x`;
@@ -68,7 +71,7 @@ async function boot() {
   $('homeName').textContent = TEAMS.home.name;
   $('awayName').textContent = TEAMS.away.name;
 
-  const game = new Game($('renderCanvas'), ui);
+  const game = new Game($('renderCanvas'), ui, $('controls'));
   window.__game = game; // útil para depuração no console
   await game.init(setProgress);
 
@@ -109,7 +112,7 @@ async function boot() {
   });
   $('btnReset').addEventListener('click', () => {
     game.audio.ui();
-    game.resetBall();
+    game.restartPositions();
   });
   $('btnRotateIgnore').addEventListener('click', () => {
     try { sessionStorage.setItem('rotateIgnored', '1'); } catch { /* ignora */ }

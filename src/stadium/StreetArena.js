@@ -445,7 +445,8 @@ export class StreetArena {
     }
     // fundos: bloqueiam tudo fora da boca do gol
     const inMouth = Math.abs(p.z) < FIELD.goalWidth / 2 && p.y < FIELD.goalHeight;
-    const inGoalBox = Math.abs(p.x) > hl; // já dentro do recuo do gol
+    // já dentro do recuo do gol (entre as redes laterais)
+    const inGoalBox = Math.abs(p.x) > hl && Math.abs(p.z) < FIELD.goalWidth / 2 + r;
     if (!inMouth && !inGoalBox) {
       if (p.x + r > hl) {
         p.x = hl - r;

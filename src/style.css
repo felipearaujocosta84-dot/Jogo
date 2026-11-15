@@ -109,23 +109,94 @@ html, body {
 
 #topButtons { position: absolute; top: calc(8px + var(--safe-t)); right: calc(10px + var(--safe-r)); display: flex; gap: 8px; }
 
-#charge {
+#playerTag {
   position: absolute;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(260px, 50vw);
-  height: 14px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  overflow: hidden;
-  opacity: 0;
+  top: calc(8px + var(--safe-t));
+  left: calc(10px + var(--safe-l));
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 8px;
+  align-items: center;
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: 800;
+  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+#playerTag b { background: var(--accent); color: #111; border-radius: 6px; padding: 0 6px; font-variant-numeric: tabular-nums; }
+#playerTag .stamina { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); overflow: hidden; width: 110px; }
+#staminaFill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff5a3d, #ffd23f, #3df27a); background-size: 110px 100%; transition: width 0.1s linear; }
+#fps { top: calc(62px + var(--safe-t)) !important; }
+
+/* ---------- controles virtuais ---------- */
+#controls { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+.joy-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 46%;
+  height: 72%;
+  pointer-events: auto;
+  touch-action: none;
+}
+.joy-base {
+  position: absolute;
+  left: calc(26px + var(--safe-l));
+  bottom: 26px;
+  width: clamp(110px, 17vw, 150px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
   transition: opacity 0.15s;
 }
-#charge.on { opacity: 1; }
-#chargeFill { height: 100%; width: 0; background: linear-gradient(90deg, #3df27a, var(--accent), var(--home)); }
-#charge span { position: absolute; inset: 0; font: 800 10px system-ui; letter-spacing: 2px; display: flex; align-items: center; justify-content: center; color: #fff; text-shadow: 0 1px 2px #000; }
+.joy-base.active { opacity: 1; bottom: auto; }
+.joy-knob {
+  width: 46%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #c9cfdc);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.btn-zone {
+  position: absolute;
+  right: calc(14px + var(--safe-r));
+  bottom: 14px;
+  width: clamp(190px, 30vw, 270px);
+  height: clamp(170px, 42vh, 250px);
+  pointer-events: none;
+}
+.ctl-btn {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  color: #fff;
+  font: 900 clamp(10px, 1.7vw, 13px) system-ui, sans-serif;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), inset 0 2px 6px rgba(255, 255, 255, 0.25);
+  opacity: 0.88;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.ctl-btn.down { transform: scale(0.9); opacity: 1; filter: brightness(1.25); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.ctl-shoot { width: 40%; aspect-ratio: 1; right: 0; bottom: 18%; background: radial-gradient(circle at 40% 35%, #ff6b4d, #c4260f); }
+.ctl-pass { width: 33%; aspect-ratio: 1; right: 40%; bottom: 0; background: radial-gradient(circle at 40% 35%, #4da3ff, #1456b8); }
+.ctl-sprint { width: 33%; aspect-ratio: 1; right: 42%; bottom: 2%; background: radial-gradient(circle at 40% 35%, #5be38a, #168a43); }
+.ctl-tackle { width: 30%; aspect-ratio: 1; right: 74%; bottom: 30%; background: radial-gradient(circle at 40% 35%, #ffb84d, #c27306); }
+.ctl-switch { width: 28%; aspect-ratio: 1; right: 6%; bottom: 72%; background: radial-gradient(circle at 40% 35%, #b38bff, #5a2fb0); }
 
 #goalBanner {
   position: fixed;

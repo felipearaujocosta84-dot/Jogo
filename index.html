@@ -22,12 +22,12 @@
     <!-- Tela inicial (necessária para liberar áudio e tela cheia) -->
     <div id="start" class="overlay hidden">
       <div class="logo"><span>STREET</span><b>FOOTBALL 3D</b></div>
-      <p class="stage">Etapa 1 · Treino de chute na quadra</p>
+      <p class="stage">Etapa 2 · Jogadores em quadra</p>
       <button id="btnStart" class="btn primary">TOCAR PARA JOGAR</button>
       <ul class="howto">
-        <li><b>Toque rápido</b> na quadra: passe rasteiro até o ponto.</li>
-        <li><b>Segure</b> e solte: chute — quanto mais tempo, mais forte e mais alto.</li>
-        <li><b>Arraste</b> enquanto segura para ajustar a mira.</li>
+        <li><b>Polegar esquerdo</b>: joystick para mover (aparece onde você tocar).</li>
+        <li><b>CORRIDA</b> (segurar): sprint, gasta fôlego. <b>CHUTE</b>: chuta na direção do joystick.</li>
+        <li><b>TROCAR</b>: passa o controle para o companheiro mais perto da bola. Encoste na bola para conduzir.</li>
       </ul>
     </div>
 
@@ -37,15 +37,17 @@
         <div class="team home"><i></i><span id="homeName">CASA</span></div>
         <div class="score"><span id="homeScore">0</span><em>:</em><span id="awayScore">0</span></div>
         <div class="team away"><span id="awayName">VISITANTE</span><i></i></div>
-        <div class="mode">TREINO</div>
+        <div class="mode">AMISTOSO</div>
       </div>
       <div id="fps" class="hidden"></div>
       <div id="topButtons">
-        <button id="btnReset" class="btn icon" title="Recolocar bola">⟲</button>
+        <button id="btnReset" class="btn icon" title="Reiniciar posições">⟲</button>
         <button id="btnPause" class="btn icon" title="Pausar">❚❚</button>
       </div>
-      <div id="charge"><div id="chargeFill"></div><span>FORÇA</span></div>
+      <div id="playerTag"><b id="playerNum">7</b><span id="playerName">Tito</span><div class="stamina"><div id="staminaFill"></div></div></div>
     </div>
+
+    <div id="controls" class="hidden"></div>
 
     <div id="goalBanner" class="hidden"><b>GOOOL!</b><span id="goalTeam"></span></div>
 
