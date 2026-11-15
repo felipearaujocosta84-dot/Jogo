@@ -89,11 +89,22 @@ export class Room {
     return this.state !== 'over' && this.members.length < 10;
   }
 
-  join(c: Client): string | null {
+  /** Time de quem criou a sala (amigos que entram pelo código jogam juntos). */
+  hostTeam(): Team | null {
+    const m = this.members.find(x => x.client.id === this.host);
+    if (!m) return null;
+    return this.sim?.byId(m.playerId)?.team ?? m.team;
+  }
+
+  join(c: Client, preferTeam: Team | null = null): string | null {
     if (!this.canJoin()) return 'Sala cheia ou encerrada';
     const t = this.members.filter(m => m.team === 'T').length;
     const ct = this.members.filter(m => m.team === 'CT').length;
-    const team: Team = t <= ct ? 'T' : 'CT';
+    let team: Team = t <= ct ? 'T' : 'CT';
+    if (preferTeam) {
+      const count = this.sim ? this.sim.players.filter(p => p.team === preferTeam && !p.bot).length : (preferTeam === 'T' ? t : ct);
+      if (count < 5) team = preferTeam;
+    }
     let playerId = 'h' + ++this.lobbyIds + '_' + c.id.slice(0, 4);
     if (this.sim) {
       const p = this.sim.addPlayer(c.name, { team, id: playerId });

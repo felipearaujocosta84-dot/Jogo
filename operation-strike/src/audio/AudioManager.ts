@@ -264,17 +264,27 @@ export class AudioManager {
     this.tone({ freq: 80, freqEnd: 45, dur: 0.12, gain: g * 0.8 });
   }
 
-  /** Sequência de recarga: pente sai, pente entra, ferrolho. */
-  reload(duration: number): void {
-    const click = (delay: number, freq: number, gain = 0.3) => {
-      this.noise({ dur: 0.05, gain, type: 'bandpass', freq, q: 4, delay });
-      this.tone({ freq: freq * 0.25, dur: 0.04, gain: gain * 0.4, type: 'square', delay });
+  /** Sequência de recarga sincronizada com a animação: pente sai, pente entra, tapa, alavanca/ferrolho. */
+  reload(duration: number, cls = 'rifle'): void {
+    const click = (at: number, freq: number, gain = 0.3, dur = 0.05) => {
+      const delay = duration * at;
+      this.noise({ dur, gain, type: 'bandpass', freq, q: 4, delay });
+      this.tone({ freq: freq * 0.25, dur: dur * 0.8, gain: gain * 0.4, type: 'square', delay });
     };
-    click(duration * 0.15, 2200);
-    click(duration * 0.55, 1800, 0.35);
-    click(duration * 0.62, 2600, 0.25);
-    click(duration * 0.82, 1500, 0.4);
-    click(duration * 0.88, 2400, 0.3);
+    if (cls === 'pistol') {
+      click(0.1, 2400, 0.25); // trava do pente
+      click(0.62, 1700, 0.35); // pente entra
+      click(0.66, 1300, 0.3);
+      click(0.8, 2600, 0.3, 0.07); // ferrolho atrás
+      click(0.85, 1500, 0.4); // ferrolho solta
+      return;
+    }
+    click(0.17, 2200, 0.3); // solta o pente
+    this.noise({ dur: 0.25, gain: 0.08, type: 'bandpass', freq: 900, q: 1, delay: duration * 0.2 }); // pente saindo
+    click(0.6, 1700, 0.35); // pente encaixa
+    click(0.66, 1200, 0.45, 0.07); // tapa no pente
+    click(0.8, 2700, 0.3, 0.08); // alavanca para trás
+    click(0.86, 1400, 0.45); // alavanca volta
   }
 
   play(name: SoundName): void {

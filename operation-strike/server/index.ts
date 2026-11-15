@@ -159,7 +159,7 @@ wss.on('connection', (ws: WebSocket) => {
         const r = rooms.get(String(msg.code).toUpperCase().trim());
         if (!r) send({ t: 'error', msg: 'Sala não encontrada' });
         else {
-          const err = r.join(client!);
+          const err = r.join(client!, r.hostTeam());
           if (err) send({ t: 'error', msg: err });
         }
         break;

@@ -26,7 +26,7 @@ export const RULES: Record<GameMode, RoundRules> = {
   competitive: {
     mode: 'competitive', maxRounds: 24, winRounds: 13, halfAt: 12, freezeTime: 12, roundTime: 115, bombTime: 40,
     plantTime: 3.2, defuseTime: 10, defuseKitTime: 5, buyTime: 25, roundEndTime: 6, startMoney: 800, maxMoney: 16000,
-    friendlyFire: true, training: false
+    friendlyFire: false, training: false
   },
   casual: {
     mode: 'casual', maxRounds: 15, winRounds: 8, halfAt: 7, freezeTime: 8, roundTime: 120, bombTime: 40,

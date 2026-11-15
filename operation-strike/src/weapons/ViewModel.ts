@@ -21,6 +21,19 @@ import type { Team } from '../sim/types';
 
 export const VIEW_GROUP = 1;
 
+/** Interpola uma trilha de quadros-chave [tempo, ...valores] com suavização entre eles. */
+function track(frames: number[][], k: number): number[] {
+  let i = 0;
+  while (i < frames.length - 2 && k > frames[i + 1][0]) i++;
+  const a = frames[i], b = frames[i + 1];
+  let t = (k - a[0]) / Math.max(1e-6, b[0] - a[0]);
+  t = Math.max(0, Math.min(1, t));
+  t = t * t * (3 - 2 * t);
+  const out: number[] = [];
+  for (let j = 1; j < a.length; j++) out.push(a[j] + (b[j] - a[j]) * t);
+  return out;
+}
+
 type AnimKind = 'reload' | 'draw' | 'inspect' | 'slash' | 'throw' | 'plant';
 
 interface Visual {
@@ -29,6 +42,11 @@ interface Visual {
   cls: WeaponClass;
   parts: GunParts;
   magRest: Vector3 | null;
+  /** Mão esquerda (anda durante a recarga) e pontos de referência no corpo da arma. */
+  leftArm: TransformNode | null;
+  leftRest: Vector3;
+  magGrab: Vector3;
+  handle: Vector3;
   hip: Vector3;
   ads: Vector3;
 }
@@ -130,7 +148,7 @@ export class ViewModel {
     m.isPickable = false;
   }
 
-  private arm(parent: TransformNode, hand: Vector3, toward: Vector3): void {
+  private arm(parent: TransformNode, hand: Vector3, toward: Vector3): TransformNode {
     const node = new TransformNode('arm', this.scene);
     node.parent = parent;
     node.position.copyFrom(hand);
@@ -150,6 +168,7 @@ export class ViewModel {
     add(CreateCylinder('wrist', { diameter: 0.068, height: 0.06, tessellation: 10 }, this.scene), 'skin', 0.09);
     add(CreateCylinder('cuff', { diameter: 0.088, height: 0.05, tessellation: 10 }, this.scene), 'cuff', 0.13);
     add(CreateCylinder('sleeve', { diameterTop: 0.12, diameterBottom: 0.098, height: 0.5, tessellation: 10 }, this.scene), sleeve, 0.38);
+    return node;
   }
 
   private visual(id: string, skin: string): Visual {
@@ -158,6 +177,7 @@ export class ViewModel {
     if (v) return v;
     const def = WEAPONS[id];
     const parts = buildGun(id, this.scene, skin);
+    let leftArm: TransformNode | null = null;
     parts.root.parent = this.sway;
     for (const m of [parts.body, parts.mag, parts.slide]) this.prep(m);
     const cls = def.cls;
@@ -172,10 +192,17 @@ export class ViewModel {
     } else {
       this.arm(parts.root, new Vector3(0.01, -0.09, -0.05), new Vector3(0.45, -0.55, -0.7));
       const lh = parts.leftHand;
-      this.arm(parts.root, cls === 'pistol' ? new Vector3(-0.03, -0.085, -0.02) : lh, new Vector3(-0.55, -0.6, -0.55));
+      leftArm = this.arm(parts.root, cls === 'pistol' ? new Vector3(-0.03, -0.085, -0.02) : lh, new Vector3(-0.55, -0.6, -0.55));
     }
+    // ponto onde a mão pega o pente (embaixo do pente) e onde puxa a alavanca/ferrolho
+    let magGrab = new Vector3(0, -0.15, 0.1);
+    if (parts.mag) {
+      const bb = parts.mag.getBoundingInfo().boundingBox;
+      magGrab = new Vector3(bb.center.x, bb.minimum.y + 0.04, bb.center.z);
+    }
+    const handle = cls === 'pistol' ? new Vector3(-0.025, 0.045, -0.05) : cls === 'sniper' ? new Vector3(0.05, 0.05, -0.03) : new Vector3(0.045, 0.04, 0.08);
     const pose = POSE[cls];
-    v = { id, skin, cls, parts, magRest: parts.mag ? parts.mag.position.clone() : null, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
+    v = { id, skin, cls, parts, magRest: parts.mag ? parts.mag.position.clone() : null, leftArm, leftRest: leftArm ? leftArm.position.clone() : Vector3.Zero(), magGrab, handle, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
     parts.root.setEnabled(false);
     this.visuals.set(key, v);
     return v;
@@ -193,7 +220,10 @@ export class ViewModel {
   setWeapon(id: string, drawTime: number, skin = 'default'): void {
     if (this.current?.id === id && this.current.skin === skin) return;
     const sameGun = this.current?.id === id;
-    if (this.current) this.current.parts.root.setEnabled(false);
+    if (this.current) {
+      this.resetPose(this.current);
+      this.current.parts.root.setEnabled(false);
+    }
     this.current = this.visual(id, skin);
     if (sameGun) drawTime = 0; // só trocou a skin
     this.current.parts.root.setEnabled(this.visible);
@@ -227,6 +257,16 @@ export class ViewModel {
 
   reload(duration: number): void {
     this.anim = { kind: 'reload', t: 0, dur: duration };
+  }
+
+  /** Devolve mão, pente e ferrolho à posição normal (fim ou interrupção de animação). */
+  private resetPose(v: Visual): void {
+    if (v.parts.mag && v.magRest) {
+      v.parts.mag.position.copyFrom(v.magRest);
+      v.parts.mag.setEnabled(true);
+    }
+    if (v.leftArm) v.leftArm.position.copyFrom(v.leftRest);
+    if (v.parts.slide) v.parts.slide.position.z = 0;
   }
 
   /** Inspeção da arma. Retorna false se não pôde começar (ex.: recarregando). */
@@ -291,19 +331,48 @@ export class ViewModel {
           break;
         }
         case 'reload': {
-          const tilt = Math.sin(Math.min(1, k * 1.15) * Math.PI);
-          rz += tilt * 0.55;
-          rx += tilt * -0.15;
-          pos.y -= tilt * 0.05;
-          pos.x -= tilt * 0.03;
-          if (v.parts.mag && v.magRest) {
-            const m = v.parts.mag.position;
-            m.copyFrom(v.magRest);
-            if (k > 0.1 && k < 0.45) m.y -= Math.min(1, (k - 0.1) / 0.2) * 0.35;
-            else if (k >= 0.45 && k < 0.7) m.y -= (1 - (k - 0.45) / 0.25) * 0.2;
+          // Recarga em etapas, com a mão esquerda trabalhando:
+          // fuzis/SMGs/snipers: mão vai ao pente, puxa, o pente sai, mão busca outro fora da tela, encaixa,
+          // dá o tapa, vai até a alavanca de manejo (ou ferrolho), puxa e solta, volta ao guarda-mão.
+          // pistolas: o pente cai sozinho, a mão traz outro por baixo, encaixa e puxa o ferrolho por cima.
+          const pistol = v.cls === 'pistol';
+          const R = v.leftRest, G = v.magGrab, H = v.handle;
+          const Gd = G.add(new Vector3(0, -0.12, 0));
+          const D = G.add(new Vector3(-0.06, -0.42, -0.1));
+          const Hp = H.add(v.cls === 'sniper' ? new Vector3(0.02, 0.02, -0.08) : new Vector3(0, 0, -0.07));
+          const P3 = (t: number, p: Vector3) => [t, p.x, p.y, p.z];
+          const hand = pistol
+            ? [P3(0, R), P3(0.12, R.add(new Vector3(0, -0.05, 0))), P3(0.3, D), P3(0.44, D), P3(0.58, Gd), P3(0.64, G), P3(0.72, H), P3(0.8, Hp), P3(0.85, H), P3(1, R)]
+            : [P3(0, R), P3(0.1, G), P3(0.2, Gd), P3(0.32, D), P3(0.46, D), P3(0.58, Gd), P3(0.64, G), P3(0.72, G), P3(0.78, H), P3(0.83, Hp), P3(0.87, H), P3(1, R)];
+          // pente: deslocamento vertical/frontal em relação ao lugar dele
+          const mag = pistol
+            ? [[0, 0, 0], [0.08, 0, 0], [0.26, -0.45, -0.05], [0.44, -0.45, -0.05], [0.58, -0.12, 0], [0.64, 0, 0], [1, 0, 0]]
+            : [[0, 0, 0], [0.1, 0, 0], [0.2, -0.12, 0], [0.32, -0.42, -0.1], [0.46, -0.42, -0.1], [0.58, -0.12, 0], [0.64, 0, 0], [1, 0, 0]];
+          // arma: [rx, ry, rz, dx, dy, dz]
+          const gun = pistol
+            ? [[0, 0, 0, 0, 0, 0, 0], [0.1, -0.28, 0.32, -0.32, -0.05, 0.07, 0.03], [0.6, -0.28, 0.32, -0.32, -0.05, 0.07, 0.03],
+               [0.64, -0.34, 0.32, -0.32, -0.05, 0.085, 0.03], [0.7, -0.12, -0.55, 0.25, 0.03, 0.04, 0.1], [0.86, -0.12, -0.55, 0.25, 0.03, 0.04, 0.1], [1, 0, 0, 0, 0, 0, 0]]
+            : [[0, 0, 0, 0, 0, 0, 0], [0.1, -0.06, -0.4, 0.62, -0.05, 0.05, 0.07], [0.6, -0.06, -0.42, 0.66, -0.05, 0.05, 0.07],
+               [0.65, -0.1, -0.42, 0.66, -0.05, 0.068, 0.07], [0.7, -0.06, -0.4, 0.62, -0.05, 0.05, 0.07], [0.77, -0.1, 0.35, -0.3, -0.03, 0.03, 0.1],
+               [0.84, -0.1, 0.35, -0.3, -0.03, 0.03, 0.085], [0.88, -0.12, 0.35, -0.3, -0.03, 0.036, 0.1], [1, 0, 0, 0, 0, 0, 0]];
+          const g = track(gun, k);
+          rx += g[0];
+          ry += g[1];
+          rz += g[2];
+          pos.x += g[3];
+          pos.y += g[4];
+          pos.z += g[5];
+          if (v.leftArm) {
+            const h = track(hand, k);
+            v.leftArm.position.set(h[0], h[1], h[2]);
           }
-          if (k > 0.7 && k < 0.78) pos.y += 0.01;
-          if (v.parts.slide) v.parts.slide.position.z = k > 0.8 && k < 0.9 ? -0.03 : 0;
+          if (v.parts.mag && v.magRest) {
+            const m = track(mag, k);
+            v.parts.mag.position.set(v.magRest.x, v.magRest.y + m[0], v.magRest.z + m[1]);
+            // o pente velho some fora da tela; o novo aparece na mão
+            v.parts.mag.setEnabled(!(k > (pistol ? 0.24 : 0.3) && k < 0.44));
+          }
+          if (v.parts.slide) v.parts.slide.position.z = pistol ? track([[0, 0], [0.72, 0], [0.8, -0.035], [0.85, 0], [1, 0]], k)[0] : 0;
           break;
         }
         case 'inspect': {
@@ -354,7 +423,7 @@ export class ViewModel {
       }
       if (k >= 1) {
         this.anim = null;
-        if (v.parts.mag && v.magRest) v.parts.mag.position.copyFrom(v.magRest);
+        this.resetPose(v);
       }
     }
 

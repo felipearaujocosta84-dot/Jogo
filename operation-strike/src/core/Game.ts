@@ -633,7 +633,7 @@ export class Game {
         }
         if (e.pid === localId) {
           this.view.reload(e.time as number);
-          this.audio.reload(e.time as number);
+          this.audio.reload(e.time as number, this.session?.local()?.weapon.cls ?? 'rifle');
         }
         break;
       }
