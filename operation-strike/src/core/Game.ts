@@ -620,7 +620,8 @@ export class Game {
         if (victim) this.hud.kill(killer?.name ?? null, killer?.team ?? null, victim.name, victim.team, e.weapon as string, !!e.hs, e.killer === localId || e.victim === localId);
         if (e.killer === localId && e.victim !== localId) this.hud.message(e.hs ? 'ABATE NA CABEÇA!' : 'ABATE!', 1);
         if (e.victim === localId) {
-          this.hud.message(killer ? `Morto por ${killer.name}` : 'Você morreu', 2.5);
+          const how = !killer ? 'Você morreu' : killer.id === me?.id ? 'Você se matou' : killer.team === me?.team ? `Morto pelo companheiro ${killer.name}` : `Morto pelo inimigo ${killer.name} (${killer.team === 'T' ? 'TR' : 'CT'})`;
+          this.hud.message(e.weapon === 'c4' ? 'Morto pela explosão da bomba' : how, 3);
           this.scoreboard.toggle(false);
         }
         break;
@@ -769,16 +770,16 @@ export class Game {
     const scale = window.innerWidth / w;
     const vp = cam.viewport.toGlobal(w, h);
     const tm = this.scene.getTransformMatrix();
-    const tags: { x: number; y: number; name: string; hp: number }[] = [];
+    const tags: { x: number; y: number; name: string; hp: number; team: string }[] = [];
     for (const p of st.players) {
       if (p.id === me.id || p.team !== me.team || !p.alive) continue;
       const pos = new Vector3(p.x, p.y + (p.crouch ? 1.45 : 2.05), p.z);
       const d = Vector3.Distance(pos, cam.position);
-      if (d > 45) continue;
+      if (d > 90) continue;
       const fwd = cam.getDirection(Vector3.Forward());
       if (Vector3.Dot(fwd, pos.subtract(cam.position)) <= 0) continue;
       const sp = Vector3.Project(pos, Matrix.IdentityReadOnly, tm, vp);
-      tags.push({ x: sp.x * scale, y: sp.y * scale, name: p.name, hp: p.hp });
+      tags.push({ x: sp.x * scale, y: sp.y * scale, name: p.name, hp: p.hp, team: p.team });
     }
     this.hud.setTags(tags);
   }

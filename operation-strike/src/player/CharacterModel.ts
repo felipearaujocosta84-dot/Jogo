@@ -33,22 +33,26 @@ interface Look {
   accent: string;
 }
 
+// TR: tons de terra/verde-oliva + braçadeira laranja. CT: tons de azul + braçadeira azul e capacete.
+// As paletas não se cruzam, para nunca confundir inimigo com companheiro.
 const LOOKS: Record<Team, Look[]> = {
   T: [
-    { shirt: '#9c8763', pants: '#5d5a3c', vest: '#3f3a2a', head: 'balaclava', headColor: '#1d1d1d', skin: '#b98a68', accent: '#2a2a22' },
-    { shirt: '#6e4a32', pants: '#3b4a63', vest: '#4a3b2b', head: 'scarf', headColor: '#8a2b22', skin: '#8d5f45', accent: '#2b2018' },
-    { shirt: '#77775a', pants: '#a69676', vest: '#4f4a35', head: 'scarf', headColor: '#cfc3a8', skin: '#c49a78', accent: '#3a3426' },
-    { shirt: '#2c2d30', pants: '#5d5f63', vest: '#2a2a2a', head: 'cap', headColor: '#3b2e22', skin: '#d0a385', accent: '#151515' },
+    { shirt: '#9c8763', pants: '#5d5a3c', vest: '#3f3a2a', head: 'balaclava', headColor: '#2a2318', skin: '#b98a68', accent: '#2a2a22' },
+    { shirt: '#7a5236', pants: '#6b5a3e', vest: '#4a3b2b', head: 'scarf', headColor: '#8a2b22', skin: '#8d5f45', accent: '#2b2018' },
+    { shirt: '#86845f', pants: '#a69676', vest: '#4f4a35', head: 'scarf', headColor: '#cfc3a8', skin: '#c49a78', accent: '#3a3426' },
+    { shirt: '#6a4a2e', pants: '#8a7550', vest: '#3e2f1f', head: 'beanie', headColor: '#a0602a', skin: '#d0a385', accent: '#2b2015' },
     { shirt: '#5b6640', pants: '#a08f6a', vest: '#38402a', head: 'beanie', headColor: '#4a3a2c', skin: '#9b6b4f', accent: '#262b1c' }
   ],
   CT: [
-    { shirt: '#2a3446', pants: '#1f2633', vest: '#15181d', head: 'helmet', headColor: '#20262e', skin: '#d6a98a', accent: '#0f1114' },
-    { shirt: '#5b6168', pants: '#2c3440', vest: '#2a3442', head: 'helmet', headColor: '#3a4048', skin: '#b7896a', accent: '#1a1d22' },
-    { shirt: '#5c5f45', pants: '#8f8466', vest: '#77694c', head: 'helmet', headColor: '#6f6650', skin: '#c99c7c', accent: '#3a3628' },
-    { shirt: '#1f2a3d', pants: '#141a24', vest: '#0f1218', head: 'balaclava', headColor: '#101215', skin: '#e0b496', accent: '#0a0b0d' },
-    { shirt: '#26282c', pants: '#3a3f46', vest: '#4b5058', head: 'cap', headColor: '#1a1c20', skin: '#a8765a', accent: '#121316' }
+    { shirt: '#2a3a5c', pants: '#1f2a40', vest: '#16223a', head: 'helmet', headColor: '#243556', skin: '#d6a98a', accent: '#101826' },
+    { shirt: '#3d5a86', pants: '#26354f', vest: '#1d2c47', head: 'helmet', headColor: '#2c4166', skin: '#b7896a', accent: '#141c2b' },
+    { shirt: '#4a6fa5', pants: '#2c3a55', vest: '#22314f', head: 'helmet', headColor: '#30466e', skin: '#c99c7c', accent: '#16203a' },
+    { shirt: '#22345a', pants: '#18233a', vest: '#121b30', head: 'balaclava', headColor: '#1b2a48', skin: '#e0b496', accent: '#0c1322' },
+    { shirt: '#355585', pants: '#2a3d5e', vest: '#203252', head: 'helmet', headColor: '#2a3f66', skin: '#a8765a', accent: '#121c30' }
   ]
 };
+
+const TEAM_BAND: Record<Team, string> = { T: '#f08a24', CT: '#3d8bff' };
 
 // índices dos ossos
 const B = { root: 0, hips: 1, spine: 2, chest: 3, neck: 4, head: 5, uaR: 6, faR: 7, hR: 8, uaL: 9, faL: 10, hL: 11, thR: 12, shR: 13, ftR: 14, thL: 15, shL: 16, ftL: 17 };
@@ -132,6 +136,8 @@ export class CharacterModel {
     g.box(0.42, 0.3, 0.25, [0, 1.35, 0], c.shirt, undefined, B.chest);
     // colete com placas e bolsos
     g.box(0.4, 0.34, 0.07, [0, 1.3, 0.13], c.vest, undefined, B.chest);
+    for (const s2 of [1, -1]) g.cyl(0.152, 0.152, 0.07, [0.21 * s2, 1.36, 0], TEAM_BAND[team], undefined, s2 > 0 ? B.uaR : B.uaL);
+    g.box(0.22, 0.08, 0.01, [0, 1.4, -0.166], TEAM_BAND[team], undefined, B.chest); // faixa nas costas
     g.box(0.4, 0.34, 0.06, [0, 1.3, -0.13], c.vest, undefined, B.chest);
     for (const x of [-0.12, 0, 0.12]) g.box(0.1, 0.12, 0.06, [x, 1.2, 0.18], c.accent, undefined, B.chest);
     g.box(0.12, 0.08, 0.05, [0.13, 1.4, 0.17], c.accent, undefined, B.chest);

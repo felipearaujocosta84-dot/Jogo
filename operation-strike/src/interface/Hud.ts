@@ -186,7 +186,7 @@ export class Hud {
   }
 
   /** Nomes sobre os companheiros (posições de tela já calculadas). */
-  setTags(tags: { x: number; y: number; name: string; hp: number }[]): void {
+  setTags(tags: { x: number; y: number; name: string; hp: number; team?: string }[]): void {
     const box = $('nameTags');
     while (this.tags.length < tags.length) {
       const el = document.createElement('div');
@@ -203,7 +203,11 @@ export class Hud {
       el.style.display = 'block';
       el.style.transform = `translate(${t.x.toFixed(0)}px, ${t.y.toFixed(0)}px) translate(-50%, -100%)`;
       const txt = `${t.name}`;
-      if (el.textContent !== txt) el.textContent = txt;
+      if (el.dataset.txt !== txt) {
+        el.dataset.txt = txt;
+        el.innerHTML = `<span>${esc(txt)}</span><i>▼</i>`;
+      }
+      el.classList.toggle('ct', t.team === 'CT');
     });
   }
 
