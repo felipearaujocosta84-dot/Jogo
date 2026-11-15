@@ -7,6 +7,17 @@ export default defineConfig({
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 6000,
-    assetsInlineLimit: 0
+    assetsInlineLimit: 0,
+    rolldownOptions: {
+      output: {
+        // Agrupa os pedaços carregados sob demanda: poucos arquivos = carregamento mais rápido no celular
+        codeSplitting: {
+          groups: [
+            { name: 'shaders', test: /@babylonjs[\\/]core[\\/]Shaders[\\/]/ },
+            { name: 'shaders-webgpu', test: /@babylonjs[\\/]core[\\/]ShadersWGSL[\\/]/ }
+          ]
+        }
+      }
+    }
   }
 });

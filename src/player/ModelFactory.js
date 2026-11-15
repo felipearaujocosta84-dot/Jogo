@@ -3,15 +3,17 @@
 //
 // PARA USAR UM MODELO 3D PRÓPRIO:
 //   1. Coloque o arquivo em  public/models/player.glb  (modelo rigado, olhando para +Z, ~1,8 m de altura)
-//   2. Mude MODEL_CONFIG.url abaixo para 'models/player.glb'
+//   2. Crie um arquivo  .env  na raiz do projeto com a linha:  VITE_PLAYER_MODEL=models/player.glb
+//      (é uma configuração de build: sem ela o carregador GLB nem entra no pacote, que fica bem menor)
 //   3. (opcional) informe os nomes das animações em MODEL_CONFIG.animations
-//   4. O material cujo nome contém "jersey"/"shirt"/"camisa" recebe a cor do time.
+//   4. O material cujo nome contém "jersey"/"shirt"/"camisa"/"body" recebe a cor do time
+//      (se nenhum nome casar, a maior malha do modelo é pintada).
 import { Color3 } from '../babylon.js';
 import { buildProceduralHumanoid, getHumanoidMaterial } from './ProceduralHumanoid.js';
 import { ProceduralAnimator, GlbAnimator } from './PlayerAnimation.js';
 
 export const MODEL_CONFIG = {
-  url: null,              // ex.: 'models/player.glb'
+  url: import.meta.env.VITE_PLAYER_MODEL || null, // ex.: 'models/player.glb' (via .env)
   scale: 1,
   rotationY: 0,           // correção se o modelo olhar para outra direção
   animations: {},         // ex.: { idle: 'Idle_Anim', run: 'Running', kick: 'Soccer_Kick' }
@@ -21,7 +23,8 @@ export const MODEL_CONFIG = {
 let containerPromise = null;
 
 async function loadContainer(scene) {
-  if (!MODEL_CONFIG.url) return null;
+  // o "if" com a variável de build permite ao bundler remover o carregador quando não há modelo
+  if (!import.meta.env.VITE_PLAYER_MODEL || !MODEL_CONFIG.url) return null;
   if (!containerPromise) {
     containerPromise = (async () => {
       try {

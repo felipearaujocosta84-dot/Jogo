@@ -39,8 +39,9 @@ Futebol de rua 3D (3 contra 3) feito com **Babylon.js + JavaScript + Vite**, pen
   disputa a bola e conduz para o gol adversário; os outros se posicionam (atacante oferece linha de passe, defensor cobre o gol),
   sem se amontoar. Regra de saída de bola, dividida (bola espirra quando os dois times travam a disputa) e "puxada com a sola" na parede.
 - **Controles**: joystick analógico dinâmico (multitoque), botões CORRIDA, CHUTE e TROCAR. Teclado no PC: WASD/setas, Shift, Espaço, Q.
-- **Pronto para modelos GLB**: `src/player/ModelFactory.js` → coloque `public/models/player.glb` e ajuste `MODEL_CONFIG.url`.
-  O animador GLB usa as animações do arquivo (Idle/Walk/Run/Kick…); sem o arquivo, o personagem procedural é usado.
+- **Pronto para modelos GLB** (testado com um modelo rigado de exemplo): coloque `public/models/player.glb` e crie um
+  arquivo `.env` com `VITE_PLAYER_MODEL=models/player.glb`. O animador GLB usa as animações do arquivo (Idle/Walk/Run/Kick…)
+  e pinta o uniforme com a cor do time. Sem modelo configurado, o personagem procedural é usado e o carregador GLB nem entra no pacote.
 
 ### Como jogar
 - **Polegar esquerdo**: joystick (aparece onde tocar). **CORRIDA** (segurar): sprint.
