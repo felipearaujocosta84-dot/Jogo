@@ -35,6 +35,19 @@ npm start          # servidor: jogo + multiplayer + ranking em http://localhost:
   Para usar um servidor online em outro endereço, informe-o em Configurações → "Servidor online".
 - Desenvolvimento: `npm start` em um terminal e `npm run dev` em outro (o Vite repassa `/ws` e `/api` para a porta 8080).
 
+### APK para Android
+O projeto Android (Capacitor) fica em `android/`. A cada envio ao GitHub, o workflow **APK Android**
+(`.github/workflows/android-apk.yml`) compila o jogo e publica o arquivo **OperationStrike.apk** em
+**Releases → "Operation Strike APK"** (também fica em Actions → Artifacts).
+- No celular: abra a página de Releases do repositório, baixe `OperationStrike.apk` e instale
+  (o Android pede para permitir "instalar apps desconhecidos" para o navegador).
+- O app abre em tela cheia, na horizontal, com a tela sempre ligada. Contra bots e treino funcionam **offline**.
+- Online: em Configurações → "Servidor online", informe o endereço do servidor (ex.: `ws://192.168.0.10:8080/ws`
+  na rede local, ou `wss://seu-dominio/ws` na internet).
+- Todos os APKs são assinados com a mesma chave (`android/app/opstrike.keystore`), então cada versão nova instala
+  por cima da anterior. Para publicar na Play Store, use uma chave privada fora do repositório.
+- Compilar no computador (com Android SDK instalado): `npm run build && npx cap sync android && cd android && ./gradlew assembleRelease`.
+
 ### Testes
 ```bash
 npm run test:sim -- dust_zone hard competitive   # partida completa 5v5 só com bots (sem gráficos)

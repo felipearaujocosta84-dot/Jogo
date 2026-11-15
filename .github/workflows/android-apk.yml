@@ -1,0 +1,72 @@
+# Compila o APK Android do OPERATION STRIKE a cada envio e publica em
+# Releases → "Operation Strike APK" (link fixo para baixar direto no celular).
+name: APK Android
+
+on:
+  push:
+    paths:
+      - 'operation-strike/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: operation-strike
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: operation-strike/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Dependências
+        run: npm ci
+
+      - name: Build do jogo (TypeScript + Vite)
+        run: npm run build
+
+      - name: Copia o jogo para o projeto Android
+        run: npx cap sync android
+
+      - name: Compila o APK
+        working-directory: operation-strike/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../OperationStrike.apk
+
+      - name: Guarda o APK (Actions → Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OperationStrike-apk
+          path: operation-strike/OperationStrike.apk
+
+      - name: Publica em Releases (link para o celular)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: Operation Strike APK (build ${{ github.run_number }})
+          body: |
+            APK do OPERATION STRIKE gerado automaticamente (build ${{ github.run_number }}, commit ${{ github.sha }}).
+            Baixe o arquivo **OperationStrike.apk** abaixo no celular Android e instale (permita "instalar apps desconhecidos").
+            Contra bots e treino funcionam offline. Para jogar online, informe o servidor em Configurações → Servidor online.
+          files: operation-strike/OperationStrike.apk
+          make_latest: true

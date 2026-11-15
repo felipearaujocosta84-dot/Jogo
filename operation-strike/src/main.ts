@@ -11,6 +11,7 @@ import { loadLocalProfile, saveLocalProfile } from './save/LocalProfile';
 import { Storage } from './save/Storage';
 import type { Difficulty, GameMode, Team } from './sim/types';
 import { esc } from './interface/Hud';
+import { isNativeApp } from './core/Platform';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -18,6 +19,7 @@ const settings = new Settings();
 const canvas = $<HTMLCanvasElement>('renderCanvas');
 const game = new Game(canvas, settings);
 document.body.classList.toggle('touch', game.isTouch);
+document.body.classList.toggle('native', isNativeApp());
 
 const SCREENS = ['loading', 'mainMenu', 'playMenu', 'lobbyScreen', 'trainingMenu', 'arsenalScreen', 'profileScreen', 'rankingScreen', 'pauseMenu', 'endScreen', 'settingsMenu'] as const;
 type ScreenId = (typeof SCREENS)[number] | null;
@@ -46,7 +48,7 @@ function toast(text: string, ms = 2500): void {
 }
 
 async function enterFullscreen(): Promise<void> {
-  if (!game.isTouch) return;
+  if (!game.isTouch || isNativeApp()) return; // no app a tela cheia e a orientação são nativas
   try {
     if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
     const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
@@ -167,13 +169,17 @@ function showEnd(s: Session): void {
 // ------------------------------------------------------------ online
 
 function httpBase(): string {
-  const url = net?.url ?? NetClient.defaultUrl();
+  const url = net?.url ?? (settings.get('serverUrl') || NetClient.defaultUrl());
   return url.replace(/^ws/, 'http').replace(/\/ws$/, '');
 }
 
 async function ensureNet(): Promise<NetClient> {
   if (net && net.connected) return net;
   const url = settings.get('serverUrl') || NetClient.defaultUrl();
+  if (!url) {
+    toast('Informe o endereço do servidor em Configurações → Servidor online (ex.: ws://192.168.0.10:8080/ws)', 5000);
+    throw new Error('Servidor não configurado');
+  }
   if (!net || net.url !== url) {
     net?.close();
     net = new NetClient(url, settings.get('playerName'), profile.id);

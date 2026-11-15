@@ -4,6 +4,7 @@ import type { ClientMsg, RoomInfo, ServerMsg } from './Protocol';
 import type { ProfileData } from '../save/Profile';
 import type { UserCmd } from '../sim/types';
 import { Storage } from '../save/Storage';
+import { isNativeApp } from '../core/Platform';
 
 type Handler = (msg: ServerMsg) => void;
 
@@ -29,6 +30,8 @@ export class NetClient {
   static defaultUrl(): string {
     const saved = Storage.load<string>('serverUrl', '');
     if (saved) return saved;
+    // no app os arquivos são locais: o endereço do servidor precisa ser informado nas configurações
+    if (isNativeApp()) return '';
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${location.host}/ws`;
   }
