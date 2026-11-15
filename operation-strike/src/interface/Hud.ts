@@ -21,6 +21,8 @@ export class Hud {
 
   show(v: boolean): void {
     this.root.classList.toggle('hidden', !v);
+    // o botão de pausa fica fora do HUD, acima dos controles de toque
+    $('btnPause').classList.toggle('hidden', !v);
   }
 
   setMap(map: MapRuntime): void {

@@ -10,6 +10,8 @@ import { Room, type Client } from './Room';
 import type { ClientMsg, ServerMsg } from '../src/multiplayer/Protocol';
 import { MAPS } from '../src/maps/maps';
 import type { Difficulty, GameMode } from '../src/sim/types';
+import { sanitizeSkins } from '../src/weapons/Skins';
+import { levelFor } from '../src/save/Profile';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = resolve(process.cwd(), 'dist');
@@ -135,7 +137,7 @@ wss.on('connection', (ws: WebSocket) => {
           client.room?.resume(client);
         } else {
           const token = randomBytes(16).toString('hex');
-          client = { id: randomUUID(), token, name, profile: store.get(String(msg.profileId ?? token), name), send, room: null, playerId: null, connected: true, disconnectedAt: 0, ping: 0 };
+          client = { id: randomUUID(), token, name, profile: store.get(String(msg.profileId ?? token), name), send, room: null, playerId: null, connected: true, disconnectedAt: 0, ping: 0, skins: {} };
           clients.set(token, client);
           send({ t: 'welcome', clientId: client.id, token, profile: client.profile, resumed: false });
         }
@@ -177,6 +179,10 @@ wss.on('connection', (ws: WebSocket) => {
         break;
       case 'buy':
         client!.room?.buy(client!, msg.item);
+        break;
+      case 'skins':
+        client!.skins = sanitizeSkins(msg.skins, levelFor(client!.profile.xp).level);
+        client!.room?.skins(client!);
         break;
       case 'chat':
         client!.room?.chat(client!.name, msg.text);

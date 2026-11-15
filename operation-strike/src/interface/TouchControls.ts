@@ -56,7 +56,7 @@ const DEFAULT_LAYOUT: Layout = {
   crouch: { x: 0.94, y: 0.92, size: 0.11 },
   switch: { x: 0.61, y: 0.9, size: 0.1 },
   interact: { x: 0.72, y: 0.4, size: 0.1 },
-  inspect: { x: 0.85, y: 0.3, size: 0.08, hidden: true },
+  inspect: { x: 0.6, y: 0.74, size: 0.085 },
   nade: { x: 0.5, y: 0.9, size: 0.09 },
   knife: { x: 0.4, y: 0.9, size: 0.08 },
   buy: { x: 0.215, y: 0.12, size: 0.085 },
@@ -144,7 +144,12 @@ export class TouchControls {
   }
 
   private loadLayout(): Layout {
-    const saved = Storage.load<Layout>('touchLayout2', {});
+    let saved = Storage.load<Layout>('touchLayout3', {});
+    if (!Object.keys(saved).length) {
+      // layout da versão anterior: mantém as posições, mas mostra o novo botão INSPECIONAR no lugar padrão
+      saved = Storage.load<Layout>('touchLayout2', {});
+      delete saved.inspect;
+    }
     const out: Layout = structuredClone(DEFAULT_LAYOUT);
     for (const k of Object.keys(out)) if (saved[k]) out[k] = { ...out[k], ...saved[k] };
     return out;
@@ -376,7 +381,7 @@ export class TouchControls {
     this.root.classList.remove('editing');
     this.editorBar.classList.add('hidden');
     this.refreshEditorBar();
-    Storage.save('touchLayout2', this.layout);
+    Storage.save('touchLayout3', this.layout);
     const cb = this.onEditorClose;
     this.onEditorClose = null;
     cb?.();

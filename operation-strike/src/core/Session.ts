@@ -34,6 +34,8 @@ export interface Session {
   /** Posição local no passo anterior (para interpolação). */
   prevPos: { x: number; y: number; z: number };
   buy(item: string): string | null;
+  /** Atualiza as skins do jogador local. */
+  setSkins(skins: Record<string, string>): void;
   dispose(): void;
 }
 
@@ -47,9 +49,10 @@ export class LocalSession implements Session {
   private seq = 0;
   private events: SimEvent[] = [];
 
-  constructor(config: MatchConfig, name: string, team: Team) {
+  constructor(config: MatchConfig, name: string, team: Team, skins: Record<string, string> = {}) {
     this.sim = new MatchSim(config);
     this.sim.addPlayer(name, { team, id: this.localId });
+    this.sim.setSkins(this.localId, skins);
     if (config.mode === 'training') this.sim.fillBotsFor(team === 'T' ? 'CT' : 'T', 5);
     else this.sim.fillBots();
     this.sim.start();
@@ -110,6 +113,10 @@ export class LocalSession implements Session {
 
   buy(item: string): string | null {
     return this.sim.buy(this.localId, item);
+  }
+
+  setSkins(skins: Record<string, string>): void {
+    this.sim.setSkins(this.localId, skins);
   }
 
   dispose(): void {}
@@ -287,7 +294,7 @@ export class OnlineSession implements Session {
     const players = s.players.map(cur => {
       if (cur.id === this.localId) {
         const c = this.pred.ctrl;
-        return { ...cur, x: c.position.x, y: c.position.y, z: c.position.z, vx: c.velocity.x, vz: c.velocity.z, yaw: c.yaw, pitch: c.pitch, crouch: c.crouched, ground: c.onGround, weapon: this.pred.weaponId() };
+        return { ...cur, skin: this.pred.skinOf(), x: c.position.x, y: c.position.y, z: c.position.z, vx: c.velocity.x, vz: c.velocity.z, yaw: c.yaw, pitch: c.pitch, crouch: c.crouched, ground: c.onGround, weapon: this.pred.weaponId() };
       }
       const pa = a.players.find(p => p.id === cur.id), pb = b.players.find(p => p.id === cur.id);
       if (!pa || !pb) return cur;
@@ -328,6 +335,11 @@ export class OnlineSession implements Session {
     if (def && def.slot === 'primary') this.lastSelectAt = 0;
     this.net.send({ t: 'buy', item });
     return null;
+  }
+
+  setSkins(skins: Record<string, string>): void {
+    this.pred.skins = { ...skins };
+    this.net.send({ t: 'skins', skins });
   }
 
   dispose(): void {

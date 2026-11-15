@@ -74,6 +74,8 @@ export interface PlayerView {
   ping: number;
   connected: boolean;
   variant: number;
+  /** Skin da arma em uso. */
+  skin: string;
 }
 
 export interface BombView {

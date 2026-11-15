@@ -20,6 +20,8 @@ import { Scoreboard } from '../interface/Scoreboard';
 import { BuyMenu } from '../interface/BuyMenu';
 import { CharacterModel } from '../player/CharacterModel';
 import { WEAPONS } from '../weapons/WeaponData';
+import { skinById } from '../weapons/Skins';
+import { SkinPrefs } from '../save/SkinPrefs';
 import { PLAYER } from '../player/PlayerController';
 import { BTN, type PlayerView, type SimEvent, type Team, type UserCmd } from '../sim/types';
 import type { SurfaceKind } from '../physics/CollisionWorld';
@@ -107,6 +109,11 @@ export class Game {
       }
     };
     this.touch = new TouchControls(document.getElementById('touchControls')!, this.input);
+    this.buyMenu.skinOf = id => SkinPrefs.get(id);
+    this.buyMenu.onSkin = (id, dir) => {
+      SkinPrefs.cycle(id, dir);
+      this.session?.setSkins(SkinPrefs.all);
+    };
     this.buyMenu.onBuy = item => {
       const err = this.session?.buy(item);
       if (err) {
@@ -305,7 +312,10 @@ export class Game {
     if (i.consume('buy')) this.toggleBuy();
     const sbHeld = i.isDown('score');
     if (sbHeld !== this.scoreboard.open) this.scoreboard.toggle(sbHeld);
-    if (i.consume('inspect')) this.view.inspect();
+    if (i.consume('inspect') && local?.alive && this.view.inspect()) {
+      const wid = local.weaponId();
+      this.hud.message(`${WEAPONS[wid]?.name ?? wid} | ${skinById(local.skinOf(wid)).name}`, 2.5);
+    }
 
     // mira (sensibilidade menor com zoom)
     const zoomScale = this.camera.currentZoom < 0.98 ? set.aimSensitivity * this.camera.currentZoom : 1;
@@ -394,10 +404,12 @@ export class Game {
       this.hud.setScope(scoped);
       // arma em primeira pessoa
       const wid = local.weaponId();
-      if (wid !== this.lastWeapon) {
-        this.lastWeapon = wid;
-        this.view.setWeapon(wid, w.drawTime);
-        if (this.lastPhase !== '') this.audio.play('draw');
+      const wskin = local.skinOf(wid);
+      if (wid + '|' + wskin !== this.lastWeapon) {
+        const sameGun = this.lastWeapon.startsWith(wid + '|');
+        this.lastWeapon = wid + '|' + wskin;
+        this.view.setWeapon(wid, w.drawTime, wskin);
+        if (this.lastPhase !== '' && !sameGun) this.audio.play('draw');
       }
       this.view.plant(local.act === 2 || local.act === 3);
       this.view.setVisible(!scoped);

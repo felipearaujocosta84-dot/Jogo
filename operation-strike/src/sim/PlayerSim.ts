@@ -50,6 +50,8 @@ export class SimPlayer {
   scope = 0;
   private scopeRestore = 0;
   flashUntil = 0;
+  /** Skins escolhidas pelo jogador (arma → skin). */
+  skins: Record<string, string> = {};
   flashAmount = 0;
   /** 0 nada, 1 recarregando, 2 plantando, 3 desarmando */
   act = 0;
@@ -108,6 +110,10 @@ export class SimPlayer {
     if (slot === 'primary') return this.primary?.id ?? 'knife';
     if (slot === 'secondary') return this.secondary?.id ?? 'knife';
     return slot;
+  }
+
+  skinOf(weaponId: string = this.weaponId()): string {
+    return this.skins[weaponId] ?? 'default';
   }
 
   get weapon(): WeaponDef {

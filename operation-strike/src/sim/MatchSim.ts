@@ -12,6 +12,7 @@ import { computeDamage, explosionDamage, rayBody } from '../combat/Hitboxes';
 import { GrenadeSim, type Nade, type NadeType } from './Grenades';
 import { SimPlayer, type SimHooks } from './PlayerSim';
 import { NavGrid } from '../bots/navigation/NavGrid';
+import { randomSkins } from '../weapons/Skins';
 import { BotBrain } from '../bots/behavior/BotBrain';
 import { TeamTactics } from '../bots/tactics/TeamTactics';
 import type {
@@ -144,7 +145,10 @@ export class MatchSim {
     p.money = this.rules.startMoney;
     this.players.push(p);
     this.groups.set(id, group);
-    if (p.bot) this.attachBrain(p);
+    if (p.bot) {
+      this.attachBrain(p);
+      p.skins = randomSkins(Object.keys(WEAPONS));
+    }
     // entra no meio da rodada: espera a próxima (morto), exceto no aquecimento/compra/treino
     const sp = this.map.spawn(team, variant);
     p.spawn(sp.x, 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
@@ -197,6 +201,12 @@ export class MatchSim {
         this.addPlayer(name, { bot: true, team: this.teamOf(g) });
       }
     }
+  }
+
+  /** Troca as skins de um jogador (já validadas). */
+  setSkins(id: string, skins: Record<string, string>): void {
+    const p = this.byId(id);
+    if (p) p.skins = { ...skins };
   }
 
   pushCmd(id: string, cmd: UserCmd): void {
@@ -793,7 +803,7 @@ export class MatchSim {
       yaw: r3(c.yaw), pitch: r3(c.pitch), crouch: c.crouched, ground: c.onGround, alive: p.alive,
       hp: Math.max(0, Math.round(p.health)), armor: Math.round(p.armor), helmet: p.helmet, kit: p.kit, money: p.money,
       weapon: p.weaponId(), bomb: p.c4, act: p.act, kills: p.kills, deaths: p.deaths, assists: p.assists, score: p.score,
-      mvps: p.mvps, ping: p.ping, connected: p.connected, variant: p.variant
+      mvps: p.mvps, ping: p.ping, connected: p.connected, variant: p.variant, skin: p.skinOf()
     };
   }
 

@@ -24,6 +24,9 @@ export class GeoBuilder {
   private indices: number[] = [];
   private boneIdx: number[] = [];
   private boneW: number[] = [];
+  private uvs: number[] = [];
+  /** Peças seguintes recebem o padrão da skin (UV na área do desenho) ou cor lisa (UV na faixa branca). */
+  patterned = false;
 
   add(vd: VertexData, pos: V3, rot: V3 = [0, 0, 0], color: string | Color3 = '#888888', bone = 0, scale: V3 = [1, 1, 1]): this {
     const m = Matrix.Compose(new Vector3(...scale), Quaternion.FromEulerAngles(rot[0], rot[1], rot[2]), new Vector3(...pos));
@@ -31,7 +34,11 @@ export class GeoBuilder {
     const base = this.positions.length / 3;
     const c = typeof color === 'string' ? Color3.FromHexString(color) : color;
     const p = vd.positions!, n = vd.normals!, idx = vd.indices!;
-    for (let i = 0; i < p.length; i += 3) {
+    const uv = vd.uvs;
+    for (let i = 0, k = 0; i < p.length; i += 3, k += 2) {
+      // a textura da skin tem o desenho em u 0..0,74 e uma faixa branca em u > 0,8
+      if (this.patterned && uv) this.uvs.push(uv[k] * 0.72 + 0.01, uv[k + 1]);
+      else this.uvs.push(0.9, 0.5);
       this.positions.push(p[i], p[i + 1], p[i + 2]);
       this.normals.push(n[i], n[i + 1], n[i + 2]);
       this.colors.push(c.r, c.g, c.b, 1);
@@ -68,8 +75,14 @@ export class GeoBuilder {
     this.colors.push(...o.colors);
     this.boneIdx.push(...o.boneIdx);
     this.boneW.push(...o.boneW);
+    this.uvs.push(...o.uvs);
     for (const i of o.indices) this.indices.push(base + i);
     return this;
+  }
+
+  /** Dados brutos (miniaturas desenhadas em canvas). */
+  get data() {
+    return { positions: this.positions, normals: this.normals, colors: this.colors, indices: this.indices, uvs: this.uvs };
   }
 
   get vertexCount(): number {
@@ -83,6 +96,7 @@ export class GeoBuilder {
     vd.normals = this.normals;
     vd.colors = this.colors;
     vd.indices = this.indices;
+    vd.uvs = this.uvs;
     if (skinned) {
       vd.matricesIndices = this.boneIdx;
       vd.matricesWeights = this.boneW;

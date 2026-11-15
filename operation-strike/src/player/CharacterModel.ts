@@ -76,6 +76,7 @@ export class CharacterModel {
   private bones: Bone[] = [];
   private gun: InstancedMesh | null = null;
   private gunId = '';
+  private gunSkin = '';
   private gunNode: TransformNode;
   private flash: Mesh;
   private flashT = 0;
@@ -223,12 +224,13 @@ export class CharacterModel {
     this.flash.setEnabled(false);
   }
 
-  setWeapon(id: string): void {
-    if (id === this.gunId) return;
+  setWeapon(id: string, skin = 'default'): void {
+    if (id === this.gunId && skin === this.gunSkin) return;
     this.gunId = id;
+    this.gunSkin = skin;
     this.gun?.dispose();
     this.gun = null;
-    const src = gunSource(id, this.scene);
+    const src = gunSource(id, this.scene, skin);
     this.gun = src.createInstance('gunInst');
     this.gun.parent = this.gunNode;
     this.gun.isVisible = true;
@@ -302,7 +304,7 @@ export class CharacterModel {
   update(dt: number, p: PlayerView, reloadT: number): void {
     this.root.position.set(p.x, p.y, p.z);
     this.root.rotation.y = p.yaw;
-    this.setWeapon(p.weapon);
+    this.setWeapon(p.weapon, p.skin);
     const cls = WEAPONS[p.weapon]?.cls ?? 'rifle';
 
     // morte

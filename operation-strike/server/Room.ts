@@ -18,6 +18,7 @@ export interface Client {
   connected: boolean;
   disconnectedAt: number;
   ping: number;
+  skins: Record<string, string>;
 }
 
 interface Member {
@@ -99,6 +100,7 @@ export class Room {
       if (!p) return 'Times cheios';
       playerId = p.id;
     }
+    if (this.sim) this.sim.setSkins(playerId, c.skins);
     const mem: Member = { client: c, playerId, team, events: [] };
     this.members.push(mem);
     c.room = this;
@@ -167,6 +169,7 @@ export class Room {
     for (const m of this.members) {
       const p = this.sim.addPlayer(m.client.name, { team: m.team, id: m.playerId });
       if (!p) continue;
+      p.skins = { ...m.client.skins };
       if (!m.client.connected) this.sim.setBotControl(m.playerId, true);
     }
     this.sim.fillBots();
@@ -190,6 +193,10 @@ export class Room {
     if (!this.sim || !c.playerId) return;
     const err = this.sim.buy(c.playerId, String(item));
     if (err) c.send({ t: 'error', msg: err });
+  }
+
+  skins(c: Client): void {
+    if (this.sim && c.playerId) this.sim.setSkins(c.playerId, c.skins);
   }
 
   chat(from: string, text: string): void {

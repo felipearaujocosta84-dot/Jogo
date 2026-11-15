@@ -36,6 +36,7 @@ export type ClientMsg =
   | { t: 'start' }
   | { t: 'cmd'; c: UserCmd[] }
   | { t: 'buy'; item: string }
+  | { t: 'skins'; skins: Record<string, string> }
   | { t: 'chat'; text: string }
   | { t: 'leave' }
   | { t: 'ping'; ts: number; rtt?: number };

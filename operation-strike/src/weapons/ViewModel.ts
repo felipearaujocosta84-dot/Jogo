@@ -25,6 +25,7 @@ type AnimKind = 'reload' | 'draw' | 'inspect' | 'slash' | 'throw' | 'plant';
 
 interface Visual {
   id: string;
+  skin: string;
   cls: WeaponClass;
   parts: GunParts;
   magRest: Vector3 | null;
@@ -117,9 +118,9 @@ export class ViewModel {
     // mangas trocam de cor: recria os modelos
     for (const v of this.visuals.values()) v.parts.root.dispose(false, false);
     this.visuals.clear();
-    const id = this.current?.id;
+    const id = this.current?.id, skin = this.current?.skin;
     this.current = null;
-    if (id) this.setWeapon(id, 0);
+    if (id) this.setWeapon(id, 0, skin);
   }
 
   private prep(m: Mesh | null): void {
@@ -151,11 +152,12 @@ export class ViewModel {
     add(CreateCylinder('sleeve', { diameterTop: 0.12, diameterBottom: 0.098, height: 0.5, tessellation: 10 }, this.scene), sleeve, 0.38);
   }
 
-  private visual(id: string): Visual {
-    let v = this.visuals.get(id);
+  private visual(id: string, skin: string): Visual {
+    const key = id + '|' + skin;
+    let v = this.visuals.get(key);
     if (v) return v;
     const def = WEAPONS[id];
-    const parts = buildGun(id, this.scene);
+    const parts = buildGun(id, this.scene, skin);
     parts.root.parent = this.sway;
     for (const m of [parts.body, parts.mag, parts.slide]) this.prep(m);
     const cls = def.cls;
@@ -173,9 +175,9 @@ export class ViewModel {
       this.arm(parts.root, cls === 'pistol' ? new Vector3(-0.03, -0.085, -0.02) : lh, new Vector3(-0.55, -0.6, -0.55));
     }
     const pose = POSE[cls];
-    v = { id, cls, parts, magRest: parts.mag ? parts.mag.position.clone() : null, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
+    v = { id, skin, cls, parts, magRest: parts.mag ? parts.mag.position.clone() : null, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
     parts.root.setEnabled(false);
-    this.visuals.set(id, v);
+    this.visuals.set(key, v);
     return v;
   }
 
@@ -188,10 +190,12 @@ export class ViewModel {
     return Vector3.TransformCoordinates(this.current.parts.muzzle, this.current.parts.root.getWorldMatrix());
   }
 
-  setWeapon(id: string, drawTime: number): void {
-    if (this.current?.id === id) return;
+  setWeapon(id: string, drawTime: number, skin = 'default'): void {
+    if (this.current?.id === id && this.current.skin === skin) return;
+    const sameGun = this.current?.id === id;
     if (this.current) this.current.parts.root.setEnabled(false);
-    this.current = this.visual(id);
+    this.current = this.visual(id, skin);
+    if (sameGun) drawTime = 0; // só trocou a skin
     this.current.parts.root.setEnabled(this.visible);
     this.flash.parent = this.current.parts.root;
     this.flash.position.copyFrom(this.current.parts.muzzle);
@@ -225,8 +229,13 @@ export class ViewModel {
     this.anim = { kind: 'reload', t: 0, dur: duration };
   }
 
-  inspect(): void {
-    if (!this.anim) this.anim = { kind: 'inspect', t: 0, dur: 2.6 };
+  /** Inspeção da arma. Retorna false se não pôde começar (ex.: recarregando). */
+  inspect(): boolean {
+    if (this.anim && this.anim.kind !== 'inspect') return false;
+    const cls = this.current?.cls;
+    const dur = cls === 'knife' ? 2.6 : cls === 'pistol' ? 3 : cls === 'grenade' || cls === 'c4' ? 2 : 3.6;
+    this.anim = { kind: 'inspect', t: 0, dur };
+    return true;
   }
 
   plant(active: boolean): void {
@@ -298,12 +307,26 @@ export class ViewModel {
           break;
         }
         case 'inspect': {
-          const e = Math.sin(k * Math.PI);
-          ry -= e * 0.9;
-          rz += Math.sin(Math.min(1, k * 1.4) * Math.PI) * 0.7;
-          rx -= e * 0.15;
-          pos.x -= e * 0.08;
-          pos.z -= e * 0.05;
+          // quadros-chave: [tempo, rx, ry, rz, dx, dy, dz]
+          const knife = v.cls === 'knife';
+          const frames: number[][] = knife
+            ? [[0, 0, 0, 0, 0, 0, 0], [0.18, -0.2, -0.9, 0.3, -0.06, 0.05, -0.02], [0.3, -0.2, -0.9, 0.3, -0.06, 0.05, -0.02],
+               [0.55, -0.2, -0.9, 0.3 + Math.PI * 2, -0.06, 0.09, -0.02], [0.75, 0.3, 0.6, -0.4, -0.04, 0.04, -0.03], [0.88, 0.3, 0.6, -0.4, -0.04, 0.04, -0.03], [1, 0, 0, 0, 0, 0, 0]]
+            : [[0, 0, 0, 0, 0, 0, 0], [0.16, -0.1, -1.05, 0.35, -0.07, 0.04, -0.05], [0.42, -0.06, -1.15, 0.3, -0.07, 0.045, -0.05],
+               [0.6, -0.55, 0.55, -0.3, -0.05, 0.06, -0.03], [0.8, -0.5, 0.65, -0.35, -0.05, 0.06, -0.03], [1, 0, 0, 0, 0, 0, 0]];
+          let i = 0;
+          while (i < frames.length - 2 && k > frames[i + 1][0]) i++;
+          const a = frames[i], b = frames[i + 1];
+          let t = (k - a[0]) / Math.max(1e-6, b[0] - a[0]);
+          t = Math.max(0, Math.min(1, t));
+          t = t * t * (3 - 2 * t); // suavização
+          const f = (j: number) => a[j] + (b[j] - a[j]) * t;
+          rx += f(1);
+          ry += f(2);
+          rz += f(3);
+          pos.x += f(4);
+          pos.y += f(5);
+          pos.z += f(6);
           break;
         }
         case 'slash': {
