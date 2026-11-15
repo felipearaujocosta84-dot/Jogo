@@ -55,12 +55,22 @@ export async function createPlayerVisual(scene, name, look) {
     root.scaling.scaleInPlace(MODEL_CONFIG.scale);
     const meshes = root.getChildMeshes(false);
     const jersey = Color3.FromHexString(look.jersey);
+    const tint = (mat) => {
+      if ('albedoColor' in mat) mat.albedoColor = jersey;
+      else if ('diffuseColor' in mat) mat.diffuseColor = jersey;
+    };
+    let tinted = 0;
     for (const m of meshes) {
       const mat = m.material;
       if (mat && MODEL_CONFIG.jerseyMaterialKeys.some((k) => mat.name.toLowerCase().includes(k))) {
-        if ('albedoColor' in mat) mat.albedoColor = jersey;
-        else if ('diffuseColor' in mat) mat.diffuseColor = jersey;
+        tint(mat);
+        tinted++;
       }
+    }
+    // nenhum material com nome reconhecido: pinta o da maior malha (normalmente o corpo/uniforme)
+    if (!tinted) {
+      const biggest = meshes.filter((m) => m.material).sort((a, b) => b.getTotalVertices() - a.getTotalVertices())[0];
+      if (biggest) tint(biggest.material);
     }
     const animator = new GlbAnimator(inst.animationGroups, MODEL_CONFIG.animations);
     return { root, meshes, animator, kind: 'glb', yawOffset: MODEL_CONFIG.rotationY };
