@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#05070f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Street Football 3D</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    <!-- Carregamento -->
+    <div id="loading" class="overlay">
+      <div class="logo"><span>STREET</span><b>FOOTBALL 3D</b></div>
+      <div class="bar"><div id="loadingFill"></div></div>
+      <p id="loadingText">Carregando…</p>
+    </div>
+
+    <!-- Tela inicial (necessária para liberar áudio e tela cheia) -->
+    <div id="start" class="overlay hidden">
+      <div class="logo"><span>STREET</span><b>FOOTBALL 3D</b></div>
+      <p class="stage">Etapa 1 · Treino de chute na quadra</p>
+      <button id="btnStart" class="btn primary">TOCAR PARA JOGAR</button>
+      <ul class="howto">
+        <li><b>Toque rápido</b> na quadra: passe rasteiro até o ponto.</li>
+        <li><b>Segure</b> e solte: chute — quanto mais tempo, mais forte e mais alto.</li>
+        <li><b>Arraste</b> enquanto segura para ajustar a mira.</li>
+      </ul>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="scoreboard">
+        <div class="team home"><i></i><span id="homeName">CASA</span></div>
+        <div class="score"><span id="homeScore">0</span><em>:</em><span id="awayScore">0</span></div>
+        <div class="team away"><span id="awayName">VISITANTE</span><i></i></div>
+        <div class="mode">TREINO</div>
+      </div>
+      <div id="fps" class="hidden"></div>
+      <div id="topButtons">
+        <button id="btnReset" class="btn icon" title="Recolocar bola">⟲</button>
+        <button id="btnPause" class="btn icon" title="Pausar">❚❚</button>
+      </div>
+      <div id="charge"><div id="chargeFill"></div><span>FORÇA</span></div>
+    </div>
+
+    <div id="goalBanner" class="hidden"><b>GOOOL!</b><span id="goalTeam"></span></div>
+
+    <!-- Pausa / configurações -->
+    <div id="pause" class="overlay hidden">
+      <h2>PAUSADO</h2>
+      <div class="settings">
+        <label>Qualidade
+          <select id="optQuality">
+            <option value="auto">Automática</option>
+            <option value="high">Alta</option>
+            <option value="medium">Média</option>
+            <option value="low">Baixa</option>
+          </select>
+        </label>
+        <label>Limite de FPS
+          <select id="optFps">
+            <option value="60">60</option>
+            <option value="30">30 (economia)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="optSound" /> Som</label>
+        <label class="check"><input type="checkbox" id="optShowFps" /> Mostrar FPS</label>
+      </div>
+      <button id="btnResume" class="btn primary">CONTINUAR</button>
+    </div>
+
+    <div id="rotate" class="overlay hidden">
+      <div class="phone"></div>
+      <p>Gire o celular para jogar na horizontal</p>
+      <button id="btnRotateIgnore" class="btn">Continuar assim</button>
+    </div>
+
+    <div id="error" class="overlay hidden"><h2>Ops!</h2><pre id="errorText"></pre></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
