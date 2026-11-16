@@ -11,7 +11,7 @@ e separação do pente em uma peça própria ("Magazine") nos fuzis, para a anim
 
 | Arquivo no jogo | Modelo original |
 |---|---|
-| weapons/rifles/ak47.glb | AssaultRifle_2 |
+| weapons/extra/ak47_lowpoly.glb | AssaultRifle_2 (AK-47 anterior, guardada) |
 | weapons/rifles/m4a4.glb | AssaultRifle2_2 |
 | weapons/rifles/m4a1.glb | AssaultRifle2_2 (mesmo modelo da M4A4) |
 | weapons/rifles/aug.glb | Bullpup_1 |
@@ -19,6 +19,18 @@ e separação do pente em uma peça própria ("Magazine") nos fuzis, para a anim
 | weapons/pistols/glock.glb | Pistol_4 |
 | weapons/pistols/p250.glb | Pistol_1 |
 | weapons/extra/AssaultRifle_1.glb, _3, _4, _5 | variantes de AK guardadas para armas futuras |
+
+## Armas detalhadas — Stein Games (CC0 1.0)
+Modelos e texturas PBR de **Stein Games**, licença **CC0 1.0** (uso livre, inclusive comercial; crédito opcional —
+ver `weapons/LICENSE_SteinGames.txt`). Convertidos com `scripts/blender/convert_stein_weapons.py`: carregador e ferrolho
+separados em peças ("Magazine"/"Slide") para a recarga, texturas RMAO→ORM e normal DirectX→OpenGL.
+
+| Arquivo no jogo | Modelo original |
+|---|---|
+| weapons/rifles/ak47.glb | SKM_AK47 |
+| weapons/smg/mp5.glb | SKM_MP5 |
+| weapons/smg/mac10.glb | SKM_Mac10 |
+| weapons/snipers/ssg08.glb | SKM_M700 (fuzil de ferrolho, usado como SSG 08) |
 
 ## Mapas 3D (public/assets/maps/)
 Kit gratuito **"PvP Battle Maps"** da **Shuriken Studio** — https://shuriken.studio/kits/pvp-battle-maps
