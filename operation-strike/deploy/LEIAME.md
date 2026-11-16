@@ -51,3 +51,14 @@ O app não contém senhas nem chaves: só guarda o token da sessão do jogador.
 ## O que NÃO está feito por mim
 O servidor **não está online**: não tenho acesso a uma VPS. Os passos acima são para você (ou eu, se você
 fornecer o acesso) colocar no ar.
+
+## Hospedar no Render (sem VPS)
+O arquivo `render.yaml` (na raiz do repositório) cria o servidor e o PostgreSQL:
+1. Crie a conta em https://render.com e conecte o GitHub.
+2. **New → Blueprint** → escolha o repositório `Jogo` e o ramo `claude/operation-strike-fps-pyufgw` → **Apply**.
+3. Aguarde o primeiro deploy (alguns minutos). O endereço fica como `https://operation-strike-xxxx.onrender.com`.
+4. Teste no navegador: `https://SEU-ENDEREÇO/api/health` → `{"ok":true}`. O jogo também abre em `https://SEU-ENDEREÇO`.
+5. No app: **Jogar online → CONTA → Servidor** = `https://SEU-ENDEREÇO`.
+Planos no arquivo: web `starter` e banco `basic-256mb` (pagos, sempre ligados). O plano gratuito do web dorme sem uso
+(primeira conexão demora ~1 min) e o banco gratuito expira — dá para testar trocando `plan: free` nos dois.
+A cada envio de código no ramo, o Render atualiza sozinho (`autoDeploy`).

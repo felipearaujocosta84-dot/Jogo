@@ -13,7 +13,9 @@ export class PgStore implements Store {
   private pool: pg.Pool;
 
   constructor(url: string) {
-    this.pool = new pg.Pool({ connectionString: url, max: 10, idleTimeoutMillis: 30_000 });
+    // DATABASE_SSL=1 para bancos que exigem SSL (conexões externas de provedores gerenciados)
+    const ssl = process.env.DATABASE_SSL === '1' ? { rejectUnauthorized: false } : undefined;
+    this.pool = new pg.Pool({ connectionString: url, max: 10, idleTimeoutMillis: 30_000, ssl });
   }
 
   async init(): Promise<void> {

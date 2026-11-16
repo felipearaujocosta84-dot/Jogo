@@ -1,0 +1,33 @@
+# Render Blueprint: servidor multiplayer do OPERATION STRIKE + PostgreSQL.
+# No Render: New → Blueprint → escolha este repositório. HTTPS/WSS são automáticos.
+services:
+  - type: web
+    name: operation-strike
+    runtime: node
+    rootDir: operation-strike
+    plan: starter
+    region: ohio
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npx tsx server/index.ts
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: operation-strike-db
+          property: connectionString
+
+databases:
+  - name: operation-strike-db
+    plan: basic-256mb
+    region: ohio
+    databaseName: opstrike
+    user: opstrike
