@@ -3,7 +3,6 @@
 // recuo, recarga (pente sai/entra), saque, inspeção, mira, golpe de faca, arremesso de granada, plantio da C4.
 import {
   Color3,
-  CreateBox,
   CreateCylinder,
   CreatePlane,
   Mesh,
@@ -11,11 +10,18 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  Matrix,
+  type AbstractMesh,
+  type AnimationGroup,
+  type AssetContainer,
   type Camera,
   type Scene
 } from '../core/babylon';
 import { paintedTexture } from '../maps/textures';
-import { buildGun, type GunParts } from './WeaponModels';
+import { buildGun } from './WeaponModels';
+import { buildHand } from './Hands';
+import type { WeaponLibrary, GlbGun } from './WeaponLibrary';
+import type { WeaponModelConfig } from '../assets/AssetRegistry';
 import { WEAPONS, type WeaponClass } from './WeaponData';
 import type { Team } from '../sim/types';
 
@@ -36,11 +42,45 @@ function track(frames: number[][], k: number): number[] {
 
 type AnimKind = 'reload' | 'draw' | 'inspect' | 'slash' | 'throw' | 'plant';
 
+/** Caixa envolvente de um nó (e filhos) no espaço de outro nó. */
+function boundsIn(node: TransformNode, space: TransformNode): { min: Vector3; max: Vector3 } | null {
+  const meshes = (node as unknown as AbstractMesh).getBoundingInfo ? [node as unknown as AbstractMesh, ...node.getChildMeshes(false)] : node.getChildMeshes(false);
+  space.computeWorldMatrix(true);
+  const inv = Matrix.Invert(space.getWorldMatrix());
+  const min = new Vector3(Infinity, Infinity, Infinity), max = new Vector3(-Infinity, -Infinity, -Infinity);
+  let any = false;
+  for (const m of meshes) {
+    if (!m.getBoundingInfo) continue;
+    m.computeWorldMatrix(true);
+    for (const c of m.getBoundingInfo().boundingBox.vectorsWorld) {
+      const p = Vector3.TransformCoordinates(c, inv);
+      min.minimizeInPlace(p);
+      max.maximizeInPlace(p);
+      any = true;
+    }
+  }
+  return any ? { min, max } : null;
+}
+
+/** Peças da arma em primeira pessoa (modelo procedural ou GLB). */
+interface VisualParts {
+  root: TransformNode;
+  meshes: AbstractMesh[];
+  mag: TransformNode | null;
+  slide: TransformNode | null;
+  muzzle: Vector3;
+  leftHand: Vector3;
+}
+
 interface Visual {
   id: string;
   skin: string;
   cls: WeaponClass;
-  parts: GunParts;
+  parts: VisualParts;
+  /** true = modelo GLB do arquivo; false = modelo procedural provisório. */
+  glb: boolean;
+  /** Animações do arquivo GLB (por nome normalizado: idle, fire, reload, inspect, draw). */
+  clips: Record<string, AnimationGroup>;
   magRest: Vector3 | null;
   /** Mão esquerda (anda durante a recarga) e pontos de referência no corpo da arma. */
   leftArm: TransformNode | null;
@@ -79,6 +119,12 @@ export class ViewModel {
   private time = 0;
   private team: Team = 'CT';
   private visible = true;
+  private runT = 0;
+  private library: WeaponLibrary | null = null;
+  private handsTemplate: AssetContainer | null = null;
+  private handsCfg: WeaponModelConfig & { scale?: number } = {};
+  /** Avisado quando um modelo GLB substitui o provisório (interface). */
+  onModelChange: ((id: string, glb: boolean) => void) | null = null;
 
   constructor(private scene: Scene, camera: Camera) {
     scene.setRenderingAutoClearDepthStencil(VIEW_GROUP, true, true, false);
@@ -134,6 +180,30 @@ export class ViewModel {
     if (team === this.team) return;
     this.team = team;
     // mangas trocam de cor: recria os modelos
+    this.rebuild();
+  }
+
+  private prep(m: AbstractMesh | null): void {
+    if (!m) return;
+    m.renderingGroupId = VIEW_GROUP;
+    m.alwaysSelectAsActiveMesh = true;
+    m.isPickable = false;
+  }
+
+  /** Liga a biblioteca de modelos GLB (armas e mãos). */
+  setLibrary(lib: WeaponLibrary | null, handsCfg: WeaponModelConfig & { scale?: number } = {}): void {
+    this.library = lib;
+    this.handsCfg = handsCfg;
+    if (!lib) return;
+    void lib.handsContainer().then(c => {
+      if (!c) return;
+      this.handsTemplate = c;
+      this.rebuild(); // troca as mãos procedurais pelas do arquivo
+    });
+  }
+
+  /** Recria os modelos (troca de time, mãos novas, qualidade). */
+  private rebuild(): void {
     for (const v of this.visuals.values()) v.parts.root.dispose(false, false);
     this.visuals.clear();
     const id = this.current?.id, skin = this.current?.skin;
@@ -141,14 +211,7 @@ export class ViewModel {
     if (id) this.setWeapon(id, 0, skin);
   }
 
-  private prep(m: Mesh | null): void {
-    if (!m) return;
-    m.renderingGroupId = VIEW_GROUP;
-    m.alwaysSelectAsActiveMesh = true;
-    m.isPickable = false;
-  }
-
-  private arm(parent: TransformNode, hand: Vector3, toward: Vector3): TransformNode {
+  private arm(parent: TransformNode, hand: Vector3, toward: Vector3, side: 1 | -1 = 1, grip = 0.85): TransformNode {
     const node = new TransformNode('arm', this.scene);
     node.parent = parent;
     node.position.copyFrom(hand);
@@ -164,7 +227,25 @@ export class ViewModel {
       m.material = this.mats[mat];
       this.prep(m);
     };
-    add(CreateBox('glove', { width: 0.072, height: 0.1, depth: 0.082 }, this.scene), 'glove', 0.02);
+    if (this.handsTemplate) {
+      // mão do arquivo GLB (a esquerda é espelhada)
+      const inst = this.handsTemplate.instantiateModelsToScene(n => 'hand_' + n, false, { doNotInstantiate: true });
+      const h = new TransformNode('glbHand', this.scene);
+      h.parent = node;
+      const c = this.handsCfg;
+      const sc = c.scale ?? 1;
+      h.scaling.set(sc * side, sc, sc);
+      if (c.rotation) h.rotation.set(...(c.rotation.map(d => (d * Math.PI) / 180) as [number, number, number]));
+      if (c.offset) h.position.set(...c.offset);
+      for (const r of inst.rootNodes) r.parent = h;
+      for (const m of h.getChildMeshes(false)) this.prep(m);
+      const idle = inst.animationGroups.find(a => /idle|grip|hold/i.test(a.name)) ?? inst.animationGroups[0];
+      idle?.start(true);
+    } else {
+      const glove = buildHand(this.scene, side, grip);
+      glove.parent = node;
+      this.prep(glove);
+    }
     add(CreateCylinder('wrist', { diameter: 0.068, height: 0.06, tessellation: 10 }, this.scene), 'skin', 0.09);
     add(CreateCylinder('cuff', { diameter: 0.088, height: 0.05, tessellation: 10 }, this.scene), 'cuff', 0.13);
     add(CreateCylinder('sleeve', { diameterTop: 0.12, diameterBottom: 0.098, height: 0.5, tessellation: 10 }, this.scene), sleeve, 0.38);
@@ -173,39 +254,94 @@ export class ViewModel {
 
   private visual(id: string, skin: string): Visual {
     const key = id + '|' + skin;
+    // o GLB definitivo (se já carregado) tem prioridade sobre o provisório
+    const glbHit = this.visuals.get('glb|' + key);
+    if (glbHit) return glbHit;
     let v = this.visuals.get(key);
     if (v) return v;
     const def = WEAPONS[id];
-    const parts = buildGun(id, this.scene, skin);
+    const g = buildGun(id, this.scene, skin);
+    const meshes = [g.body, g.mag, g.slide].filter((m): m is Mesh => !!m);
+    const parts: VisualParts = { root: g.root, meshes, mag: g.mag, slide: g.slide, muzzle: g.muzzle, leftHand: g.leftHand };
+    v = this.assemble(id, skin, def.cls, parts, false, {});
+    this.visuals.set(key, v);
+    return v;
+  }
+
+  /** Monta braços, pontos de recarga e poses em volta de uma arma (procedural ou GLB). */
+  private assemble(id: string, skin: string, cls: WeaponClass, parts: VisualParts, glb: boolean, clips: Record<string, AnimationGroup>): Visual {
     let leftArm: TransformNode | null = null;
     parts.root.parent = this.sway;
-    for (const m of [parts.body, parts.mag, parts.slide]) this.prep(m);
-    const cls = def.cls;
+    for (const m of parts.meshes) this.prep(m);
     // mãos
     if (cls === 'grenade') {
-      this.arm(parts.root, new Vector3(0.0, -0.03, 0.02), new Vector3(0.4, -0.6, -0.7));
+      this.arm(parts.root, new Vector3(0.0, -0.03, 0.02), new Vector3(0.4, -0.6, -0.7), 1, 0.95);
     } else if (cls === 'knife') {
-      this.arm(parts.root, new Vector3(0.0, -0.02, 0.0), new Vector3(0.4, -0.55, -0.75));
+      this.arm(parts.root, new Vector3(0.0, -0.02, 0.0), new Vector3(0.4, -0.55, -0.75), 1, 1);
     } else if (cls === 'c4') {
-      this.arm(parts.root, new Vector3(0.08, -0.04, 0.04), new Vector3(0.45, -0.6, -0.65));
-      this.arm(parts.root, new Vector3(-0.08, -0.04, 0.04), new Vector3(-0.45, -0.6, -0.65));
+      this.arm(parts.root, new Vector3(0.08, -0.04, 0.04), new Vector3(0.45, -0.6, -0.65), 1, 0.5);
+      this.arm(parts.root, new Vector3(-0.08, -0.04, 0.04), new Vector3(-0.45, -0.6, -0.65), -1, 0.5);
     } else {
-      this.arm(parts.root, new Vector3(0.01, -0.09, -0.05), new Vector3(0.45, -0.55, -0.7));
+      this.arm(parts.root, new Vector3(0.01, -0.09, -0.05), new Vector3(0.45, -0.55, -0.7), 1, 0.9);
       const lh = parts.leftHand;
-      leftArm = this.arm(parts.root, cls === 'pistol' ? new Vector3(-0.03, -0.085, -0.02) : lh, new Vector3(-0.55, -0.6, -0.55));
+      leftArm = this.arm(parts.root, cls === 'pistol' ? new Vector3(-0.03, -0.085, -0.02) : lh, new Vector3(-0.55, -0.6, -0.55), -1, cls === 'pistol' ? 0.7 : 0.75);
     }
     // ponto onde a mão pega o pente (embaixo do pente) e onde puxa a alavanca/ferrolho
     let magGrab = new Vector3(0, -0.15, 0.1);
     if (parts.mag) {
-      const bb = parts.mag.getBoundingInfo().boundingBox;
-      magGrab = new Vector3(bb.center.x, bb.minimum.y + 0.04, bb.center.z);
+      const b = boundsIn(parts.mag, parts.root);
+      if (b) magGrab = new Vector3((b.min.x + b.max.x) / 2, b.min.y + 0.04, (b.min.z + b.max.z) / 2);
     }
     const handle = cls === 'pistol' ? new Vector3(-0.025, 0.045, -0.05) : cls === 'sniper' ? new Vector3(0.05, 0.05, -0.03) : new Vector3(0.045, 0.04, 0.08);
     const pose = POSE[cls];
-    v = { id, skin, cls, parts, magRest: parts.mag ? parts.mag.position.clone() : null, leftArm, leftRest: leftArm ? leftArm.position.clone() : Vector3.Zero(), magGrab, handle, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
+    const v: Visual = { id, skin, cls, parts, glb, clips, magRest: parts.mag ? parts.mag.position.clone() : null, leftArm, leftRest: leftArm ? leftArm.position.clone() : Vector3.Zero(), magGrab, handle, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
     parts.root.setEnabled(false);
-    this.visuals.set(key, v);
     return v;
+  }
+
+  /** Pede o modelo GLB da arma; quando chegar, substitui o provisório sem interromper a animação. */
+  private requestGlb(id: string, skin: string): void {
+    const lib = this.library;
+    if (!lib || this.visuals.has('glb|' + id + '|' + skin)) return;
+    void lib.instantiate(id, skin).then((g: GlbGun | null) => {
+      if (!g) {
+        this.onModelChange?.(id, false);
+        return;
+      }
+      const clips: Record<string, AnimationGroup> = {};
+      for (const a of g.animations) {
+        a.stop();
+        const n = a.name.toLowerCase();
+        const key = /reload|recarg/.test(n) ? 'reload' : /inspect|inspec/.test(n) ? 'inspect' : /draw|deploy|equip|saque/.test(n) ? 'draw' : /fire|shoot|recoil|tiro/.test(n) ? 'fire' : /idle|parad/.test(n) ? 'idle' : n;
+        clips[key] = a;
+      }
+      const parts: VisualParts = { root: g.root, meshes: g.meshes, mag: g.mag, slide: g.slide, muzzle: g.muzzle, leftHand: g.leftHand };
+      const v = this.assemble(id, skin, WEAPONS[id].cls, parts, true, clips);
+      this.visuals.set('glb|' + id + '|' + skin, v);
+      if (this.current && this.current.id === id && this.current.skin === skin && !this.current.glb) {
+        this.resetPose(this.current);
+        this.current.parts.root.setEnabled(false);
+        this.current = v;
+        v.parts.root.setEnabled(this.visible);
+        this.flash.parent = v.parts.root;
+        this.flash.position.copyFrom(v.parts.muzzle);
+        this.flash.position.z += 0.04;
+        v.clips.idle?.start(true);
+      }
+      this.onModelChange?.(id, true);
+    });
+  }
+
+  /** O modelo atual é o GLB definitivo? */
+  get usingGlb(): boolean {
+    return !!this.current?.glb;
+  }
+
+  private play(name: string, loop = false): void {
+    const c = this.current?.clips[name];
+    if (!c) return;
+    for (const other of Object.values(this.current!.clips)) if (other !== c) other.stop();
+    c.start(loop, 1, c.from, c.to, false);
   }
 
   get weaponId(): string {
@@ -231,6 +367,8 @@ export class ViewModel {
     this.flash.position.copyFrom(this.current.parts.muzzle);
     this.flash.position.z += 0.04;
     this.anim = drawTime > 0 ? { kind: 'draw', t: 0, dur: drawTime } : null;
+    if (drawTime > 0) this.play('draw');
+    if (!this.current.glb) this.requestGlb(id, skin);
   }
 
   fire(): void {
@@ -245,6 +383,7 @@ export class ViewModel {
     }
     const pistol = cls === 'pistol';
     const sniper = cls === 'sniper';
+    this.play('fire');
     this.kickBack = Math.min(0.07, this.kickBack + (sniper ? 0.06 : pistol ? 0.035 : 0.02));
     this.kickRot = Math.min(0.3, this.kickRot + (sniper ? 0.25 : pistol ? 0.15 : 0.045));
     if (WEAPONS[this.current?.id ?? '']?.sound !== 'silenced') {
@@ -257,6 +396,7 @@ export class ViewModel {
 
   reload(duration: number): void {
     this.anim = { kind: 'reload', t: 0, dur: duration };
+    this.play('reload');
   }
 
   /** Devolve mão, pente e ferrolho à posição normal (fim ou interrupção de animação). */
@@ -275,6 +415,7 @@ export class ViewModel {
     const cls = this.current?.cls;
     const dur = cls === 'knife' ? 2.6 : cls === 'pistol' ? 3 : cls === 'grenade' || cls === 'c4' ? 2 : 3.6;
     this.anim = { kind: 'inspect', t: 0, dur };
+    this.play('inspect');
     return true;
   }
 
@@ -427,9 +568,16 @@ export class ViewModel {
       }
     }
 
-    const run = Math.max(0, Math.min(1, (st.speed - 3.5) / 2)) * (1 - this.aimT);
-    rz += run * 0.08;
-    ry += run * 0.06;
+    // corrida: arma abaixa e inclina (transição suave); some ao mirar ou animar
+    const runTarget = !this.anim && this.aimT < 0.2 && st.onGround ? Math.max(0, Math.min(1, (st.speed - 4.6) / 0.9)) : 0;
+    this.runT += (runTarget - this.runT) * Math.min(1, dt * 7);
+    const run = this.runT;
+    rx += run * 0.32;
+    ry += run * 0.42;
+    rz += run * 0.18;
+    pos.x += run * 0.02;
+    pos.y -= run * 0.045 + Math.abs(Math.sin(st.bobPhase)) * 0.012 * run;
+    pos.z -= run * 0.03;
     this.sway.position.copyFrom(pos);
     this.sway.rotation.set(rx, ry, rz);
 

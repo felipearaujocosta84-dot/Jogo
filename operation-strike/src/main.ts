@@ -5,7 +5,6 @@ import { LocalSession, OnlineSession, type Session } from './core/Session';
 import { NetClient } from './multiplayer/NetClient';
 import type { RoomInfo } from './multiplayer/Protocol';
 import { MAP_LIST, MAPS } from './maps/maps';
-import { BUY_CATEGORIES, WEAPONS, EQUIPMENT, itemName } from './weapons/WeaponData';
 import { applyMatch, BOT_MMR, levelFor, rankName, type ProfileData } from './save/Profile';
 import { loadLocalProfile, saveLocalProfile } from './save/LocalProfile';
 import { Storage } from './save/Storage';
@@ -13,13 +12,16 @@ import type { Difficulty, GameMode, Team } from './sim/types';
 import { esc } from './interface/Hud';
 import { isNativeApp } from './core/Platform';
 import { SkinPrefs } from './save/SkinPrefs';
-import { SKINS, RARITY_COLOR, skinById } from './weapons/Skins';
-import { gunThumbnail } from './weapons/WeaponModels';
-import { skinSwatch } from './weapons/SkinPatterns';
+import { ArsenalScreen } from './interface/ArsenalScreen';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const settings = new Settings();
+const arsenal = new ArsenalScreen();
+arsenal.onToast = msg => toast(msg);
+arsenal.onEquip = () => {
+  if (net?.connected) net.send({ t: 'skins', skins: SkinPrefs.all });
+};
 const canvas = $<HTMLCanvasElement>('renderCanvas');
 const game = new Game(canvas, settings);
 document.body.classList.toggle('touch', game.isTouch);
@@ -39,7 +41,10 @@ function show(id: ScreenId): void {
   if (id === 'mainMenu') refreshMenuRank();
   if (id === 'profileScreen') renderProfile(profileTab);
   if (id === 'rankingScreen') void loadRanking();
-  if (id === 'arsenalScreen') renderArsenal();
+  if (id === 'arsenalScreen') {
+    updateSkinLevel();
+    arsenal.open();
+  } else arsenal.close();
 }
 
 let toastTimer = 0;
@@ -267,49 +272,6 @@ function renderLobby(r: RoomInfo): void {
 }
 
 // ------------------------------------------------------------ telas informativas
-
-function renderArsenal(): void {
-  updateSkinLevel();
-  const bar = (v: number, max: number) => `<i class="bar"><b style="width:${Math.min(100, (v / max) * 100)}%"></b></i>`;
-  const swatchRow = (weapon: string, cur: string) =>
-    SKINS.map(sk => {
-      const locked = !SkinPrefs.unlocked(sk.id);
-      return `<button class="sw ${sk.id === cur ? 'on' : ''} ${locked ? 'locked' : ''}" data-w="${weapon}" data-sk="${sk.id}" title="${sk.name}${locked ? ' — nível ' + sk.level : ''}" style="--rar:${RARITY_COLOR[sk.rarity]};background-image:url(${skinSwatch(sk.id).toDataURL()})">${locked ? '🔒' : ''}</button>`;
-    }).join('');
-  const knifeSkin = skinById(SkinPrefs.get('knife'));
-  $('arsenalList').innerHTML =
-    `<p class="roadmap">Toque numa skin para equipar. Novas skins são liberadas ao subir de nível (você está no nível ${SkinPrefs.level}).</p>` +
-    BUY_CATEGORIES.map(c => {
-      const items = c.items.map(id => {
-        const w = WEAPONS[id];
-        const side = (w?.team ?? EQUIPMENT.find(e => e.id === id)?.team) ?? '';
-        if (!w) return `<div class="wcard"><b>${itemName(id)}</b><span class="price">$${EQUIPMENT.find(e => e.id === id)?.price}</span><small>${side ? 'Somente ' + side : 'Ambos os lados'}</small></div>`;
-        if (w.cls === 'grenade')
-          return `<div class="wcard"><img src="${gunThumbnail(id)}" alt="" /><b>${w.name}</b><span class="price">$${w.price}</span><small>${id === 'he' ? 'Até 98 de dano em 8 m' : id === 'flash' ? 'Cega quem estiver olhando' : 'Fumaça por 18 s, bloqueia a visão'}</small></div>`;
-        const cur = skinById(SkinPrefs.get(id));
-        return `<div class="wcard"><img src="${gunThumbnail(id, cur.id)}" alt="" /><b>${w.name}</b><span class="skinname" style="color:${RARITY_COLOR[cur.rarity]}">${cur.name}</span><span class="price">$${w.price}</span>
-          <div class="swatches">${swatchRow(id, cur.id)}</div>
-          <small>${side ? 'Somente ' + (side === 'T' ? 'TR' : 'CT') : 'Ambos os lados'} · recompensa $${w.killReward}</small>
-          <label>Dano ${w.damage}${bar(w.damage, 115)}</label><label>Cadência ${Math.round(w.fireRate * 60)} RPM${bar(w.fireRate, 14)}</label>
-          <label>Penetração no colete ${Math.round(w.armorPen * 100)}%${bar(w.armorPen, 1)}</label><label>Precisão${bar(6 - Math.min(6, w.spreadStand * 2), 6)}</label>
-          <label>Mobilidade${bar(w.speed, 1)}</label><small>Pente ${w.magazine}/${w.reserve} · recarga ${w.reloadTime}s${w.scope ? ' · luneta' : ''}</small></div>`;
-      });
-      return `<h3>${c.name}</h3><div class="wgrid">${items.join('')}</div>`;
-    }).join('') +
-    `<h3>Faca</h3><div class="wgrid"><div class="wcard"><img src="${gunThumbnail('knife', knifeSkin.id)}" alt="" /><b>Faca</b><span class="skinname" style="color:${RARITY_COLOR[knifeSkin.rarity]}">${knifeSkin.name}</span><div class="swatches">${swatchRow('knife', knifeSkin.id)}</div><small>Recompensa por abate $1500</small></div></div>`;
-}
-
-$('arsenalList').addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest<HTMLElement>('[data-sk]');
-  if (!b) return;
-  const sk = skinById(b.dataset.sk);
-  if (!SkinPrefs.set(b.dataset.w!, sk.id)) return toast(`${sk.name} é liberada no nível ${sk.level}`);
-  game.audio.play('click');
-  if (net?.connected) net.send({ t: 'skins', skins: SkinPrefs.all });
-  const y = $('arsenalList').scrollTop;
-  renderArsenal();
-  $('arsenalList').scrollTop = y;
-});
 
 let profileTab: 'local' | 'online' = 'local';
 

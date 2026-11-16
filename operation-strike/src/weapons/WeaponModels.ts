@@ -4,7 +4,7 @@
 // para as mãos dos personagens e para as miniaturas da loja (desenhadas em canvas a partir da geometria).
 // Origem = empunhadura (mão direita); +Z = cano.
 import { GeoBuilder } from '../core/GeoBuilder';
-import { Mesh, StandardMaterial, Color3, DynamicTexture, Texture, TransformNode, Vector3, type Scene } from '../core/babylon';
+import { Mesh, StandardMaterial, PBRMaterial, Color3, DynamicTexture, Texture, TransformNode, Vector3, type Scene } from '../core/babylon';
 import { skinById, type SkinDef } from './Skins';
 import { skinCanvas } from './SkinPatterns';
 
@@ -31,9 +31,6 @@ function col(g: GeoBuilder, role: Role, c: string): string {
   const pat = SK.pattern !== 'none' && (role === 'body' || role === 'furn');
   g.patterned = pat;
   if (pat) return '#ffffff';
-  if (role === 'body' && SK.body) return SK.body;
-  if (role === 'furn' && SK.furniture) return SK.furniture;
-  if (role === 'metal' && SK.metal) return SK.metal;
   return c;
 }
 
@@ -118,6 +115,25 @@ function buildParts(id: string, skin: string): { parts: Parts; muzzle: number; l
   let r = { muzzle: 0.3, left: 0.2 };
   switch (id) {
     case 'ak47': r = rifleLike(parts, { recv: 0.36, barrel: 0.3, body: METAL, furn: WOOD, stock: 'wood', mag: 'curved' }); break;
+    case 'aug': {
+      // fuzil bullpup: pente atrás da empunhadura, luneta integrada e empunhadura frontal
+      const g = parts.body;
+      g.box(0.07, 0.1, 0.52, [0, 0.0, -0.06], col(g, 'body', '#3d4a3a'));
+      g.box(0.075, 0.04, 0.4, [0, -0.06, -0.04], col(g, 'furn', '#2f3a2d'));
+      g.box(0.034, 0.1, 0.05, [0, -0.07, 0.0], col(g, 'detail', POLY), [-0.25, 0, 0]);
+      g.box(0.034, 0.1, 0.045, [0, -0.08, 0.17], col(g, 'detail', POLY), [0.1, 0, 0]);
+      g.box(0.06, 0.012, 0.2, [0, -0.11, 0.08], col(g, 'furn', '#2f3a2d'));
+      g.cyl(0.022, 0.022, 0.26, [0, 0.02, 0.33], col(g, 'metal', METAL), [Math.PI / 2, 0, 0]);
+      g.cyl(0.034, 0.034, 0.06, [0, 0.02, 0.47], col(g, 'metal', METAL2), [Math.PI / 2, 0, 0]);
+      g.cyl(0.042, 0.042, 0.2, [0, 0.1, 0.03], col(g, 'body', '#2a332a'), [Math.PI / 2, 0, 0], 0, 12);
+      g.cyl(0.05, 0.042, 0.04, [0, 0.1, 0.14], col(g, 'detail', '#1d1f21'), [Math.PI / 2, 0, 0], 0, 12);
+      g.box(0.05, 0.05, 0.03, [0, 0.062, 0.03], col(g, 'metal', METAL));
+      g.box(0.07, 0.13, 0.03, [0, -0.02, -0.33], col(g, 'detail', POLY));
+      for (const z of [-0.2, 0.1]) g.cyl(0.01, 0.01, 0.075, [0, 0.0, z], col(g, 'metal', METAL2), [0, 0, Math.PI / 2], 0, 6); // parafusos
+      parts.mag.box(0.035, 0.16, 0.07, [0, -0.13, -0.14], col(parts.mag, 'detail', '#2a2c2e'), [0.18, 0, 0]);
+      r = { muzzle: 0.5, left: 0.17 };
+      break;
+    }
     case 'm4a4': r = rifleLike(parts, { recv: 0.34, barrel: 0.32, body: '#2e3134', furn: POLY, stock: 'poly', mag: 'straight', rail: true }); break;
     case 'm4a1': r = rifleLike(parts, { recv: 0.34, barrel: 0.2, body: '#3a3e42', furn: '#8a7a5a', stock: 'poly', mag: 'straight', supp: 0.22, rail: true, hg: '#8a7a5a' }); break;
     case 'awp': r = rifleLike(parts, { recv: 0.42, barrel: 0.55, body: '#3e4b36', furn: '#3e4b36', stock: 'poly', mag: 'box', scope: 0.3 }); break;
@@ -171,27 +187,51 @@ function buildParts(id: string, skin: string): { parts: Parts; muzzle: number; l
   return { parts, muzzle: r.muzzle, left: r.left };
 }
 
-const mats = new Map<string, StandardMaterial>();
+const mats = new Map<string, StandardMaterial | PBRMaterial>();
+/** Material PBR (metal/rugosidade reais) nas qualidades média e alta; Standard na baixa. */
+let usePbr = true;
 
-/** Material por skin (textura do padrão multiplicada pelas cores de vértice). */
-export function gunMaterial(scene: Scene, skin = 'default'): StandardMaterial {
+export function setWeaponMaterialQuality(pbr: boolean): void {
+  if (pbr === usePbr) return;
+  usePbr = pbr;
+  for (const m of mats.values()) m.dispose(true, false);
+  mats.clear();
+}
+
+/** Material por skin (padrão da skin multiplicado pelas cores de vértice das peças). */
+export function gunMaterial(scene: Scene, skin = 'default'): StandardMaterial | PBRMaterial {
   const hit = mats.get(skin);
   if (hit && hit.getScene() === scene) return hit;
   const def = skinById(skin);
-  const m = new StandardMaterial('gunMat_' + skin, scene);
-  m.diffuseColor = Color3.White();
-  const shiny = def.pattern === 'brushed' || def.pattern === 'carbon' || def.pattern === 'hex';
-  m.specularColor = shiny ? new Color3(0.6, 0.6, 0.6) : new Color3(0.35, 0.35, 0.35);
-  m.specularPower = shiny ? 64 : 48;
+  let tex: DynamicTexture | null = null;
   if (def.pattern !== 'none') {
     const src = skinCanvas(skin, 256);
-    const tex = new DynamicTexture('skinTex_' + skin, { width: 256, height: 256 }, scene, true);
+    tex = new DynamicTexture('skinTex_' + skin, { width: 256, height: 256 }, scene, true);
     (tex.getContext() as unknown as CanvasRenderingContext2D).drawImage(src, 0, 0);
     tex.update(false);
     tex.wrapU = Texture.CLAMP_ADDRESSMODE;
     tex.wrapV = Texture.WRAP_ADDRESSMODE;
-    m.diffuseTexture = tex;
-    if (def.pattern === 'hex') m.emissiveColor = new Color3(0.05, 0.25, 0.28);
+  }
+  let m: StandardMaterial | PBRMaterial;
+  if (usePbr) {
+    const p = new PBRMaterial('gunPbr_' + skin, scene);
+    p.albedoColor = Color3.White();
+    if (tex) p.albedoTexture = tex;
+    p.metallic = def.metallic;
+    p.roughness = def.roughness;
+    p.environmentIntensity = 0.9;
+    p.directIntensity = 1.2;
+    if (def.emissive) p.emissiveColor = Color3.FromHexString(def.emissive);
+    m = p;
+  } else {
+    const s2 = new StandardMaterial('gunMat_' + skin, scene);
+    s2.diffuseColor = Color3.White();
+    if (tex) s2.diffuseTexture = tex;
+    const shine = 1 - def.roughness;
+    s2.specularColor = new Color3(0.2 + shine * 0.5, 0.2 + shine * 0.5, 0.2 + shine * 0.5);
+    s2.specularPower = 16 + shine * 80;
+    if (def.emissive) s2.emissiveColor = Color3.FromHexString(def.emissive);
+    m = s2;
   }
   mats.set(skin, m);
   return m;

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@babylonjs/core": "9.32.1",
+    "@babylonjs/loaders": "9.32.1",
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
     "tsx": "4.20.6",

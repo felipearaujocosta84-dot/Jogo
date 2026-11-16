@@ -28,6 +28,14 @@ export { Skeleton } from '@babylonjs/core/Bones/skeleton';
 export { Bone } from '@babylonjs/core/Bones/bone';
 export { Space } from '@babylonjs/core/Maths/math.axis';
 export { PointLight } from '@babylonjs/core/Lights/pointLight';
+export { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
+export { RawCubeTexture } from '@babylonjs/core/Materials/Textures/rawCubeTexture';
+export { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
+export { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
+export { AssetContainer } from '@babylonjs/core/assetContainer';
+export type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
+export type { Material } from '@babylonjs/core/Materials/material';
+export type { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture';
 export { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
 
 // Módulos de efeito colateral (registram funcionalidades na cena)

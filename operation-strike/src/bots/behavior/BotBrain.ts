@@ -431,7 +431,7 @@ export class BotBrain {
       else b('p250');
       return;
     }
-    const rifle = p.team === 'T' ? 'ak47' : Math.random() < 0.5 ? 'm4a4' : 'm4a1';
+    const rifle = p.team === 'T' ? 'ak47' : (['m4a4', 'm4a1', 'aug'] as const)[Math.floor(Math.random() * 3)];
     if (!p.primary) {
       if (p.money >= 5750 && Math.random() < 0.18) b('awp');
       else if (p.money >= WEAPONS[rifle].price + 650) b(rifle);

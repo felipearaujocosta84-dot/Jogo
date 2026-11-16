@@ -53,6 +53,17 @@ export class AudioManager {
     }
   }
 
+  private playSampleAt(name: string, dest: AudioNode, rate = 1): boolean {
+    const buf = this.samples.get(name);
+    if (!buf || !this.ctx) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    src.connect(dest);
+    src.start();
+    return true;
+  }
+
   private playSample(name: string, gain = 1, rate = 1): boolean {
     const buf = this.samples.get(name);
     if (!buf || !this.ctx || !this.master) return false;
@@ -137,9 +148,11 @@ export class AudioManager {
   }
 
   /** Tiro: pos = null para a própria arma. */
-  shot(kind: string, pos: { x: number; y: number; z: number } | null = null): void {
+  shot(kind: string, pos: { x: number; y: number; z: number } | null = null, weaponId = ''): void {
     const dest = this.spatial(pos, 110);
     if (!dest) return;
+    // som gravado da arma (public/assets/audio/weapons/<arma>_fire.mp3), se existir
+    if (weaponId && this.playSampleAt('fire_' + weaponId, dest, 0.9 + Math.random() * 0.06)) return;
     if (!pos && this.playSample('shot_' + kind, 1, 0.95 + Math.random() * 0.1)) return;
     const v = 0.92 + Math.random() * 0.16;
     const far = pos ? Math.hypot(pos.x - this.listener.x, pos.z - this.listener.z) : 0;

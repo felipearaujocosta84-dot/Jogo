@@ -33,6 +33,8 @@ interface GeoBucket {
   uvs: number[];
   indices: number[];
   shadow: boolean;
+  /** Detalhe visual (janelas, beirais, cabos): some à distância (LOD). */
+  detail: boolean;
 }
 
 export interface MapVisual {
@@ -158,17 +160,17 @@ export class MapBuilder {
 
   // -------------------------------------------------------------- geometria
 
-  private bucket(mat: MaterialName, cx: number, cz: number, shadow: boolean): GeoBucket {
-    const key = `${mat}|${Math.floor(cx / CHUNK)}|${Math.floor(cz / CHUNK)}|${shadow ? 1 : 0}`;
+  private bucket(mat: MaterialName, cx: number, cz: number, shadow: boolean, detail = false): GeoBucket {
+    const key = `${mat}|${Math.floor(cx / CHUNK)}|${Math.floor(cz / CHUNK)}|${shadow ? 1 : 0}|${detail ? 1 : 0}`;
     let b = this.buckets.get(key);
-    if (!b) this.buckets.set(key, (b = { mat, positions: [], normals: [], uvs: [], indices: [], shadow }));
+    if (!b) this.buckets.set(key, (b = { mat, positions: [], normals: [], uvs: [], indices: [], shadow, detail }));
     return b;
   }
 
   addBox(b: BoxDef): void {
     const [x0, y0, z0] = b.min;
     const [x1, y1, z1] = b.max;
-    const bucket = this.bucket(b.mat, (x0 + x1) / 2, (z0 + z1) / 2, b.shadow !== false);
+    const bucket = this.bucket(b.mat, (x0 + x1) / 2, (z0 + z1) / 2, b.shadow !== false, !!b.detail || (b.collide === false && b.mat !== 'grass'));
     const s = MATERIAL_SCALE[b.mat];
     const fit = s === 0;
     const sx = x1 - x0, sy = y1 - y0, sz = z1 - z0;
@@ -252,6 +254,8 @@ export class MapBuilder {
       mesh.material = this.material(b.mat);
       mesh.isPickable = false;
       mesh.metadata = { shadow: b.shadow };
+      // LOD do cenário: detalhes deixam de ser desenhados longe da câmera
+      if (b.detail) mesh.addLODLevel(this.quality.shadowMapSize >= 2048 ? 110 : 55, null);
       mesh.freezeWorldMatrix();
       mesh.doNotSyncBoundingInfo = true;
       meshes.push(mesh);

@@ -67,6 +67,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
   // ---------------------------------------------------------------- fuzis
   ak47: { ...base, id: 'ak47', name: 'AK-47', cls: 'rifle', slot: 'primary', price: 2700, team: 'T', automatic: true, fireRate: 10, magazine: 30, reserve: 90, reloadTime: 2.5, drawTime: 0.8, damage: 36, armorPen: 0.775, rangeMod: 0.98, spreadStand: 0.3, spreadMove: 4.5, spreadAir: 8, recoil: 1.05, recoilYaw: 0.9, speed: 0.86, sound: 'rifle', zoom: [0.72] },
   m4a4: { ...base, id: 'm4a4', name: 'M4A4', cls: 'rifle', slot: 'primary', price: 3100, team: 'CT', automatic: true, fireRate: 11.1, magazine: 30, reserve: 90, reloadTime: 3.1, drawTime: 0.8, damage: 33, armorPen: 0.7, rangeMod: 0.97, spreadStand: 0.27, spreadMove: 4, spreadAir: 8, recoil: 0.85, recoilYaw: 0.7, speed: 0.9, sound: 'rifle', zoom: [0.72] },
+  aug: { ...base, id: 'aug', name: 'AUG', cls: 'rifle', slot: 'primary', price: 3300, team: 'CT', automatic: true, fireRate: 10, magazine: 30, reserve: 90, reloadTime: 3.8, drawTime: 0.85, damage: 28, armorPen: 0.9, rangeMod: 0.98, spreadStand: 0.25, spreadMove: 4.2, spreadAir: 8, recoil: 0.8, recoilYaw: 0.6, speed: 0.88, sound: 'rifle', zoom: [0.55] },
   m4a1: { ...base, id: 'm4a1', name: 'M4A1-S', cls: 'rifle', slot: 'primary', price: 2900, team: 'CT', automatic: true, fireRate: 10, magazine: 20, reserve: 80, reloadTime: 3.1, drawTime: 0.8, damage: 38, armorPen: 0.7, rangeMod: 0.99, spreadStand: 0.22, spreadMove: 3.8, spreadAir: 8, recoil: 0.7, recoilYaw: 0.5, speed: 0.9, sound: 'silenced', zoom: [0.72] },
   // ---------------------------------------------------------------- snipers
   awp: { ...base, id: 'awp', name: 'AWP', cls: 'sniper', slot: 'primary', price: 4750, fireRate: 0.68, magazine: 5, reserve: 30, reloadTime: 3.7, drawTime: 1.1, damage: 115, armorPen: 0.975, rangeMod: 0.99, range: 300, spreadStand: 5, spreadMove: 9, spreadAir: 14, recoil: 4, recoilYaw: 0.5, speed: 0.8, killReward: 100, sound: 'sniper', zoom: [0.42, 0.14], scope: true },
@@ -95,7 +96,7 @@ export const EQUIPMENT: EquipmentDef[] = [
 export const BUY_CATEGORIES: { id: string; name: string; items: string[] }[] = [
   { id: 'pistol', name: 'Pistolas', items: ['glock', 'usp', 'p250', 'deagle'] },
   { id: 'smg', name: 'Submetralhadoras', items: ['mac10', 'ump45', 'mp5'] },
-  { id: 'rifle', name: 'Fuzis', items: ['ak47', 'm4a1', 'm4a4'] },
+  { id: 'rifle', name: 'Fuzis', items: ['ak47', 'm4a1', 'm4a4', 'aug'] },
   { id: 'sniper', name: 'Snipers', items: ['ssg08', 'awp'] },
   { id: 'grenade', name: 'Granadas', items: ['he', 'flash', 'smoke'] },
   { id: 'gear', name: 'Equipamento', items: ['vest', 'vesthelm', 'kit'] }
@@ -112,5 +113,17 @@ export function itemPrice(id: string): number {
 export function itemTeam(id: string): Team | undefined {
   return WEAPONS[id]?.team ?? EQUIPMENT.find(e => e.id === id)?.team;
 }
+
+/** Distância (m) em que o dano cai 25% — "distância efetiva" mostrada no arsenal. */
+export function effectiveRange(w: WeaponDef): number {
+  if (w.cls === 'knife') return w.range;
+  if (w.rangeMod >= 0.999) return w.range;
+  return Math.min(w.range, Math.round((12.7 * Math.log(0.75)) / Math.log(w.rangeMod)));
+}
+
+/** Categoria legível. */
+export const CLASS_LABEL: Record<WeaponClass, string> = {
+  pistol: 'Pistola', smg: 'Submetralhadora', rifle: 'Fuzil', sniper: 'Sniper', knife: 'Corpo a corpo', grenade: 'Granada', c4: 'Explosivo'
+};
 
 export const DEFAULT_PISTOL: Record<Team, string> = { T: 'glock', CT: 'usp' };

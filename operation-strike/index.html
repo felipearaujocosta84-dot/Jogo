@@ -151,9 +151,16 @@
     </div>
 
     <div id="arsenalScreen" class="screen menu hidden">
-      <h2>ARSENAL</h2>
-      <div id="arsenalList" class="arsenal"></div>
-      <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button></div>
+      <div class="ars-top">
+        <h2>ARSENAL</h2>
+        <div class="tabs"><button class="tab on" data-arstab="weapons">ARMAS</button><button class="tab" data-arstab="inventory">INVENTÁRIO</button><button class="tab" data-arstab="assets">RECURSOS 3D</button></div>
+        <button class="btn small" data-go="mainMenu">VOLTAR</button>
+      </div>
+      <div class="ars-layout">
+        <aside id="arsList" class="ars-list"></aside>
+        <section class="ars-view"><canvas id="arsCanvas" touch-action="none"></canvas><div id="arsBadge" class="ars-badge"></div><div class="ars-hint">Arraste para girar · pinça/roda para aproximar</div></section>
+        <section id="arsInfo" class="ars-info"></section>
+      </div>
     </div>
 
     <div id="profileScreen" class="screen menu hidden">

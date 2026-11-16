@@ -22,6 +22,10 @@ import { CharacterModel } from '../player/CharacterModel';
 import { WEAPONS } from '../weapons/WeaponData';
 import { skinById } from '../weapons/Skins';
 import { SkinPrefs } from '../save/SkinPrefs';
+import { WeaponLibrary } from '../weapons/WeaponLibrary';
+import { setWeaponMaterialQuality } from '../weapons/WeaponModels';
+import { applyStudioEnvironment } from './Environment';
+import { weaponConfigs, assetExists, ASSET_BASE } from '../assets/AssetRegistry';
 import { PLAYER } from '../player/PlayerController';
 import { BTN, type PlayerView, type SimEvent, type Team, type UserCmd } from '../sim/types';
 import type { SurfaceKind } from '../physics/CollisionWorld';
@@ -43,6 +47,7 @@ export class Game {
   readonly scoreboard = new Scoreboard();
   readonly buyMenu = new BuyMenu();
   keyboard!: KeyboardMouse;
+  library!: WeaponLibrary;
   touch!: TouchControls;
 
   session: Session | null = null;
@@ -95,6 +100,11 @@ export class Game {
     await nextFrame();
     this.camera = new FirstPersonCamera(this.scene);
     this.view = new ViewModel(this.scene, this.camera.camera);
+    // reflexos para os materiais PBR das armas + biblioteca de modelos GLB (carrega sob demanda)
+    applyStudioEnvironment(this.scene);
+    this.library = new WeaponLibrary(this.scene);
+    this.configureLibrary();
+    void weaponConfigs().then(cfg => this.view.setLibrary(this.library.enabled ? this.library : null, (cfg as Record<string, object>).hands ?? {}));
     this.decals = new ImpactEffects(this.scene, this.quality.preset.decals, this.quality.preset.particles);
     this.fx = new Effects(this.scene, this.quality.preset.particles);
     onProgress(25, 'Construindo o cenário');
@@ -144,6 +154,16 @@ export class Game {
     onProgress(100, 'Pronto');
   }
 
+  /** Qualidade dos modelos de arma: baixa = modelos leves e material simples; média/alta = GLB + PBR. */
+  private configureLibrary(): void {
+    const level = this.quality.level;
+    const lib = this.library;
+    lib.enabled = level !== 'low';
+    lib.maxLoaded = level === 'high' ? 6 : 4;
+    lib.textureSize = level === 'high' ? 2048 : 1024;
+    setWeaponMaterialQuality(level !== 'low');
+  }
+
   applySettings(): void {
     const s = this.settings.data;
     if (this.quality.setMode(s.quality) && this.visualMapId) {
@@ -162,6 +182,11 @@ export class Game {
     this.audio.setVolume(s.volume);
     this.decals.setLimits(this.quality.preset.decals, this.quality.preset.particles);
     this.fx.setMaxParticles(this.quality.preset.particles);
+    if (this.library) {
+      const was = this.library.enabled;
+      this.configureLibrary();
+      if (was !== this.library.enabled) void weaponConfigs().then(cfg => this.view.setLibrary(this.library.enabled ? this.library : null, (cfg as Record<string, object>).hands ?? {}));
+    }
     this.hud.setFps(s.showFps ? this.quality.averageFps : null);
   }
 
@@ -185,6 +210,22 @@ export class Game {
 
   // ------------------------------------------------------------------ sessões
 
+  private weaponSoundsLoaded = false;
+
+  /** Carrega sons gravados de tiro que existirem em public/assets/audio/weapons/. */
+  private loadWeaponSounds(): void {
+    if (this.weaponSoundsLoaded) return;
+    this.weaponSoundsLoaded = true;
+    for (const id of Object.keys(WEAPONS)) {
+      for (const ext of ['mp3', 'ogg']) {
+        const path = `audio/weapons/${id}_fire.${ext}`;
+        void assetExists(path).then(ok => {
+          if (ok) void this.audio.load('fire_' + id, ASSET_BASE + path);
+        });
+      }
+    }
+  }
+
   startSession(s: Session): void {
     this.endSession();
     this.session = s;
@@ -196,6 +237,7 @@ export class Game {
     this.lastWeapon = '';
     this.seenEnemy.clear();
     this.audio.unlock();
+    this.loadWeaponSounds();
     this.audio.startAmbient();
     this.resume();
   }
@@ -585,12 +627,12 @@ export class Game {
         if (!serverEcho) {
           if (isLocal) {
             this.view.fire();
-            this.audio.shot(def?.sound ?? 'rifle');
+            this.audio.shot(def?.sound ?? 'rifle', null, e.w as string);
             if (def?.cls !== 'knife') this.fx.tracer(this.view.muzzleWorld, to);
           } else {
             const c = this.chars.get(e.pid as string);
             c?.model.fire();
-            this.audio.shot(def?.sound ?? 'rifle', from);
+            this.audio.shot(def?.sound ?? 'rifle', from, e.w as string);
             if (def?.cls !== 'knife') this.fx.tracer(from.add(to.subtract(from).normalize().scale(0.8)), to);
             this.seenEnemy.set(e.pid as string, this.time);
           }

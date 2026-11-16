@@ -35,6 +35,19 @@ npm start          # servidor: jogo + multiplayer + ranking em http://localhost:
   Para usar um servidor online em outro endereço, informe-o em Configurações → "Servidor online".
 - Desenvolvimento: `npm start` em um terminal e `npm run dev` em outro (o Vite repassa `/ws` e `/api` para a porta 8080).
 
+### Arsenal 3D, modelos GLB e skins
+- **Menu → Arsenal**: visualização 3D da arma (arrastar gira, pinça/roda aproxima), nome, categoria,
+  estatísticas (dano, cadência, carregador, recarga, recuo, precisão, distância efetiva, penetração, mobilidade, preço),
+  skins com raridade (Comum, Rara, Épica, Lendária, Especial), pré-visualização, botão **Equipar**, **Inventário**
+  e **Recursos 3D** (lista o que existe em `public/assets/` e o que falta).
+- Modelos reais: coloque os GLB em `public/assets/weapons/...` e as mãos em `public/assets/hands/tactical_gloves.glb`
+  (estrutura e convenções em [`public/assets/README.md`](public/assets/README.md)). O jogo verifica se cada arquivo existe,
+  carrega sob demanda, ajusta orientação/escala/empunhadura sozinho e usa o modelo provisório enquanto o arquivo não existir.
+- Skins: Camuflagem Militar, Carbono, Gelo Negro, Inferno, Dragão Azul e Dourada (padrões originais; texturas opcionais em
+  `public/assets/skins/<pasta>/albedo|normal|orm`). Só visuais: não mudam o combate.
+- Qualidade baixa usa modelos leves e material simples; média/alta usam GLB + materiais PBR com reflexos.
+- Teste do carregamento: `npx tsx scripts/maketestglb.ts teste.glb` gera um GLB de teste (não definitivo).
+
 ### APK para Android
 O projeto Android (Capacitor) fica em `android/`. A cada envio ao GitHub, o workflow **APK Android**
 (`.github/workflows/android-apk.yml`) compila o jogo e publica o arquivo **OperationStrike.apk** em
