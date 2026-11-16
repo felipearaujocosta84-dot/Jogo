@@ -78,8 +78,9 @@ def ao_from_height(h, N, strength=1.0):
     ao = np.zeros_like(h)
     for s, w in ((N / 512, 0.5), (N / 160, 0.35), (N / 48, 0.25)):
         ao += np.clip(blur(h, s) - h, 0, None) * w
-    ao = 1 - np.clip(ao * strength * 6, 0, 0.85)
-    return ao.astype(f32)
+    ao = 1 - np.clip(ao * strength * 3, 0, 0.7)
+    # oclusão é sombra larga (frestas e juntas), não granulado: suaviza
+    return blur(ao.astype(f32), N / 1024 * 1.5)
 
 def normal_from_height(h, N, tile_m, depth_m):
     """Normal OpenGL a partir da altura (0..1) com profundidade real em metros."""
