@@ -109,7 +109,7 @@ export class Game {
     this.view = new ViewModel(this.scene, this.camera.camera);
     // reflexos para os materiais PBR das armas + biblioteca de modelos GLB (carrega sob demanda)
     applyStudioEnvironment(this.scene);
-    this.library = new WeaponLibrary(this.scene);
+    this.library = WeaponLibrary.forScene(this.scene);
     this.configureLibrary();
     void weaponConfigs().then(cfg => this.view.setLibrary(this.library.enabled ? this.library : null, (cfg as Record<string, object>).hands ?? {}));
     this.decals = new ImpactEffects(this.scene, this.quality.preset.decals, this.quality.preset.particles);
@@ -178,6 +178,11 @@ export class Game {
     lib.maxLoaded = level === 'ultra' || level === 'ultrareal' ? 8 : level === 'high' ? 6 : 4;
     lib.textureSize = level === 'high' || level === 'ultra' || level === 'ultrareal' ? 2048 : 1024;
     setWeaponMaterialQuality(level !== 'low');
+    // arma detalhada na mão dos personagens e roupa personalizada em alta resolução: só nas qualidades altas
+    const high = level === 'high' || level === 'ultra' || level === 'ultrareal';
+    CharacterModel.glbWeapons = high && (!isMobile() || level !== 'high');
+    CharacterModel.lookTextureSize = high && !isMobile() ? 2048 : 1024;
+    if (high) lib.maxLoaded = Math.max(lib.maxLoaded, 10);
   }
 
   applySettings(): void {
@@ -513,10 +518,11 @@ export class Game {
       // arma em primeira pessoa
       const wid = local.weaponId();
       const wskin = local.skinOf(wid);
-      if (wid + '|' + wskin !== this.lastWeapon) {
+      const watt = local.skins['a_' + wid] ?? '';
+      if (wid + '|' + wskin + '|' + watt !== this.lastWeapon) {
         const sameGun = this.lastWeapon.startsWith(wid + '|');
-        this.lastWeapon = wid + '|' + wskin;
-        this.view.setWeapon(wid, w.drawTime, wskin);
+        this.lastWeapon = wid + '|' + wskin + '|' + watt;
+        this.view.setWeapon(wid, w.drawTime, wskin, watt);
         if (this.lastPhase !== '' && !sameGun) this.audio.play('draw');
       }
       this.view.plant(local.act === 2 || local.act === 3);

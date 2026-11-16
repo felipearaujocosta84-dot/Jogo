@@ -13,6 +13,7 @@ import type { Difficulty, GameMode, Team } from './sim/types';
 import { esc } from './interface/Hud';
 import { isNativeApp } from './core/Platform';
 import { SkinPrefs } from './save/SkinPrefs';
+import { randomCosmetics } from './cosmetics/Cosmetics';
 import { ArsenalScreen } from './interface/ArsenalScreen';
 import { CHARACTER_FILES } from './player/CharacterAssets';
 import type { SquadMember } from './interface/LobbyScene';
@@ -49,6 +50,8 @@ const LOBBY_SCREENS = new Set<string>(['mainMenu', 'playMenu', 'lobbyScreen', 't
 const LOBBY_WEAPONS = BUY_CATEGORIES.filter(c => c.id !== 'grenade' && c.id !== 'gear').flatMap(c => c.items);
 const agent = Object.assign({ team: 'CT' as Team, variant: 0, weapon: 'ak47' }, Storage.load<Partial<{ team: Team; variant: number; weapon: string }>>('agent', {}));
 if (!WEAPONS[agent.weapon]) agent.weapon = 'ak47';
+
+SkinPrefs.onChange(() => syncLobby());
 
 function syncLobby(): void {
   const l = game.lobby;
@@ -96,8 +99,13 @@ const squadPick = Storage.load<number[] | null>('squad', null) ?? (() => {
 function squadMembers(): SquadMember[] {
   const rifles = agent.team === 'T' ? ['ak47', 'mac10', 'awp'] : ['m4a4', 'aug', 'mp5'];
   const lv = levelFor(profile.xp).level;
-  const bots = squadPick.map((k, i) => ({ name: 'BOT ' + SQUAD_NAMES[k % SQUAD_NAMES.length], level: 8 + ((k * 7 + i * 5) % 33), weapon: rifles[i % rifles.length], skin: 'default' }));
-  const me: SquadMember = { name: profile.name, level: lv, weapon: agent.weapon, skin: SkinPrefs.get(agent.weapon), me: true };
+  const bots = squadPick.map((k, i) => {
+    const weapon = rifles[i % rifles.length];
+    // companheiros com visual e armas personalizados (fixos por nome)
+    const cos = randomCosmetics([weapon], k * 7919 + i * 104729 + 17);
+    return { name: 'BOT ' + SQUAD_NAMES[k % SQUAD_NAMES.length], level: 8 + ((k * 7 + i * 5) % 33), weapon, skin: cos[weapon] ?? 'default', att: cos['a_' + weapon] ?? '', look: cos['lk_' + agent.team] ?? '' };
+  });
+  const me: SquadMember = { name: profile.name, level: lv, weapon: agent.weapon, skin: SkinPrefs.get(agent.weapon), att: SkinPrefs.attachments(agent.weapon).join('.'), look: SkinPrefs.lookString(agent.team), me: true };
   return [bots[0], me, bots[1], bots[2]];
 }
 
@@ -158,6 +166,14 @@ function lobbyAction(action: string): boolean {
       arsenal.prepare('inventory', agent.weapon);
       show('arsenalScreen');
       return true;
+    case 'customize-character':
+      arsenal.prepare('character', agent.weapon);
+      show('arsenalScreen');
+      return true;
+    case 'customize-weapons':
+      arsenal.prepare('weapons', agent.weapon);
+      show('arsenalScreen');
+      return true;
     default:
       return false;
   }
@@ -180,6 +196,7 @@ function show(id: ScreenId): void {
   if (id === 'rankingScreen') void loadRanking();
   if (id === 'arsenalScreen') {
     updateSkinLevel();
+    arsenal.team = agent.team;
     arsenal.open();
   } else arsenal.close();
 }
@@ -698,3 +715,4 @@ game
 
 (window as unknown as { game: Game; settings: Settings }).game = game;
 (window as unknown as { settings: Settings }).settings = settings;
+(window as unknown as { arsenal: ArsenalScreen }).arsenal = arsenal;

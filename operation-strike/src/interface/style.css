@@ -550,3 +550,93 @@ body.touch .radio-feed { bottom: auto; top: max(120px, calc(var(--safe-t) + 120p
   .sq-side .sq-toggle, .sq-side .sq-sep { display: none; }
   .sq-side > button:nth-child(4) { display: none; }
 }
+
+/* ============================================================ customização (tema militar escuro e dourado) */
+.cz { --gold: #d6a738; --gold2: #f3d27a; --gline: rgba(214, 167, 56, 0.28);
+  background:
+    repeating-linear-gradient(135deg, rgba(214,167,56,0.025) 0 2px, transparent 2px 14px),
+    radial-gradient(ellipse at 50% 0%, rgba(214,167,56,0.08), transparent 60%),
+    linear-gradient(180deg, #08090b, #0d0e10) !important; }
+.cz .cz-top { border-bottom: 1px solid var(--gline); padding-bottom: 8px; }
+.cz-title { display: flex; flex-direction: column; line-height: 1; margin-right: 6px; }
+.cz-title small { font-size: 9px; letter-spacing: 0.45em; color: var(--muted); font-weight: 800; }
+.cz .cz-title h2 { color: var(--gold2); letter-spacing: 0.22em; font-size: 22px; text-shadow: 0 0 18px rgba(214,167,56,0.35); }
+.cz-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.cz .tab { background: rgba(255,255,255,0.03); border: 1px solid var(--gline); color: #cfc6b0; font-weight: 800; letter-spacing: 0.12em;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); padding: 7px 16px; }
+.cz .tab.on { color: #15110a; background: linear-gradient(180deg, var(--gold2), var(--gold)); border-color: var(--gold); }
+.cz .ars-view { border: 1px solid var(--gline); background: radial-gradient(ellipse at 50% 65%, #24221d 0%, #0d0d0e 72%); box-shadow: inset 0 0 40px rgba(0,0,0,0.6); }
+.cz .ars-view::before, .cz .ars-view::after { content: ''; position: absolute; width: 22px; height: 22px; border: 2px solid var(--gold); pointer-events: none; z-index: 1; }
+.cz .ars-view::before { left: 6px; top: 6px; border-right: 0; border-bottom: 0; }
+.cz .ars-view::after { right: 6px; bottom: 6px; border-left: 0; border-top: 0; }
+.cz .ars-badge { left: 34px; top: 10px; }
+.cz-viewbar { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px; z-index: 2; }
+.cz-viewbar button { width: 34px; height: 34px; background: rgba(10,10,12,0.75); border: 1px solid var(--gline); color: var(--gold2); font-size: 17px; font-weight: 900; cursor: pointer; border-radius: 3px; }
+.cz-viewbar button.wide { width: auto; height: 28px; font-size: 10px; letter-spacing: 0.1em; padding: 0 8px; }
+.cz-viewbar button.on { background: var(--gold); color: #15110a; }
+.cz .ars-list h4, .cz .ars-info h4 { color: var(--gold); }
+.cz .ars-list button.on { background: rgba(214,167,56,0.18); border-color: var(--gold); }
+.cz .ars-head h3 { color: #f4ecd8; letter-spacing: 0.08em; }
+.cz-teams { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-bottom: 6px; }
+.cz .cz-team { font-size: 12px !important; padding: 5px 2px !important; text-align: center !important; letter-spacing: 0.08em; display: flex; flex-direction: column; align-items: center; }
+.cz .cz-team small { font-size: 9px; color: var(--muted); letter-spacing: 0.02em; font-weight: 700; }
+.cz-slot { display: flex !important; gap: 8px; align-items: center; }
+.cz-slot i { width: 26px; height: 26px; flex: none; color: var(--gold); display: flex; }
+.cz-slot i svg { width: 100%; height: 100%; }
+.cz-slot span { display: flex; flex-direction: column; min-width: 0; }
+.cz-slot b { font-size: 12px; }
+.cz-slot small { font-size: 10px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cz-sel { margin: 4px 0 8px; padding: 8px 10px; border-left: 3px solid var(--gold); background: rgba(214,167,56,0.07); }
+.cz-sel b { font-size: 15px; }
+.cz-sel p { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
+.cz-sel small { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+.rar { font-style: normal; font-size: 10px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: var(--rar); border: 1px solid var(--rar); padding: 1px 5px; border-radius: 2px; margin-left: 4px; }
+.cz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
+.cz-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: 7px; cursor: pointer;
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)); border: 1px solid rgba(255,255,255,0.08); border-bottom: 3px solid var(--rar); color: var(--text);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%); }
+.cz-card .sw { width: 100%; height: 44px; border-radius: 2px; background-size: 64px; display: flex; align-items: center; justify-content: center; }
+.cz-card .sw.orig { background: repeating-linear-gradient(45deg, #2b2a26 0 6px, #232220 6px 12px); color: var(--gold); font-size: 10px; font-weight: 900; letter-spacing: 0.2em; }
+.sw.ico { background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c, #555) 70%, #fff 10%), #151515 80%); color: #f2ead7; }
+.sw.ico svg { width: 30px; height: 30px; }
+.cz-card b { font-size: 12px; }
+.cz-card small { font-size: 10px; color: var(--muted); }
+.cz-card.sel { outline: 2px solid var(--gold2); outline-offset: -1px; background: rgba(214,167,56,0.12); }
+.cz-card.eq::after { content: '✔'; position: absolute; right: 12px; top: 5px; color: #7ee07a; font-size: 11px; font-weight: 900; }
+.cz-card.locked { opacity: 0.5; }
+.cz-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 6px; margin-top: 10px; }
+.cz .btn.primary { background: linear-gradient(180deg, var(--gold2), var(--gold)); color: #15110a; border-color: var(--gold); }
+.cz .btn:disabled { opacity: 0.45; cursor: default; }
+.cz-reset { margin-top: 8px; width: 100%; }
+.cz-atts { display: flex; flex-direction: column; gap: 6px; }
+.cz-attrow { display: grid; grid-template-columns: 22px 78px 1fr; gap: 6px; align-items: start; }
+.cz-attrow i { width: 22px; height: 22px; color: var(--gold); display: flex; }
+.cz-attrow i svg { width: 100%; height: 100%; }
+.cz-attrow > span { font-size: 11px; font-weight: 800; color: #cfc6b0; padding-top: 4px; }
+.cz-attrow > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.cz-chip { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-bottom: 2px solid var(--rar, rgba(255,255,255,0.2)); color: var(--text); font-size: 11px; font-weight: 700; padding: 4px 8px; cursor: pointer; border-radius: 2px; display: inline-flex; align-items: center; gap: 4px; }
+.cz-chip.sel { background: rgba(214,167,56,0.2); border-color: var(--gold); }
+.cz-chip.eq { box-shadow: inset 0 0 0 1px rgba(126,224,122,0.6); }
+.cz-chip.locked { opacity: 0.5; }
+.cz-chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.cz-filters { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 0; }
+.cz-filters select { margin-left: auto; background: #111; color: var(--text); border: 1px solid var(--gline); padding: 4px 6px; font-weight: 700; }
+.inv-list { display: flex; flex-direction: column; gap: 4px; }
+.cz .inv-row { border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid var(--rar); background: rgba(255,255,255,0.025); padding: 5px 6px; }
+.cz .inv-row.eq { background: rgba(214,167,56,0.07); }
+.cz .inv-row .sw { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 2px; }
+.cz .inv-row .sw.ico svg { width: 24px; height: 24px; }
+.inv-txt { flex: 1; min-width: 0; }
+.inv-txt b { font-size: 12px; }
+.inv-txt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inv-act { display: flex; gap: 3px; flex: none; }
+.inv-act button { background: transparent; border: 1px solid var(--gline); color: var(--gold2); font-size: 10px; font-weight: 800; padding: 4px 6px; cursor: pointer; letter-spacing: 0.06em; }
+.inv-act button:hover { background: rgba(214,167,56,0.15); }
+@media (max-width: 900px), (max-height: 520px) {
+  .cz .cz-title h2 { font-size: 16px; }
+  .cz .tab { padding: 5px 9px; font-size: 11px; }
+  .cz-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+  .cz-card .sw { height: 32px; }
+  .cz-attrow { grid-template-columns: 18px 60px 1fr; }
+  .cz-viewbar button { width: 28px; height: 28px; font-size: 14px; }
+}

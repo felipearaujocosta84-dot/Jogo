@@ -125,7 +125,8 @@
         <button class="sq-ico" data-action="mode-tdm" aria-label="Mata-mata">✚</button>
         <span class="sq-gap"></span>
         <button data-action="inventory">INVENTÁRIO</button>
-        <button data-go="arsenalScreen">ARSENAL</button>
+        <button data-action="customize-character">PERSONAGEM</button>
+        <button data-action="customize-weapons">ARSENAL</button>
         <button data-go="profileScreen">PERFIL</button>
         <button data-go="rankingScreen">RANKING</button>
         <span class="sq-gap"></span>
@@ -188,15 +189,17 @@
       <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button><button class="btn primary" data-action="start-training">COMEÇAR</button></div>
     </div>
 
-    <div id="arsenalScreen" class="screen menu hidden">
-      <div class="ars-top">
-        <h2>ARSENAL</h2>
-        <div class="tabs"><button class="tab on" data-arstab="weapons">ARMAS</button><button class="tab" data-arstab="inventory">INVENTÁRIO</button><button class="tab" data-arstab="assets">RECURSOS 3D</button></div>
+    <div id="arsenalScreen" class="screen menu hidden cz">
+      <div class="ars-top cz-top">
+        <div class="cz-title"><small>OPERATION STRIKE</small><h2>CUSTOMIZAÇÃO</h2></div>
+        <div class="tabs cz-tabs"><button class="tab" data-arstab="character">PERSONAGEM</button><button class="tab" data-arstab="weapons">ARSENAL</button><button class="tab" data-arstab="inventory">INVENTÁRIO</button><button class="tab" data-arstab="assets">RECURSOS 3D</button></div>
         <button class="btn small" data-go="mainMenu">VOLTAR</button>
       </div>
       <div class="ars-layout">
         <aside id="arsList" class="ars-list"></aside>
-        <section class="ars-view"><canvas id="arsCanvas" touch-action="none"></canvas><div id="arsBadge" class="ars-badge"></div><div class="ars-hint">Arraste para girar · pinça/roda para aproximar</div></section>
+        <section class="ars-view"><canvas id="arsCanvas" touch-action="none"></canvas><div id="arsBadge" class="ars-badge"></div>
+          <div class="cz-viewbar"><button data-czv="zin" title="Aproximar">+</button><button data-czv="zout" title="Afastar">−</button><button data-czv="left" title="Girar">⟲</button><button data-czv="right" title="Girar">⟳</button><button data-czv="reset" title="Centralizar">◎</button><button id="czCompare" data-czv="compare" class="wide">COMPARAR</button></div>
+          <div class="ars-hint">Arraste para girar · pinça/roda para aproximar</div></section>
         <section id="arsInfo" class="ars-info"></section>
       </div>
     </div>

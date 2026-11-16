@@ -6,7 +6,7 @@
 import { GeoBuilder } from '../core/GeoBuilder';
 import { Mesh, StandardMaterial, PBRMaterial, Color3, DynamicTexture, Texture, TransformNode, Vector3, type Scene } from '../core/babylon';
 import { skinById, type SkinDef } from './Skins';
-import { skinCanvas } from './SkinPatterns';
+import { skinCanvas, skinNormal } from './SkinPatterns';
 
 export interface GunParts {
   root: TransformNode;
@@ -222,6 +222,20 @@ export function gunMaterial(scene: Scene, skin = 'default'): StandardMaterial | 
     p.environmentIntensity = 0.9;
     p.directIntensity = 1.2;
     if (def.emissive) p.emissiveColor = Color3.FromHexString(def.emissive);
+    const nc = skinNormal(skin, 256);
+    if (nc) {
+      // relevo do padrão (mesma faixa de UV da textura; a faixa branca fica lisa)
+      const nt = new DynamicTexture('skinNrm_' + skin, { width: 256, height: 256 }, scene, true);
+      const ctx = nt.getContext() as unknown as CanvasRenderingContext2D;
+      ctx.fillStyle = '#8080ff';
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.drawImage(nc, 0, 0, 192, 256);
+      nt.update(false);
+      nt.wrapU = Texture.CLAMP_ADDRESSMODE;
+      nt.wrapV = Texture.WRAP_ADDRESSMODE;
+      p.bumpTexture = nt;
+      p.bumpTexture.level = 0.8;
+    }
     m = p;
   } else {
     const s2 = new StandardMaterial('gunMat_' + skin, scene);

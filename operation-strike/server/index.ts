@@ -12,7 +12,7 @@ import type { ClientMsg, ServerMsg } from '../src/multiplayer/Protocol';
 import { MAPS, mapAllows } from '../src/maps/maps';
 import { applyModelData, type ModelMapData } from '../src/maps/ModelMaps';
 import type { Difficulty, GameMode } from '../src/sim/types';
-import { sanitizeSkins } from '../src/weapons/Skins';
+import { sanitizeCosmetics } from '../src/cosmetics/Cosmetics';
 import { levelFor } from '../src/save/Profile';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -198,7 +198,7 @@ wss.on('connection', (ws: WebSocket) => {
         client!.room?.buy(client!, msg.item);
         break;
       case 'skins':
-        client!.skins = sanitizeSkins(msg.skins, levelFor(client!.profile.xp).level);
+        client!.skins = sanitizeCosmetics(msg.skins, levelFor(client!.profile.xp).level);
         client!.room?.skins(client!);
         break;
       case 'chat':

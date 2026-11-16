@@ -48,3 +48,11 @@ malhas unidas por material, portões das bases e portas fechadas removidos, coli
 | maps/warehouse_yard.glb / .json | warehouse-yard-arena.glb |
 | maps/snowy_bunker.glb / .json | snowy-bunker-battle-map.glb |
 | maps/jungle_ruins.glb / .json | jungle-ruins-arena.glb |
+
+## Cosméticos (public/assets/attachments/, public/assets/cosmetics/)
+Modelos 3D **originais** do projeto, gerados por código no Blender (`scripts/blender/cosmetic_models.py`):
+miras (red dot, holográfica, 4x, red dot de pistola), silenciadores, compensador, empunhaduras, lanternas, laser;
+capacetes, máscaras, óculos, fone, mochilas, rádio, joelheiras e bolsa de quadril (encaixados em cada personagem).
+Mapas de região das roupas (`characters/*_regions.png`, `_pos.png`, `_nrm.png`) gerados por `scripts/blender/region_maps.py`.
+Os 6 modelos de arma simples (M4A4, M4A1, AUG, Glock, Desert Eagle, P250) receberam chanfros, UV e texturas PBR
+assadas por `scripts/blender/upgrade_weapon.py`; os originais estão em `art/weapons/originais/`.

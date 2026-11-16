@@ -19,6 +19,7 @@ import {
 } from '../core/babylon';
 import { paintedTexture } from '../maps/textures';
 import { buildGun } from './WeaponModels';
+import { attachToGun } from './WeaponAttachments';
 import { buildHand } from './Hands';
 import type { WeaponLibrary, GlbGun } from './WeaponLibrary';
 import type { WeaponModelConfig } from '../assets/AssetRegistry';
@@ -75,6 +76,8 @@ interface VisualParts {
 interface Visual {
   id: string;
   skin: string;
+  /** Acessórios ("a.b.c"). */
+  att: string;
   cls: WeaponClass;
   parts: VisualParts;
   /** true = modelo GLB do arquivo; false = modelo procedural provisório. */
@@ -206,9 +209,9 @@ export class ViewModel {
   private rebuild(): void {
     for (const v of this.visuals.values()) v.parts.root.dispose(false, false);
     this.visuals.clear();
-    const id = this.current?.id, skin = this.current?.skin;
+    const id = this.current?.id, skin = this.current?.skin, att = this.current?.att;
     this.current = null;
-    if (id) this.setWeapon(id, 0, skin);
+    if (id) this.setWeapon(id, 0, skin, att);
   }
 
   private arm(parent: TransformNode, hand: Vector3, toward: Vector3, side: 1 | -1 = 1, grip = 0.85): TransformNode {
@@ -252,8 +255,8 @@ export class ViewModel {
     return node;
   }
 
-  private visual(id: string, skin: string): Visual {
-    const key = id + '|' + skin;
+  private visual(id: string, skin: string, att: string): Visual {
+    const key = id + '|' + skin + '|' + att;
     // o GLB definitivo (se já carregado) tem prioridade sobre o provisório
     const glbHit = this.visuals.get('glb|' + key);
     if (glbHit) return glbHit;
@@ -263,13 +266,29 @@ export class ViewModel {
     const g = buildGun(id, this.scene, skin);
     const meshes = [g.body, g.mag, g.slide].filter((m): m is Mesh => !!m);
     const parts: VisualParts = { root: g.root, meshes, mag: g.mag, slide: g.slide, muzzle: g.muzzle, leftHand: g.leftHand };
-    v = this.assemble(id, skin, def.cls, parts, false, {});
+    v = this.assemble(id, skin, att, def.cls, parts, false, {});
     this.visuals.set(key, v);
     return v;
   }
 
   /** Monta braços, pontos de recarga e poses em volta de uma arma (procedural ou GLB). */
-  private assemble(id: string, skin: string, cls: WeaponClass, parts: VisualParts, glb: boolean, clips: Record<string, AnimationGroup>): Visual {
+  /** Prende os acessórios escolhidos na arma (carregam sob demanda). */
+  private attach(v: Visual): void {
+    if (!v.att) return;
+    void attachToGun(this.scene, {
+      weapon: v.id, list: v.att, root: v.parts.root, meshes: v.parts.meshes, mag: v.parts.mag, muzzle: v.parts.muzzle, leftHand: v.parts.leftHand,
+      cacheKey: (v.glb ? 'glb|' : 'proc|') + v.id, prep: m => this.prep(m), firstPerson: true
+    }).then(r => {
+      if (!r.muzzle) return;
+      v.parts.muzzle = r.muzzle;
+      if (this.current === v) {
+        this.flash.position.copyFrom(v.parts.muzzle);
+        this.flash.position.z += 0.04;
+      }
+    });
+  }
+
+  private assemble(id: string, skin: string, att: string, cls: WeaponClass, parts: VisualParts, glb: boolean, clips: Record<string, AnimationGroup>): Visual {
     let leftArm: TransformNode | null = null;
     parts.root.parent = this.sway;
     for (const m of parts.meshes) this.prep(m);
@@ -294,15 +313,17 @@ export class ViewModel {
     }
     const handle = cls === 'pistol' ? new Vector3(-0.025, 0.045, -0.05) : cls === 'sniper' ? new Vector3(0.05, 0.05, -0.03) : new Vector3(0.045, 0.04, 0.08);
     const pose = POSE[cls];
-    const v: Visual = { id, skin, cls, parts, glb, clips, magRest: parts.mag ? parts.mag.position.clone() : null, leftArm, leftRest: leftArm ? leftArm.position.clone() : Vector3.Zero(), magGrab, handle, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
+    const v: Visual = { id, skin, att, cls, parts, glb, clips, magRest: parts.mag ? parts.mag.position.clone() : null, leftArm, leftRest: leftArm ? leftArm.position.clone() : Vector3.Zero(), magGrab, handle, hip: new Vector3(...pose.hip), ads: new Vector3(...pose.ads) };
     parts.root.setEnabled(false);
+    this.attach(v);
     return v;
   }
 
   /** Pede o modelo GLB da arma; quando chegar, substitui o provisório sem interromper a animação. */
-  private requestGlb(id: string, skin: string): void {
+  private requestGlb(id: string, skin: string, att: string): void {
     const lib = this.library;
-    if (!lib || this.visuals.has('glb|' + id + '|' + skin)) return;
+    const key = 'glb|' + id + '|' + skin + '|' + att;
+    if (!lib || this.visuals.has(key)) return;
     void lib.instantiate(id, skin).then((g: GlbGun | null) => {
       if (!g) {
         this.onModelChange?.(id, false);
@@ -316,9 +337,9 @@ export class ViewModel {
         clips[key] = a;
       }
       const parts: VisualParts = { root: g.root, meshes: g.meshes, mag: g.mag, slide: g.slide, muzzle: g.muzzle, leftHand: g.leftHand };
-      const v = this.assemble(id, skin, WEAPONS[id].cls, parts, true, clips);
-      this.visuals.set('glb|' + id + '|' + skin, v);
-      if (this.current && this.current.id === id && this.current.skin === skin && !this.current.glb) {
+      const v = this.assemble(id, skin, att, WEAPONS[id].cls, parts, true, clips);
+      this.visuals.set(key, v);
+      if (this.current && this.current.id === id && this.current.skin === skin && this.current.att === att && !this.current.glb) {
         this.resetPose(this.current);
         this.current.parts.root.setEnabled(false);
         this.current = v;
@@ -353,14 +374,14 @@ export class ViewModel {
     return Vector3.TransformCoordinates(this.current.parts.muzzle, this.current.parts.root.getWorldMatrix());
   }
 
-  setWeapon(id: string, drawTime: number, skin = 'default'): void {
-    if (this.current?.id === id && this.current.skin === skin) return;
+  setWeapon(id: string, drawTime: number, skin = 'default', att = ''): void {
+    if (this.current?.id === id && this.current.skin === skin && this.current.att === att) return;
     const sameGun = this.current?.id === id;
     if (this.current) {
       this.resetPose(this.current);
       this.current.parts.root.setEnabled(false);
     }
-    this.current = this.visual(id, skin);
+    this.current = this.visual(id, skin, att);
     if (sameGun) drawTime = 0; // só trocou a skin
     this.current.parts.root.setEnabled(this.visible);
     this.flash.parent = this.current.parts.root;
@@ -368,7 +389,7 @@ export class ViewModel {
     this.flash.position.z += 0.04;
     this.anim = drawTime > 0 ? { kind: 'draw', t: 0, dur: drawTime } : null;
     if (drawTime > 0) this.play('draw');
-    if (!this.current.glb) this.requestGlb(id, skin);
+    if (!this.current.glb) this.requestGlb(id, skin, att);
   }
 
   fire(): void {

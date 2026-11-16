@@ -39,6 +39,9 @@ export interface SquadMember {
   level: number;
   weapon: string;
   skin: string;
+  /** Acessórios da arma e visual do personagem (ver cosmetics/Cosmetics.ts). */
+  att?: string;
+  look?: string;
   /** O próprio jogador (fica em destaque). */
   me?: boolean;
 }
@@ -530,6 +533,8 @@ export class LobbyScene {
       v.team = this.team;
       v.weapon = m.weapon;
       v.skin = m.skin;
+      v.att = m.att ?? '';
+      v.look = m.look ?? '';
       v.x = x;
       v.z = z;
       v.yaw = ((yaw + Math.sin(this.t * 0.21 + i * 1.7) * 3) * Math.PI) / 180;

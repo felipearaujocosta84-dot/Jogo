@@ -10,6 +10,7 @@
 // A arma fica presa no osso da mão direita. Se o arquivo do modelo não carregar, usa o boneco antigo como reserva.
 import {
   AnimationGroupMask,
+  PBRMaterial,
   AnimationGroupMaskMode,
   Color3,
   CreatePlane,
@@ -22,10 +23,15 @@ import {
   type AbstractMesh,
   type AnimationGroup,
   type InstancedMesh,
+  type Material,
   type Scene,
   type ShadowGenerator
 } from '../core/babylon';
 import { gunSource } from '../weapons/WeaponModels';
+import { WeaponLibrary } from '../weapons/WeaponLibrary';
+import { attachToGun, detachAll } from '../weapons/WeaponAttachments';
+import { GearSet, composeAlbedo, finishKey } from '../cosmetics/CharacterLook';
+import { decodeLook, type Look } from '../cosmetics/Cosmetics';
 import { WEAPONS } from '../weapons/WeaponData';
 import { paintedTexture } from '../maps/textures';
 import type { PlayerView, Team } from '../sim/types';
@@ -63,6 +69,8 @@ interface Layer {
 }
 
 let flashMat: StandardMaterial | null = null;
+/** Material do corpo com a textura personalizada (por cena, equipe e combinação de acabamentos). */
+const lookMats = new Map<string, Promise<Material | null>>();
 let blobMat: StandardMaterial | null = null;
 
 /** Posição da arma na mão (calculada uma vez por modelo, na pose de mira). */
@@ -76,8 +84,15 @@ class SkinnedCharacter {
   private layers = new Map<string, Layer>();
   private gunNode: TransformNode;
   private gun: InstancedMesh | null = null;
-  private gunId = '';
-  private gunSkin = '';
+  private gunGlb: TransformNode | null = null;
+  private gunKey = '';
+  private gunToken = 0;
+  private attNodes: TransformNode[] = [];
+  private lookStr: string | null = null;
+  private lookToken = 0;
+  private baseMats = new Map<AbstractMesh, Material | null>();
+  private rest = new Map<string, Matrix>();
+  private gear: GearSet;
   private flash: Mesh;
   private flashT = 0;
   private blob: Mesh;
@@ -110,7 +125,21 @@ class SkinnedCharacter {
       m.receiveShadows = true;
     }
     for (const n of this.model.getChildTransformNodes(false)) this.nodes.set(n.name, n);
-
+    // pose de repouso dos ossos (antes de qualquer animação): referência para prender as peças 3D
+    this.root.computeWorldMatrix(true);
+    const modelLocal = this.model.computeWorldMatrix(true).clone();
+    for (const [name, n] of this.nodes) {
+      const chain: TransformNode[] = [];
+      for (let k: TransformNode | null = n; k; k = k.parent as TransformNode | null) chain.unshift(k);
+      for (const k of chain) k.computeWorldMatrix(true);
+      this.rest.set(name, n.getWorldMatrix().clone());
+    }
+    for (const m of this.meshes) this.baseMats.set(m, m.material);
+    this.gear = new GearSet(scene, team, name => this.nodes.get(name), name => this.rest.get(name), modelLocal, m => {
+      m.isPickable = false;
+      m.receiveShadows = true;
+      m.alwaysSelectAsActiveMesh = true;
+    });
     // camadas de animação (máscaras por região do corpo)
     const byName = new Map(inst.animationGroups.map(g => [g.name, g]));
     const lowerMask = () => new AnimationGroupMask(LOWER, AnimationGroupMaskMode.Include);
@@ -244,16 +273,92 @@ class SkinnedCharacter {
     return res;
   }
 
-  setWeapon(id: string, skin = 'default'): void {
-    if (id === this.gunId && skin === this.gunSkin) return;
-    this.gunId = id;
-    this.gunSkin = skin;
+  setWeapon(id: string, skin = 'default', att = ''): void {
+    const key = id + '|' + skin + '|' + att;
+    if (key === this.gunKey) return;
+    this.gunKey = key;
+    const token = ++this.gunToken;
     this.gun?.dispose();
+    this.gun = null;
+    this.gunGlb?.dispose(false, false);
+    this.gunGlb = null;
+    detachAll(this.attNodes);
+    this.attNodes = [];
+    // modelo leve na hora; o GLB detalhado (qualidade alta) substitui quando carregar
     this.gun = gunSource(id, this.scene, skin).createInstance('gunInst');
     this.gun.parent = this.gunNode;
     this.gun.isVisible = true;
     const cls = WEAPONS[id]?.cls ?? 'rifle';
     this.flash.position.set(0, 0.02, cls === 'pistol' ? 0.24 : cls === 'sniper' ? 0.9 : cls === 'smg' ? 0.4 : 0.66);
+    const prep = (m: AbstractMesh) => {
+      m.isPickable = false;
+      m.receiveShadows = true;
+    };
+    const attachProc = () => {
+      if (!att || !this.gun) return;
+      const g = this.gun;
+      void attachToGun(this.scene, { weapon: id, list: att, root: this.gunNode, meshes: [g], muzzle: new Vector3(0, 0.02, 0.6), leftHand: new Vector3(0, -0.03, 0.25), cacheKey: 'tp|' + id, prep }).then(r => {
+        if (token !== this.gunToken) return detachAll(r.nodes);
+        this.attNodes = r.nodes;
+        if (r.muzzle) this.flash.position.copyFrom(r.muzzle);
+      });
+    };
+    const lib = CharacterModel.glbWeapons && cls !== 'grenade' && cls !== 'c4' ? WeaponLibrary.forScene(this.scene) : null;
+    if (!lib || !lib.enabled) return attachProc();
+    void lib.instantiate(id, skin).then(g => {
+      if (token !== this.gunToken) {
+        g?.root.dispose(false, false);
+        return;
+      }
+      if (!g) return attachProc();
+      this.gun?.dispose();
+      this.gun = null;
+      g.root.parent = this.gunNode;
+      for (const m of g.meshes) prep(m);
+      for (const a of g.animations) a.stop();
+      this.gunGlb = g.root;
+      this.flash.position.copyFrom(g.muzzle);
+      if (!att) return;
+      void attachToGun(this.scene, { weapon: id, list: att, root: g.root, meshes: g.meshes, mag: g.mag, muzzle: g.muzzle, leftHand: g.leftHand, cacheKey: 'glb|' + id, prep }).then(r => {
+        if (token !== this.gunToken) return detachAll(r.nodes);
+        this.attNodes = r.nodes;
+        if (r.muzzle) this.flash.position.copyFrom(r.muzzle);
+      });
+    });
+  }
+
+  /** Visual do personagem (peças 3D e cores/camuflagens da roupa). */
+  setLook(raw: string): void {
+    if (raw === this.lookStr) return;
+    this.lookStr = raw;
+    const look: Look = decodeLook(raw);
+    this.gear.apply(look);
+    const token = ++this.lookToken;
+    const fk = finishKey(look);
+    const restore = () => {
+      for (const [m, mat] of this.baseMats) m.material = mat;
+    };
+    if (fk.split('|').every(x => x === 'orig')) return restore();
+    const body = this.meshes.find(m => (m.material as PBRMaterial | null)?.albedoTexture);
+    const base = body ? (this.baseMats.get(body) as PBRMaterial | null) : null;
+    if (!base?.albedoTexture) return;
+    const size = CharacterModel.lookTextureSize;
+    const key = `${this.scene.uniqueId}|${this.team}|${base.uniqueId}|${fk}|${size}`;
+    let p = lookMats.get(key);
+    if (!p) {
+      p = composeAlbedo(this.scene, this.team, base.albedoTexture, look, size).then(tex => {
+        if (!tex) return null;
+        const mat = base.clone(base.name + '_look') as PBRMaterial;
+        mat.albedoTexture = tex;
+        return mat as Material;
+      });
+      lookMats.set(key, p);
+      this.scene.onDisposeObservable.addOnce(() => lookMats.delete(key));
+    }
+    void p.then(mat => {
+      if (token !== this.lookToken || !mat) return;
+      for (const [m, orig] of this.baseMats) if (orig === base) m.material = mat;
+    });
   }
 
   fire(): void {
@@ -283,6 +388,7 @@ class SkinnedCharacter {
   setProtected(on: boolean, time: number): void {
     const v = on ? 0.45 + 0.25 * Math.sin(time * 14) : 1;
     for (const m of this.meshes) if (m.visibility !== v) m.visibility = v;
+    for (const m of this.gear.meshes) if (m.visibility !== v) m.visibility = v;
   }
 
   get isDeadAnimDone(): boolean {
@@ -297,7 +403,8 @@ class SkinnedCharacter {
   update(dt: number, p: PlayerView, reloadT: number): void {
     this.root.position.set(p.x, p.y, p.z);
     this.root.rotation.y = p.yaw;
-    this.setWeapon(p.weapon, p.skin);
+    this.setWeapon(p.weapon, p.skin, p.att ?? '');
+    this.setLook(p.look ?? '');
     for (const l of this.layers.values()) l.target = 0;
     this.pitch = Math.max(-1.2, Math.min(1.2, p.pitch));
     const sp = Math.hypot(p.vx, p.vz);
@@ -476,6 +583,9 @@ class SkinnedCharacter {
     this.scene.onAfterAnimationsObservable.remove(this.obs);
     for (const l of this.layers.values()) l.group.dispose();
     this.gun?.dispose();
+    this.gunGlb?.dispose(false, false);
+    detachAll(this.attNodes);
+    this.gear.dispose();
     this.flash.dispose();
     this.blob.dispose();
     this.gunNode.dispose();
@@ -495,6 +605,10 @@ export class CharacterModel {
   static set pbr(v: boolean) {
     ProceduralCharacter.pbr = v;
   }
+  /** Arma detalhada (GLB, com acessórios) na mão dos personagens — qualidade alta. */
+  static glbWeapons = false;
+  /** Resolução da textura personalizada da roupa (2048 na qualidade alta, 1024 no resto). */
+  static lookTextureSize = 1024;
 
   private impl: Impl;
   /** true = modelo 3D do arquivo; false = boneco de reserva. */
@@ -515,8 +629,13 @@ export class CharacterModel {
   get isDeadAnimDone(): boolean {
     return this.impl.isDeadAnimDone;
   }
-  setWeapon(id: string, skin = 'default'): void {
-    this.impl.setWeapon(id, skin);
+  setWeapon(id: string, skin = 'default', att = ''): void {
+    if (this.impl instanceof SkinnedCharacter) this.impl.setWeapon(id, skin, att);
+    else this.impl.setWeapon(id, skin);
+  }
+  /** Visual personalizado (ver cosmetics/Cosmetics.ts). O boneco de reserva ignora. */
+  setLook(look: string): void {
+    if (this.impl instanceof SkinnedCharacter) this.impl.setLook(look);
   }
   fire(): void {
     this.impl.fire();

@@ -43,10 +43,13 @@ export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPi
 export { SSAO2RenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssao2RenderingPipeline';
 export { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration';
 export { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
+export { ProceduralTexture } from '@babylonjs/core/Materials/Textures/Procedurals/proceduralTexture';
+export { ShaderStore } from '@babylonjs/core/Engines/shaderStore';
 
 // Módulos de efeito colateral (registram funcionalidades na cena)
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
 import '@babylonjs/core/Particles/particleSystemComponent';
 import '@babylonjs/core/Meshes/instancedMesh';
+import '@babylonjs/core/Materials/Textures/Procedurals/proceduralTextureSceneComponent';
 import '@babylonjs/core/Rendering/geometryBufferRendererSceneComponent';
 import '@babylonjs/core/PostProcesses/RenderPipeline/postProcessRenderPipelineManagerSceneComponent';

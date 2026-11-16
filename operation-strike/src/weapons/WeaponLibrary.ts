@@ -25,7 +25,7 @@ import {
 import { ASSET_BASE, HANDS_MODEL, WEAPON_MODELS, assetExists, findSkinMap, weaponConfigs, type WeaponModelConfig } from '../assets/AssetRegistry';
 import { WEAPONS } from './WeaponData';
 import { skinById } from './Skins';
-import { skinAlbedo } from './SkinPatterns';
+import { skinAlbedo, skinNormal } from './SkinPatterns';
 
 /** Comprimento real aproximado (m) usado para escalar os modelos. */
 const REAL_LENGTH: Record<string, number> = {
@@ -57,6 +57,8 @@ interface Loaded {
   leftHand: Vector3;
   cfg: WeaponModelConfig;
   lastUse: number;
+  /** Cópias vivas na cena (não descarta o modelo enquanto alguma existir). */
+  refs: number;
 }
 
 const AXES: Record<string, Vector3> = {
@@ -125,9 +127,27 @@ export class WeaponLibrary {
 
   private evict(): void {
     if (this.loaded.size <= this.maxLoaded) return;
-    const old = [...this.loaded.values()].sort((a, b) => a.lastUse - b.lastUse)[0];
+    const old = [...this.loaded.values()].filter(l => l.refs <= 0).sort((a, b) => a.lastUse - b.lastUse)[0];
+    if (!old) return;
     old.container.dispose();
     this.loaded.delete(old.id);
+  }
+
+  private static perScene = new Map<number, WeaponLibrary>();
+
+  /** Uma biblioteca por cena (primeira pessoa, personagens e lobby compartilham os modelos carregados). */
+  static forScene(scene: Scene): WeaponLibrary {
+    let lib = WeaponLibrary.perScene.get(scene.uniqueId);
+    if (!lib) {
+      lib = new WeaponLibrary(scene);
+      WeaponLibrary.perScene.set(scene.uniqueId, lib);
+      const l = lib;
+      scene.onDisposeObservable.addOnce(() => {
+        WeaponLibrary.perScene.delete(scene.uniqueId);
+        l.dispose();
+      });
+    }
+    return lib;
   }
 
   /** Calcula a normalização a partir dos vértices do modelo. */
@@ -214,7 +234,7 @@ export class WeaponLibrary {
     const leftHand = cls === 'pistol' ? new Vector3(-0.03, -0.085, -0.02) : new Vector3(-0.01, nMin.y + H * 0.45, nMin.z + L * Math.min(0.8, gripAt + 0.3)).add(offset);
     let finalRot = rot;
     if (cfg.rotation) finalRot = Quaternion.FromEulerAngles(...(cfg.rotation.map(d => (d * Math.PI) / 180) as [number, number, number])).multiply(rot);
-    return { id, container, rot: finalRot, scale, offset: offset.subtract(Vector3.Zero()), length: L, height: H, muzzle, leftHand, cfg, lastUse: performance.now(), ...{ center } } as Loaded & { center: Vector3 };
+    return { id, container, rot: finalRot, scale, offset: offset.subtract(Vector3.Zero()), length: L, height: H, muzzle, leftHand, cfg, lastUse: performance.now(), refs: 0, ...{ center } } as Loaded & { center: Vector3 };
   }
 
   /** Cria uma cópia da arma pronta para uso, já com a skin. */
@@ -226,6 +246,10 @@ export class WeaponLibrary {
     const inst = l.container.instantiateModelsToScene(n => `${id}_${n}`, false, { doNotInstantiate: true });
     // hierarquia: root (empunhadura) → pivot (escala/rotação/centro) → nós do modelo
     const root = new TransformNode('glb_' + id, this.scene);
+    l.refs++;
+    root.onDisposeObservable.addOnce(() => {
+      l.refs--;
+    });
     const offsetNode = new TransformNode('glbOffset_' + id, this.scene);
     offsetNode.parent = root;
     offsetNode.position.copyFrom(l.offset);
@@ -278,6 +302,34 @@ export class WeaponLibrary {
     return p;
   }
 
+  private details = new Map<string, Texture | null>();
+
+  /** Mapa de detalhe do Babylon (R = cor neutra, G/A = normal, B = rugosidade neutra) a partir do relevo da skin. */
+  private skinDetail(skinId: string): Texture | null {
+    if (this.details.has(skinId)) return this.details.get(skinId)!;
+    const n = skinNormal(skinId, 512);
+    let tex: Texture | null = null;
+    if (n) {
+      const src = n.getContext('2d')!.getImageData(0, 0, n.width, n.height);
+      const d = src.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const nx = d[i], ny = d[i + 1];
+        d[i] = 128;
+        d[i + 1] = ny;
+        d[i + 2] = 128;
+        d[i + 3] = nx;
+      }
+      const dt = new DynamicTexture('skinDetail_' + skinId, { width: n.width, height: n.height }, this.scene, true);
+      (dt.getContext() as unknown as CanvasRenderingContext2D).putImageData(src, 0, 0);
+      dt.update(false);
+      dt.wrapU = dt.wrapV = Texture.WRAP_ADDRESSMODE;
+      dt.hasAlpha = false;
+      tex = dt as unknown as Texture;
+    }
+    this.details.set(skinId, tex);
+    return tex;
+  }
+
   /** Troca os materiais das peças pintáveis pela versão com a skin (vidro e lentes não mudam). */
   async applySkin(meshes: AbstractMesh[], id: string, skinId: string): Promise<void> {
     const skin = skinById(skinId);
@@ -310,6 +362,18 @@ export class WeaponLibrary {
         }
         p.albedoColor = Color3.White();
         if (normal) p.bumpTexture = normal;
+        else {
+          // relevo do padrão (bordas das escamas, hexágonos, trilhas...) como mapa de detalhe:
+          // soma ao relevo próprio do modelo em vez de substituí-lo
+          const det = this.skinDetail(skin.id);
+          if (det) {
+            p.detailMap.texture = det;
+            p.detailMap.isEnabled = true;
+            p.detailMap.diffuseBlendLevel = 0;
+            p.detailMap.roughnessBlendLevel = 0;
+            p.detailMap.bumpLevel = 1;
+          }
+        }
         if (orm) {
           p.metallicTexture = orm;
           p.useRoughnessFromMetallicTextureGreen = true;
@@ -354,6 +418,8 @@ export class WeaponLibrary {
     for (const m of this.skinMats.values()) m.dispose();
     this.skinMats.clear();
     this.skinTex.clear();
+    for (const t of this.details.values()) t?.dispose();
+    this.details.clear();
     this.hands = null;
   }
 }

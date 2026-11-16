@@ -77,6 +77,9 @@ export interface PlayerView {
   variant: number;
   /** Skin da arma em uso. */
   skin: string;
+  /** Acessórios da arma em uso ("a.b.c") e visual do personagem (ver cosmetics/Cosmetics.ts). */
+  att?: string;
+  look?: string;
   /** Proteção de renascimento ativa (mata-mata). */
   prot?: boolean;
 }
