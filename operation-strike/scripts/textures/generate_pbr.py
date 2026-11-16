@@ -139,9 +139,9 @@ def m_asphalt(N, r):
     patch = smooth(0.66, 0.7, n01(warp(spectral(N, r, 3.0, 1, 6), r, N * 0.01, 20)))  # remendos mais escuros
     oil = smooth(0.8, 0.95, n01(spectral(N, r, 3.0, 2, 14)))
     h = n01(h - cr * 0.6)
-    g = 0.17 + 0.05 * n01(base)
-    col = np.stack([g, g, g * 1.03], -1)
-    col = mixc(col, hexc('#5b5a57'), stones * 0.55 * n01(spectral(N, r, 1.0, 300)))
+    g = 0.25 + 0.06 * n01(base)  # asfalto envelhecido: cinza, não preto
+    col = np.stack([g, g * 0.99, g * 1.02], -1)
+    col = mixc(col, hexc('#77746e'), stones * 0.6 * n01(spectral(N, r, 1.0, 300)))
     col = mixc(col, hexc('#141517'), patch * 0.3)
     col = mixc(col, hexc('#0d0d0e'), oil * 0.3)
     col = mixc(col, hexc('#0a0a0a'), cr * 0.8)
