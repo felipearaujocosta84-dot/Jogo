@@ -120,6 +120,7 @@
           <button data-action="quick-competitive"><span>Encontrar partida</span><i>⌕</i></button>
           <button data-action="online-x1"><span>Modo X1 (duelo)</span><i>⚔</i></button>
           <button data-action="online-friends"><span>Amigos e convites</span><i>☺</i></button>
+          <button data-action="lan-play"><span>Wi-Fi local (sem internet)</span><i>⌂</i></button>
           <button data-action="lobby-team"><span id="sqTeam">Trocar equipe</span><i>⇄</i></button>
           <button data-go="profileScreen"><span>Perfil e histórico</span><i>☺</i></button>
         </nav>
@@ -169,6 +170,7 @@
       <div class="tab-body hidden" data-tab-body="online">
         <p class="roadmap">Partidas online com outros jogadores: partida rápida, salas públicas e privadas, X1, amigos e convites.</p>
         <button class="btn primary" data-action="online-play">ABRIR MULTIPLAYER</button>
+        <button class="btn" data-action="lan-play">WI-FI LOCAL (SEM INTERNET)</button>
         <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button></div>
       </div>
     </div>
@@ -288,6 +290,15 @@
       </div>
       <div id="olStatus" class="ol-status"></div>
       <div id="olBody" class="ol-body"></div>
+    </div>
+
+    <div id="lanScreen" class="screen ol hidden">
+      <div class="ol-top">
+        <div class="cz-title"><small>OPERATION STRIKE</small><h2>WI-FI LOCAL</h2></div>
+        <span class="ol-tabs"></span>
+        <button class="btn small" data-go="mainMenu">VOLTAR</button>
+      </div>
+      <div id="lanBody" class="ol-body"></div>
     </div>
 
     <div id="rotateHint" class="rotate-hint"><div>⟳</div><p>Gire o celular para a horizontal</p></div>

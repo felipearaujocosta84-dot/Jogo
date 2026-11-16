@@ -19,6 +19,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // plugin próprio: partida em Wi-Fi local (o celular anfitrião abre a sala na rede)
+        registerPlugin(LanServerPlugin.class);
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         WebView webView = getBridge().getWebView();

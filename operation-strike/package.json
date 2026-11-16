@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
     "test:sim": "tsx scripts/simtest.ts",
     "test:net": "OS_TEST_MODE=1 LOG_LEVEL=warn tsx scripts/net/run.ts",
-    "db:dev": "sh scripts/dev-db.sh"
+    "db:dev": "sh scripts/dev-db.sh",
+    "test:lan": "node scripts/net/lan-e2e.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.32.1",

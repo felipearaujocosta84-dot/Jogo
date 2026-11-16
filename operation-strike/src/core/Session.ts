@@ -7,7 +7,16 @@ import { SimPlayer, type SimHooks } from '../sim/PlayerSim';
 import { MapRuntime } from '../maps/MapRuntime';
 import { MAPS } from '../maps/maps';
 import type { BombView, GameMode, LocalView, NadeView, PlayerView, RoundView, SimEvent, Snapshot, Team, UserCmd } from '../sim/types';
-import type { NetClient } from '../multiplayer/NetClient';
+import type { ClientMsg, ServerMsg } from '../multiplayer/Protocol';
+import type { ProfileData } from '../save/Profile';
+
+/** O que a sessão online precisa da conexão (servidor na internet ou anfitrião do Wi-Fi local). */
+export interface SessionNet {
+  profile: ProfileData | null;
+  on(h: (msg: ServerMsg) => void): () => void;
+  send(msg: ClientMsg): void;
+  queueCmd(cmd: UserCmd): void;
+}
 import { WEAPONS } from '../weapons/WeaponData';
 
 export interface ViewState {
@@ -20,6 +29,8 @@ export interface ViewState {
 
 export interface Session {
   readonly online: boolean;
+  /** partida em Wi-Fi local (não conta para perfil/ranking) */
+  lan?: boolean;
   readonly map: MapRuntime;
   readonly localId: string;
   readonly mode: GameMode;
@@ -45,16 +56,18 @@ export class LocalSession implements Session {
   readonly localId = 'local';
   alpha = 0;
   prevPos = { x: 0, y: 0, z: 0 };
-  private acc = 0;
-  private seq = 0;
-  private events: SimEvent[] = [];
+  protected acc = 0;
+  protected seq = 0;
+  protected events: SimEvent[] = [];
 
-  constructor(config: MatchConfig, name: string, team: Team, skins: Record<string, string> = {}) {
+  /** `beforeStart`: entra mais gente antes de completar com bots (anfitrião do Wi-Fi local). */
+  constructor(config: MatchConfig, name: string, team: Team, skins: Record<string, string> = {}, opts: { beforeStart?: (sim: MatchSim) => void; bots?: boolean } = {}) {
     this.sim = new MatchSim(config);
     this.sim.addPlayer(name, { team, id: this.localId });
     this.sim.setSkins(this.localId, skins);
+    opts.beforeStart?.(this.sim);
     if (config.mode === 'training') this.sim.fillBotsFor(team === 'T' ? 'CT' : 'T', 5);
-    else this.sim.fillBots();
+    else if (opts.bots !== false && config.mode !== 'x1') this.sim.fillBots();
     this.sim.start();
   }
 
@@ -130,6 +143,7 @@ const INTERP_TICKS = 6; // 100 ms de atraso de interpolação
 
 export class OnlineSession implements Session {
   readonly online = true;
+  lan = false;
   readonly map: MapRuntime;
   readonly pred: SimPlayer;
   alpha = 0;
@@ -148,7 +162,7 @@ export class OnlineSession implements Session {
   private lastSelectAt = 0;
   private lastServerActive = '';
 
-  constructor(private net: NetClient, mapId: string, readonly mode: GameMode, readonly localId: string) {
+  constructor(private net: SessionNet, mapId: string, readonly mode: GameMode, readonly localId: string) {
     this.map = new MapRuntime(MAPS[mapId] ?? MAPS.dust_zone);
     this.pred = new SimPlayer(localId, net.profile?.name ?? 'Você', 'T', false, 'normal', 0, this.map.world);
     this.pred.alive = false;

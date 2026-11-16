@@ -4,6 +4,7 @@ import { Settings, type SettingsData } from './core/Settings';
 import { LocalSession, OnlineSession, type Session } from './core/Session';
 import { NetClient, normalizeServer } from './multiplayer/NetClient';
 import { OnlineScreen } from './interface/OnlineScreen';
+import { LanScreen } from './interface/LanScreen';
 import { MAP_LIST, MAPS, mapAllows } from './maps/maps';
 import { ensureMapData } from './maps/ModelMaps';
 import { applyMatch, BOT_MMR, levelFor, rankName, type ProfileData } from './save/Profile';
@@ -37,7 +38,7 @@ const game = new Game(canvas, settings);
 document.body.classList.toggle('touch', game.isTouch);
 document.body.classList.toggle('native', isNativeApp());
 
-const SCREENS = ['loading', 'mainMenu', 'playMenu', 'lobbyScreen', 'onlineScreen', 'trainingMenu', 'arsenalScreen', 'profileScreen', 'rankingScreen', 'pauseMenu', 'endScreen', 'settingsMenu'] as const;
+const SCREENS = ['loading', 'mainMenu', 'playMenu', 'lobbyScreen', 'onlineScreen', 'lanScreen', 'trainingMenu', 'arsenalScreen', 'profileScreen', 'rankingScreen', 'pauseMenu', 'endScreen', 'settingsMenu'] as const;
 type ScreenId = (typeof SCREENS)[number] | null;
 let current: ScreenId = 'loading';
 let settingsReturn: ScreenId = 'mainMenu';
@@ -193,6 +194,10 @@ function lobbyAction(action: string): boolean {
     case 'online-play':
       online.open('play');
       show('onlineScreen');
+      return true;
+    case 'lan-play':
+      lan.open();
+      show('lanScreen');
       return true;
     case 'online-x1':
       online.open('x1');
@@ -404,7 +409,9 @@ function showEnd(s: Session): void {
   $('endStats').innerHTML = `<div class="t"><h3>TERRORISTAS ${res.scoreT}</h3><table>${head}${rows('T')}</table></div><div class="ct"><h3>CONTRATERRORISTAS ${res.scoreCT}</h3><table>${head}${rows('CT')}</table></div>`;
   let pdata: ProfileData | null = null;
   let rec = null;
-  if (!s.online && me) {
+  if (s.lan) {
+    // Wi-Fi local: só o placar, sem XP/MMR
+  } else if (!s.online && me) {
     const own = me.team === 'T' ? res.scoreT : res.scoreCT;
     const enemy = me.team === 'T' ? res.scoreCT : res.scoreT;
     const diff = (s as LocalSession).sim.config.difficulty;
@@ -429,10 +436,10 @@ function showEnd(s: Session): void {
       <div>${s.mode === 'competitive' ? `MMR ${rec.mmrDelta >= 0 ? '+' : ''}${rec.mmrDelta} → <b>${pdata.mmr}</b> · ${rankName(pdata.mmr)}` : s.mode === 'tdm' ? 'Mata-mata não altera o MMR' : 'Partida casual não altera o MMR'}${rec.coins ? ` · <b>+${rec.coins}</b> moedas` : ''}</div>`;
   } else $('endProfile').innerHTML = mine;
   // X1 online: a sala continua aberta para a revanche
-  const duel = s.online && s.mode === 'x1';
+  const duel = s.online && !s.lan && s.mode === 'x1';
   $('btnRematch').classList.toggle('hidden', !duel);
   $('btnEndRoom').classList.toggle('hidden', !duel);
-  if (s.online && !duel) void net?.leaveGame();
+  if (s.online && !s.lan && !duel) void net?.leaveGame();
   if (s.online && s.mode === 'br' && me) {
     const place = res.players.find(p => p.id === s.localId)?.place ?? 0;
     $('endTitle').textContent = place === 1 ? '1º LUGAR — VITÓRIA!' : `${place}º LUGAR`;
@@ -519,6 +526,20 @@ async function ensureNet(): Promise<NetClient> {
   await n.connect();
   return n;
 }
+
+const lan = new LanScreen();
+lan.getName = () => settings.get('playerName') || 'Jogador';
+lan.getSkins = () => SkinPrefs.all;
+lan.getTeam = () => agent.team;
+lan.onToast = (m, ms) => toast(m, ms);
+lan.prepareMap = async id => {
+  const def = MAPS[id];
+  if (def) await ensureMapData(def);
+};
+lan.onLaunch = s => {
+  void enterFullscreen();
+  launch(s);
+};
 
 const online = new OnlineScreen(() => getNet(), () => ensureNet());
 online.onToast = (m, ms) => toast(m, ms);
@@ -712,12 +733,17 @@ document.addEventListener('click', e => {
       return;
     }
     case 'quit-match':
-      if (game.session?.online) void net?.leaveGame();
+    case 'end-menu': {
+      const wasLan = !!game.session?.lan;
+      if (btn.dataset.action === 'quit-match' && game.session?.online && !wasLan) void net?.leaveGame();
       game.endSession();
+      if (wasLan) {
+        // Wi-Fi local: volta para a sala (o anfitrião pode iniciar outra partida)
+        lan.open();
+        return show('lanScreen');
+      }
       return show('mainMenu');
-    case 'end-menu':
-      game.endSession();
-      return show('mainMenu');
+    }
   }
 });
 
