@@ -7,6 +7,7 @@ import {
   CreateSphere,
   Mesh,
   ParticleSystem,
+  PointLight,
   StandardMaterial,
   Vector3,
   type Scene
@@ -35,6 +36,13 @@ export class Effects {
   private dot: ReturnType<typeof paintedTexture>;
   private soft: ReturnType<typeof paintedTexture>;
   private time = 0;
+  /** Luz dinâmica única reaproveitada (clarão dos tiros e explosões) — só nas qualidades Alta/Ultra. */
+  private light: PointLight | null = null;
+  private lightT = 0;
+  private lightDur = 1;
+  private lightPeak = 0;
+  /** Fumaça e poeira que sobem depois de uma explosão. */
+  private debris!: ParticleSystem;
 
   constructor(private scene: Scene, private maxParticles: number) {
     this.dot = paintedTexture(scene, 'fxDot', 32, (g, s) => {
@@ -95,6 +103,25 @@ export class Effects {
     this.fire.manualEmitCount = 0;
     this.fire.start();
 
+    this.debris = new ParticleSystem('explosionSmoke', 120, scene);
+    this.debris.particleTexture = this.soft;
+    this.debris.emitter = Vector3.Zero();
+    this.debris.minLifeTime = 1.4;
+    this.debris.maxLifeTime = 3.2;
+    this.debris.minEmitPower = 0.6;
+    this.debris.maxEmitPower = 2.4;
+    this.debris.direction1 = new Vector3(-1, 0.6, -1);
+    this.debris.direction2 = new Vector3(1, 1.6, 1);
+    this.debris.gravity = new Vector3(0, 0.6, 0);
+    this.debris.minAngularSpeed = -0.6;
+    this.debris.maxAngularSpeed = 0.6;
+    this.debris.color1 = new Color4(0.32, 0.29, 0.26, 0.75);
+    this.debris.color2 = new Color4(0.22, 0.2, 0.18, 0.7);
+    this.debris.colorDead = new Color4(0.4, 0.38, 0.35, 0);
+    this.debris.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    this.debris.manualEmitCount = 0;
+    this.debris.start();
+
     const fbm = new StandardMaterial('flashBallMat', scene);
     fbm.emissiveColor = new Color3(1, 1, 0.95);
     fbm.disableLighting = true;
@@ -145,6 +172,36 @@ export class Effects {
     (tr as Tracer & { from?: Vector3; to?: Vector3 }).to = to;
   }
 
+  /**
+   * Liga/desliga a luz dinâmica. A luz é criada uma vez (intensidade 0 quando apagada) e nunca é desativada,
+   * para os shaders não precisarem ser recompilados a cada tiro.
+   */
+  setDynamicLights(on: boolean): void {
+    if (on && !this.light) {
+      this.light = new PointLight('fxLight', Vector3.Zero(), this.scene);
+      this.light.intensity = 0;
+      this.light.range = 9;
+      this.light.diffuse = new Color3(1, 0.75, 0.4);
+      this.light.specular = new Color3(0.6, 0.45, 0.25);
+    } else if (!on && this.light) {
+      this.light.dispose();
+      this.light = null;
+    }
+  }
+
+  /** Clarão de luz no ponto (tiro: curto e fraco; explosão: forte e mais longo). */
+  lightFlash(p: Vector3, intensity: number, dur: number, range = 9, color?: Color3): void {
+    const l = this.light;
+    if (!l || intensity < this.lightPeak * (this.lightT / this.lightDur)) return;
+    l.position.copyFrom(p);
+    l.range = range;
+    if (color) l.diffuse.copyFrom(color);
+    else l.diffuse.set(1, 0.75, 0.4);
+    this.lightPeak = intensity;
+    this.lightT = this.lightDur = dur;
+    l.intensity = intensity;
+  }
+
   bloodAt(p: Vector3, dir: Vector3): void {
     (this.blood.emitter as Vector3).copyFrom(p);
     this.blood.direction1 = dir.add(new Vector3(-0.6, 0.2, -0.6));
@@ -162,6 +219,11 @@ export class Effects {
     (this.flashBall.material as StandardMaterial).emissiveColor = new Color3(1, 0.7, 0.35);
     this.flashBall.setEnabled(true);
     this.flashBallT = 0.12;
+    (this.debris.emitter as Vector3).copyFrom(p);
+    this.debris.minSize = big ? 2 : 0.9;
+    this.debris.maxSize = big ? 5 : 2.6;
+    this.debris.manualEmitCount = Math.min(big ? 40 : 18, this.maxParticles * 2);
+    this.lightFlash(p.add(new Vector3(0, 0.6, 0)), big ? 9 : 5, big ? 0.6 : 0.35, big ? 30 : 14, new Color3(1, 0.62, 0.3));
   }
 
   flashbang(p: Vector3): void {
@@ -170,6 +232,7 @@ export class Effects {
     (this.flashBall.material as StandardMaterial).emissiveColor = new Color3(1, 1, 1);
     this.flashBall.setEnabled(true);
     this.flashBallT = 0.15;
+    this.lightFlash(p, 7, 0.25, 18, new Color3(1, 1, 1));
   }
 
   /** Atualiza granadas em voo, nuvens de fumaça e a bomba a partir do estado da partida. */
@@ -246,6 +309,12 @@ export class Effects {
   }
 
   update(dt: number): void {
+    if (this.light && this.lightT > 0) {
+      this.lightT = Math.max(0, this.lightT - dt);
+      const k = this.lightT / this.lightDur;
+      this.light.intensity = this.lightPeak * k * k;
+      if (this.lightT === 0) this.lightPeak = 0;
+    }
     this.time += dt;
     for (const t of this.tracers) {
       if (t.t <= 0) continue;
@@ -270,6 +339,8 @@ export class Effects {
     for (const t of this.tracers) t.mesh.dispose();
     this.blood.dispose();
     this.fire.dispose();
+    this.debris.dispose();
+    this.light?.dispose();
     this.flashBall.dispose();
     this.bombNode.dispose();
   }

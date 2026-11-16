@@ -25,6 +25,7 @@ import { SkinPrefs } from '../save/SkinPrefs';
 import { WeaponLibrary } from '../weapons/WeaponLibrary';
 import { setWeaponMaterialQuality } from '../weapons/WeaponModels';
 import { applyStudioEnvironment } from './Environment';
+import { PostFx } from './Graphics';
 import { weaponConfigs, assetExists, ASSET_BASE } from '../assets/AssetRegistry';
 import { PLAYER } from '../player/PlayerController';
 import { BTN, type PlayerView, type SimEvent, type Team, type UserCmd } from '../sim/types';
@@ -95,6 +96,9 @@ export class Game {
     });
     this.engine.disableManifestCheck = true;
     this.quality = new Quality(this.engine, this.settings.get('quality'));
+    this.quality.dynamic = this.settings.get('dynamicResolution');
+    // modo automático: se o aparelho não aguentar, reduz o nível e reconstrói o cenário
+    this.quality.onAutoDowngrade = () => this.applyQualityLevel();
     this.scene = new Scene(this.engine);
     this.scene.skipPointerMovePicking = true;
     await nextFrame();
@@ -107,6 +111,10 @@ export class Game {
     void weaponConfigs().then(cfg => this.view.setLibrary(this.library.enabled ? this.library : null, (cfg as Record<string, object>).hands ?? {}));
     this.decals = new ImpactEffects(this.scene, this.quality.preset.decals, this.quality.preset.particles);
     this.fx = new Effects(this.scene, this.quality.preset.particles);
+    this.fx.setDynamicLights(this.quality.preset.dynamicLights);
+    CharacterModel.pbr = this.quality.preset.pbr;
+    this.postFx = new PostFx(this.scene, this.camera.camera);
+    this.postFx.apply(this.quality.preset);
     onProgress(25, 'Construindo o cenário');
     this.loadMapVisual(DEFAULT_MAP);
     await nextFrame();
@@ -159,18 +167,15 @@ export class Game {
     const level = this.quality.level;
     const lib = this.library;
     lib.enabled = level !== 'low';
-    lib.maxLoaded = level === 'high' ? 6 : 4;
-    lib.textureSize = level === 'high' ? 2048 : 1024;
+    lib.maxLoaded = level === 'ultra' ? 8 : level === 'high' ? 6 : 4;
+    lib.textureSize = level === 'high' || level === 'ultra' ? 2048 : 1024;
     setWeaponMaterialQuality(level !== 'low');
   }
 
   applySettings(): void {
     const s = this.settings.data;
-    if (this.quality.setMode(s.quality) && this.visualMapId) {
-      const id = this.visualMapId;
-      this.visualMapId = '';
-      this.loadMapVisual(id, this.session?.map);
-    }
+    this.quality.dynamic = s.dynamicResolution;
+    if (this.quality.setMode(s.quality)) this.applyQualityLevel();
     this.camera.baseFov = s.fov;
     this.mapVisual?.setRenderDistance(s.renderDistance);
     this.keyboard.sensitivity = s.mouseSensitivity;
@@ -188,6 +193,28 @@ export class Game {
       if (was !== this.library.enabled) void weaponConfigs().then(cfg => this.view.setLibrary(this.library.enabled ? this.library : null, (cfg as Record<string, object>).hands ?? {}));
     }
     this.hud.setFps(s.showFps ? this.quality.averageFps : null);
+  }
+
+  private postFx!: PostFx;
+
+  /** Reconfigura tudo que depende do nível de qualidade (cenário, pós-processamento, luzes, materiais). */
+  private applyQualityLevel(): void {
+    const p = this.quality.preset;
+    this.postFx?.apply(p);
+    this.fx?.setDynamicLights(p.dynamicLights);
+    this.fx?.setMaxParticles(p.particles);
+    this.decals?.setLimits(p.decals, p.particles);
+    if (CharacterModel.pbr !== p.pbr) {
+      CharacterModel.pbr = p.pbr;
+      for (const c of this.chars.values()) c.model.dispose();
+      this.chars.clear(); // recriados no próximo quadro com o material novo
+    }
+    if (this.library) this.configureLibrary();
+    if (this.visualMapId) {
+      const id = this.visualMapId;
+      this.visualMapId = '';
+      this.loadMapVisual(id, this.session?.map);
+    }
   }
 
   private loadMapVisual(mapId: string, runtime?: MapRuntime): void {
@@ -628,11 +655,13 @@ export class Game {
           if (isLocal) {
             this.view.fire();
             this.audio.shot(def?.sound ?? 'rifle', null, e.w as string);
+            if (def?.cls !== 'knife') this.fx.lightFlash(this.view.muzzleWorld, def?.cls === 'sniper' ? 2.6 : 1.6, 0.06, 7);
             if (def?.cls !== 'knife') this.fx.tracer(this.view.muzzleWorld, to);
           } else {
             const c = this.chars.get(e.pid as string);
             c?.model.fire();
             this.audio.shot(def?.sound ?? 'rifle', from, e.w as string);
+            if (def?.cls !== 'knife' && Vector3.DistanceSquared(from, this.camera.camera.position) < 900) this.fx.lightFlash(from, 1.3, 0.06, 6);
             if (def?.cls !== 'knife') this.fx.tracer(from.add(to.subtract(from).normalize().scale(0.8)), to);
             this.seenEnemy.set(e.pid as string, this.time);
           }

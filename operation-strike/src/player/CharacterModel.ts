@@ -8,6 +8,7 @@ import {
   CreatePlane,
   Matrix,
   Mesh,
+  PBRMaterial,
   Quaternion,
   Skeleton,
   StandardMaterial,
@@ -74,6 +75,8 @@ let flashMat: StandardMaterial | null = null;
 let blobMat: StandardMaterial | null = null;
 
 export class CharacterModel {
+  /** Material PBR (tecido fosco, reflexos do ambiente) nas qualidades Alta/Ultra. */
+  static pbr = false;
   readonly root: TransformNode;
   private mesh: Mesh;
   private skeleton: Skeleton;
@@ -172,10 +175,20 @@ export class CharacterModel {
     }
 
     this.mesh = g.build('soldier', scene, true);
-    const mat = new StandardMaterial('soldierMat', scene);
-    mat.diffuseColor = Color3.White();
-    mat.specularColor = new Color3(0.08, 0.08, 0.08);
-    this.mesh.material = mat;
+    if (CharacterModel.pbr) {
+      const pm = new PBRMaterial('soldierPbr', scene);
+      pm.albedoColor = Color3.White();
+      pm.metallic = 0.05;
+      pm.roughness = 0.78;
+      pm.environmentIntensity = 0.5;
+      pm.directIntensity = 1.5;
+      this.mesh.material = pm;
+    } else {
+      const mat = new StandardMaterial('soldierMat', scene);
+      mat.diffuseColor = Color3.White();
+      mat.specularColor = new Color3(0.08, 0.08, 0.08);
+      this.mesh.material = mat;
+    }
     this.mesh.skeleton = this.skeleton;
     this.mesh.parent = this.root;
     this.mesh.receiveShadows = true;

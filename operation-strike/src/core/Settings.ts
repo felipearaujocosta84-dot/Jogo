@@ -1,7 +1,7 @@
 // Preferências do jogador (salvas no aparelho).
 import { Storage } from '../save/Storage';
 
-export type QualityMode = 'auto' | 'low' | 'medium' | 'high';
+export type QualityMode = 'auto' | 'low' | 'medium' | 'high' | 'ultra';
 
 export interface SettingsData {
   quality: QualityMode;
@@ -15,7 +15,11 @@ export interface SettingsData {
   aimSensitivity: number;
   invertY: boolean;
   showFps: boolean;
-  fpsCap: 0 | 30 | 60;
+  fpsCap: 0 | 30 | 60 | 90 | 120;
+  /** Resolução dinâmica (baixa a resolução interna quando o FPS cai). */
+  dynamicResolution: boolean;
+  /** Inclinação da câmera ao andar de lado. */
+  cameraTilt: boolean;
   volume: number;
   buttonOpacity: number;
   /** Agachar: segurar (false) ou alternar (true). No toque, alternar é mais confortável. */
@@ -42,7 +46,9 @@ const DEFAULTS: SettingsData = {
   crosshairColor: '#5dff8a',
   playerName: 'Operador' + Math.floor(100 + Math.random() * 900),
   serverUrl: '',
-  nameTags: true
+  nameTags: true,
+  dynamicResolution: true,
+  cameraTilt: true
 };
 
 type Listener = (s: SettingsData) => void;

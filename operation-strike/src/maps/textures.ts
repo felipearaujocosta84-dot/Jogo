@@ -342,6 +342,53 @@ export function getTexture(scene: Scene, name: TextureName, size: number): Dynam
   return tex;
 }
 
+const normalCache = new Map<string, DynamicTexture>();
+
+/** Força do relevo por material (tijolos e caixas mais marcados, areia e vidro suaves). */
+const BUMP: Partial<Record<TextureName, number>> = {
+  sandstone: 3.2, brick: 3.4, plaster: 1.8, concrete: 2.2, crate: 2.6, tile: 2.6, metal: 2.0, container: 2.2,
+  roof: 2.0, door: 2.0, sand: 1.4, asphalt: 1.6, steel: 1.2, trim: 1.6, carpet: 1.0, grass: 1.6, glass: 0.4, dark: 0.6
+};
+
+/**
+ * Mapa de relevo (normal map) calculado da própria textura: o brilho vira altura e as diferenças viram normais.
+ * Dá volume aos tijolos, frestas e rachaduras sem nenhum arquivo extra.
+ */
+export function getNormalTexture(scene: Scene, name: TextureName, size: number): DynamicTexture {
+  const key = name + size;
+  const found = normalCache.get(key);
+  if (found && found.getInternalTexture()) return found;
+  const src = document.createElement('canvas');
+  src.width = src.height = size;
+  const sg = src.getContext('2d')!;
+  PAINTERS[name](sg, size, rng(name.length * 7919 + size));
+  const img = sg.getImageData(0, 0, size, size).data;
+  const h = new Float32Array(size * size);
+  for (let i = 0; i < size * size; i++) h[i] = (img[i * 4] * 0.3 + img[i * 4 + 1] * 0.59 + img[i * 4 + 2] * 0.11) / 255;
+  const tex = new DynamicTexture('nrm_' + name, { width: size, height: size }, scene, true);
+  const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+  const out = g.createImageData(size, size);
+  const k = BUMP[name] ?? 1.5;
+  const at = (x: number, y: number) => h[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * k;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * k;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * size + x) * 4;
+      out.data[i] = ((-dx / len) * 0.5 + 0.5) * 255;
+      out.data[i + 1] = ((-dy / len) * 0.5 + 0.5) * 255;
+      out.data[i + 2] = ((1 / len) * 0.5 + 0.5) * 255;
+      out.data[i + 3] = 255;
+    }
+  g.putImageData(out, 0, 0);
+  tex.update(true);
+  tex.wrapU = Texture.WRAP_ADDRESSMODE;
+  tex.wrapV = Texture.WRAP_ADDRESSMODE;
+  normalCache.set(key, tex);
+  return tex;
+}
+
 /** Textura com texto/pintura única (letras dos pontos de bomba, placas). */
 export function paintedTexture(scene: Scene, name: string, size: number, paint: (g: CanvasRenderingContext2D, s: number) => void): DynamicTexture {
   const tex = new DynamicTexture(name, { width: size, height: size }, scene, true);
@@ -356,4 +403,6 @@ export function paintedTexture(scene: Scene, name: string, size: number, paint: 
 export function clearTextureCache(): void {
   for (const t of cache.values()) t.dispose();
   cache.clear();
+  for (const t of normalCache.values()) t.dispose();
+  normalCache.clear();
 }

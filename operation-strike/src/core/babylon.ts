@@ -36,9 +36,14 @@ export { AssetContainer } from '@babylonjs/core/assetContainer';
 export type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 export type { Material } from '@babylonjs/core/Materials/material';
 export type { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture';
+export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline';
+export { SSAO2RenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssao2RenderingPipeline';
+export { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration';
 export { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
 
 // Módulos de efeito colateral (registram funcionalidades na cena)
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
 import '@babylonjs/core/Particles/particleSystemComponent';
 import '@babylonjs/core/Meshes/instancedMesh';
+import '@babylonjs/core/Rendering/geometryBufferRendererSceneComponent';
+import '@babylonjs/core/PostProcesses/RenderPipeline/postProcessRenderPipelineManagerSceneComponent';

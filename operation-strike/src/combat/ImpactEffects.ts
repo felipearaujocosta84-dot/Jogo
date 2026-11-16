@@ -27,6 +27,8 @@ export class ImpactEffects {
   private decals: InstancedMesh[] = [];
   private next = 0;
   private dust: ParticleSystem;
+  /** Faíscas rápidas e alongadas (metal, pedra, concreto). */
+  private sparks: ParticleSystem;
 
   constructor(scene: Scene, private maxDecals: number, maxParticles: number) {
     const holeTex = paintedTexture(scene, 'bulletHole', 64, (g, s) => {
@@ -70,6 +72,26 @@ export class ImpactEffects {
     this.dust.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     this.dust.updateSpeed = 1 / 60;
     this.dust.start();
+    this.sparks = new ParticleSystem('impactSparks', maxParticles * 3, scene);
+    this.sparks.particleTexture = dotTex;
+    this.sparks.emitter = Vector3.Zero();
+    this.sparks.manualEmitCount = 0;
+    this.sparks.minLifeTime = 0.08;
+    this.sparks.maxLifeTime = 0.26;
+    this.sparks.minSize = 0.012;
+    this.sparks.maxSize = 0.03;
+    this.sparks.minScaleY = 3;
+    this.sparks.maxScaleY = 6;
+    this.sparks.minEmitPower = 4;
+    this.sparks.maxEmitPower = 9;
+    this.sparks.gravity = new Vector3(0, -9.8, 0);
+    this.sparks.color1 = new Color4(1, 0.9, 0.55, 1);
+    this.sparks.color2 = new Color4(1, 0.6, 0.2, 1);
+    this.sparks.colorDead = new Color4(1, 0.3, 0, 0);
+    this.sparks.blendMode = ParticleSystem.BLENDMODE_ADD;
+    this.sparks.billboardMode = ParticleSystem.BILLBOARDMODE_STRETCHED;
+    this.sparks.updateSpeed = 1 / 60;
+    this.sparks.start();
     this.maxParticles = maxParticles;
   }
 
@@ -111,6 +133,14 @@ export class ImpactEffects {
     ps.direction2 = n.add(new Vector3(0.6, 1, 0.6));
     ps.blendMode = surface === 'metal' ? ParticleSystem.BLENDMODE_ADD : ParticleSystem.BLENDMODE_STANDARD;
     ps.manualEmitCount = Math.min(this.maxParticles, surface === 'metal' ? 10 : 8);
+    // faíscas em superfícies duras
+    if (surface === 'metal' || surface === 'stone' || surface === 'concrete') {
+      const sp = this.sparks;
+      (sp.emitter as Vector3).copyFrom(ps.emitter as Vector3);
+      sp.direction1 = n.add(new Vector3(-0.8, -0.2, -0.8));
+      sp.direction2 = n.add(new Vector3(0.8, 0.9, 0.8));
+      sp.manualEmitCount = Math.min(this.maxParticles, surface === 'metal' ? 9 : 3);
+    }
   }
 
   dispose(): void {
@@ -118,5 +148,6 @@ export class ImpactEffects {
     this.decals = [];
     this.decalSource.dispose(false, true);
     this.dust.dispose();
+    this.sparks.dispose();
   }
 }

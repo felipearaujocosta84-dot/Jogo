@@ -14,12 +14,14 @@ import {
   RenderTargetTexture,
   ShadowGenerator,
   StandardMaterial,
+  PBRMaterial,
   Vector3,
   VertexData,
   type Scene
 } from '../core/babylon';
 import type { QualityPreset } from '../core/Quality';
-import { getTexture, paintedTexture } from './textures';
+import { applyStudioEnvironment } from '../core/Environment';
+import { getTexture, getNormalTexture, paintedTexture } from './textures';
 import { expandMap } from './MapLayout';
 import type { MapRuntime } from './MapRuntime';
 import { MATERIAL_SCALE, type BoxDef, type MapDefinition, type MaterialName } from './MapTypes';
@@ -53,7 +55,7 @@ function hex(c: string): Color3 {
 
 export class MapBuilder {
   private buckets = new Map<string, GeoBucket>();
-  private materials = new Map<MaterialName, StandardMaterial>();
+  private materials = new Map<MaterialName, StandardMaterial | PBRMaterial>();
   private def: MapDefinition;
 
   constructor(private scene: Scene, private runtime: MapRuntime, private quality: QualityPreset) {
@@ -77,6 +79,8 @@ export class MapBuilder {
     const meshes = this.flush();
 
     const amb = def.ambience;
+    // reflexos (armas e materiais PBR) com as cores do céu e do chão deste mapa
+    applyStudioEnvironment(scene, amb.sky[1], amb.sky[2], amb.ambientGround);
     const hemi = new HemisphericLight('ambient', new Vector3(0, 1, 0), scene);
     hemi.diffuse = hex(amb.ambient);
     hemi.groundColor = hex(amb.ambientGround);
@@ -227,9 +231,33 @@ export class MapBuilder {
     else b.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
-  private material(name: MaterialName): StandardMaterial {
-    let m = this.materials.get(name);
+  /** Metalicidade e rugosidade realistas por material (PBR). */
+  private static PBR: Partial<Record<MaterialName, [number, number]>> = {
+    metal: [0.75, 0.45], container: [0.55, 0.5], door: [0.6, 0.45], steel: [0.85, 0.3], glass: [0.9, 0.08],
+    concrete: [0, 0.9], sand: [0, 0.97], sandstone: [0, 0.88], plaster: [0, 0.85], brick: [0, 0.85], tile: [0, 0.6],
+    asphalt: [0, 0.92], crate: [0, 0.75], roof: [0.2, 0.7], trim: [0, 0.8], carpet: [0, 1], grass: [0, 0.95], dark: [0.3, 0.3]
+  };
+
+  private material(name: MaterialName): StandardMaterial | PBRMaterial {
+    let m: StandardMaterial | PBRMaterial | undefined = this.materials.get(name);
     if (m) return m;
+    if (this.quality.pbr) {
+      // Alta/Ultra: PBR com mapa de relevo gerado da textura e reflexos do ambiente
+      const p = new PBRMaterial('pbr_' + name, this.scene);
+      p.albedoTexture = getTexture(this.scene, name, this.quality.textureSize);
+      if (name !== 'dark') {
+        p.bumpTexture = getNormalTexture(this.scene, name, this.quality.textureSize);
+        p.bumpTexture.level = 0.9;
+      }
+      const [met, rough] = MapBuilder.PBR[name] ?? [0, 0.8];
+      p.metallic = met;
+      p.roughness = rough;
+      p.environmentIntensity = 0.55;
+      p.directIntensity = 1.6;
+      if (name === 'dark') p.emissiveColor = new Color3(0.02, 0.025, 0.03);
+      this.materials.set(name, p);
+      return p;
+    }
     m = new StandardMaterial('mat_' + name, this.scene);
     m.diffuseTexture = getTexture(this.scene, name, this.quality.textureSize);
     m.specularColor = name === 'glass' ? new Color3(0.8, 0.8, 0.8) : name === 'metal' || name === 'container' || name === 'door' || name === 'steel' ? new Color3(0.25, 0.25, 0.25) : new Color3(0.04, 0.04, 0.04);
@@ -269,15 +297,37 @@ export class MapBuilder {
 
   private createSky(): Mesh {
     const [top, mid, horizon] = this.def.ambience.sky;
-    const tex = new DynamicTexture('skyTex', { width: 8, height: 256 }, this.scene, false);
+    // céu: degradê + névoa no horizonte + nuvens (nas qualidades com detalhes)
+    const W = this.quality.props ? 512 : 8, Hs = 256;
+    const tex = new DynamicTexture('skyTex', { width: W, height: Hs }, this.scene, false);
     const g = tex.getContext() as unknown as CanvasRenderingContext2D;
-    const grd = g.createLinearGradient(0, 0, 0, 256);
+    const grd = g.createLinearGradient(0, 0, 0, Hs);
     grd.addColorStop(0, top);
     grd.addColorStop(0.42, mid);
     grd.addColorStop(0.5, horizon);
     grd.addColorStop(1, horizon);
     g.fillStyle = grd;
-    g.fillRect(0, 0, 8, 256);
+    g.fillRect(0, 0, W, Hs);
+    if (this.quality.props) {
+      let seed = 1234;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 46; i++) {
+        const cx = rnd() * W, cy = 40 + rnd() * 70, w = 20 + rnd() * 70, hgt = 5 + rnd() * 12;
+        for (let k = 0; k < 7; k++) {
+          const x = cx + (rnd() - 0.5) * w, y = cy + (rnd() - 0.5) * hgt, r = (0.3 + rnd() * 0.5) * w * 0.5;
+          const cg = g.createRadialGradient(x, y, 0, x, y, r);
+          cg.addColorStop(0, 'rgba(255,255,255,0.32)');
+          cg.addColorStop(1, 'rgba(255,255,255,0)');
+          g.fillStyle = cg;
+          g.save();
+          g.translate(x, y);
+          g.scale(1, 0.32);
+          g.translate(-x, -y);
+          g.fillRect(x - r, y - r, r * 2, r * 2);
+          g.restore();
+        }
+      }
+    }
     tex.update(false);
     const mat = new StandardMaterial('skyMat', this.scene);
     mat.emissiveTexture = tex;
@@ -287,7 +337,7 @@ export class MapBuilder {
     mat.backFaceCulling = false;
     mat.fogEnabled = false;
     mat.disableDepthWrite = true;
-    const sky = CreateSphere('sky', { diameter: 200, segments: 12 }, this.scene);
+    const sky = CreateSphere('sky', { diameter: 200, segments: this.quality.props ? 24 : 12 }, this.scene);
     sky.material = mat;
     sky.infiniteDistance = true;
     sky.isPickable = false;
