@@ -1,7 +1,8 @@
 // Tipos compartilhados entre cliente, simulação local e servidor.
 export type Team = 'T' | 'CT';
 export type Difficulty = 'easy' | 'normal' | 'hard';
-export type GameMode = 'competitive' | 'casual' | 'training' | 'tdm';
+/** x1 = duelo 1 contra 1 (só online); br = Battle Royale, todos contra todos (só online). */
+export type GameMode = 'competitive' | 'casual' | 'training' | 'tdm' | 'x1' | 'br';
 
 /** Botões de um comando (bits). */
 export const BTN = {
@@ -120,6 +121,9 @@ export interface RoundView {
   lastReason: string;
   buyTimeLeft: number;
   halftime: boolean;
+  /** Battle Royale: zona segura atual (centro e raio) e a próxima, e quantos seguem vivos. */
+  zone?: { x: number; z: number; r: number; nx: number; nz: number; nr: number; shrinking: boolean; dps: number };
+  aliveCount?: number;
 }
 
 /** Dados privados do jogador local (inventário). */

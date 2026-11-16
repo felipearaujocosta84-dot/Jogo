@@ -43,8 +43,10 @@ export interface MatchConfig {
   /** Mata-mata: duração (minutos) e limite de abates da equipe. */
   timeLimit?: number;
   killLimit?: number;
-  /** Mata-mata: armas iniciais dos jogadores humanos. */
+  /** Mata-mata e X1: armas iniciais dos jogadores humanos (no X1, as dos dois). */
   loadout?: { primary: string | null; secondary: string | null };
+  /** X1: rodadas para vencer (melhor de 2N-1). */
+  rounds?: number;
 }
 
 export interface BombState {
@@ -62,7 +64,9 @@ export interface MatchResult {
   winner: Team | 'draw';
   scoreT: number;
   scoreCT: number;
-  players: { id: string; name: string; bot: boolean; group: Group; team: Team; kills: number; deaths: number; assists: number; mvps: number; score: number; headshots: number; damage: number; won: boolean | null }[];
+  players: { id: string; name: string; bot: boolean; group: Group; team: Team; kills: number; deaths: number; assists: number; mvps: number; score: number; headshots: number; damage: number; won: boolean | null; place?: number }[];
+  /** Battle Royale: id do vencedor. */
+  winnerId?: string | null;
 }
 
 export class MatchSim {
@@ -96,6 +100,7 @@ export class MatchSim {
 
   /** Rádio simulado dos bots (avisos curtos para o time, com intervalo mínimo por equipe). */
   radio(p: SimPlayer, text: string, force = false): void {
+    if (this.ffa || this.duel) return;
     if (!force && this.time - this.radioAt[p.team] < 2.2) return;
     this.radioAt[p.team] = this.time;
     this.emit('radio', { pid: p.id, team: p.team, text });
@@ -108,6 +113,11 @@ export class MatchSim {
     if (config.mode === 'tdm') {
       this.rules = { ...this.rules, roundTime: (config.timeLimit ?? 10) * 60, winRounds: config.killLimit ?? 50 };
     }
+    if (config.mode === 'x1') {
+      const n = Math.max(1, Math.min(15, Math.round(config.rounds ?? 5)));
+      this.rules = { ...this.rules, winRounds: n, maxRounds: n * 2 - 1 };
+    }
+    if (config.mode === 'br' && config.timeLimit) this.rules = { ...this.rules, roundTime: config.timeLimit * 60 };
     this.nades = new GrenadeSim(this.map.world);
     this.tactics = { T: new TeamTactics(this, 'T'), CT: new TeamTactics(this, 'CT') };
     this.hooks = {
@@ -123,6 +133,26 @@ export class MatchSim {
 
   get tdm(): boolean {
     return this.config.mode === 'tdm';
+  }
+
+  /** X1: duelo por rodadas, sem bomba e sem compras. */
+  get duel(): boolean {
+    return this.config.mode === 'x1';
+  }
+
+  /** Battle Royale: todos contra todos, zona que encolhe, uma vida. */
+  get ffa(): boolean {
+    return this.config.mode === 'br';
+  }
+
+  /** Bots patrulham e caçam livremente (sem objetivos de bomba). */
+  get freeplay(): boolean {
+    return this.tdm || this.ffa || this.duel;
+  }
+
+  /** Mesmo lado (não atira, não causa dano)? No todos contra todos, só o próprio jogador. */
+  sameSide(a: SimPlayer, b: SimPlayer): boolean {
+    return a.side === b.side;
   }
 
   teamOf(group: Group): Team {
@@ -162,6 +192,7 @@ export class MatchSim {
     const team = this.teamOf(group);
     const variant = this.players.filter(p => this.groups.get(p.id) === group).length;
     const p = new SimPlayer(id, name, team, !!opts.bot, opts.difficulty ?? this.config.difficulty, variant % 5, this.map.world);
+    p.ffa = this.ffa;
     p.money = this.rules.startMoney;
     this.players.push(p);
     this.groups.set(id, group);
@@ -265,6 +296,7 @@ export class MatchSim {
       p.team = this.teamOf(this.groups.get(p.id)!);
     }
     this.result = null;
+    if (this.ffa) return this.startBr();
     if (this.tdm) {
       this.phase = 'live';
       this.roundNumber = 1;
@@ -309,6 +341,143 @@ export class MatchSim {
     if (p.loadout.secondary) p.giveWeapon(p.loadout.secondary);
     p.giveWeapon(p.loadout.primary);
     p.protectUntil = this.time + TDM_PROTECTION;
+  }
+
+  /** X1: a cada rodada os dois recebem as mesmas armas, vida e colete cheios. */
+  private equipDuel(p: SimPlayer): void {
+    const lo = this.config.loadout ?? { primary: 'ak47', secondary: 'deagle' };
+    p.primary = null;
+    p.secondary = null;
+    p.nades = { he: 0, flash: 0, smoke: 0 };
+    p.health = 100;
+    p.armor = 100;
+    p.helmet = true;
+    p.money = 0;
+    if (lo.secondary && WEAPONS[lo.secondary]) p.giveWeapon(lo.secondary);
+    if (lo.primary && WEAPONS[lo.primary]) p.giveWeapon(lo.primary);
+  }
+
+  // ------------------------------------------------------------------ Battle Royale
+
+  /** Zona segura: interpola do círculo anterior ao próximo durante o encolhimento. */
+  zone = { x: 0, z: 0, r: 100, fromX: 0, fromZ: 0, fromR: 100, toX: 0, toZ: 0, toR: 100, stage: 0, wait: 0, shrink: 0, t: 0, dmgAcc: 0 };
+  private static readonly BR_STAGES = [
+    { wait: 45, shrink: 35, scale: 0.6, dps: 2 },
+    { wait: 35, shrink: 30, scale: 0.55, dps: 4 },
+    { wait: 30, shrink: 25, scale: 0.5, dps: 7 },
+    { wait: 25, shrink: 20, scale: 0.45, dps: 11 },
+    { wait: 20, shrink: 20, scale: 0.0, dps: 16 }
+  ];
+
+  private startBr(): void {
+    if (!this.nav) this.nav = new NavGrid(this.map);
+    const b = this.map.bounds;
+    const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
+    const r0 = Math.hypot(b.maxX - b.minX, b.maxZ - b.minZ) / 2 + 2;
+    this.zone = { x: cx, z: cz, r: r0, fromX: cx, fromZ: cz, fromR: r0, toX: cx, toZ: cz, toR: r0, stage: -1, wait: 0, shrink: 0, t: 0, dmgAcc: 0 };
+    this.nextZone();
+    // espalha os participantes pelo mapa (o mais longe possível uns dos outros)
+    const used: { x: number; z: number }[] = [];
+    for (const p of this.players) {
+      let best = { x: cx, z: cz }, bestD = -1;
+      for (let k = 0; k < 14; k++) {
+        const pt = this.nav.randomIn(b.minX, b.minZ, b.maxX, b.maxZ, Math.random);
+        if (!pt) continue;
+        const d = used.length ? Math.min(...used.map(u => Math.hypot(u.x - pt.x, u.z - pt.z))) : 99;
+        if (d > bestD) {
+          bestD = d;
+          best = pt;
+        }
+      }
+      used.push(best);
+      const y = this.map.def.model ? this.map.groundAt(best.x, best.z).y : 0;
+      p.spawn(best.x, y + 0.2, best.z, Math.random() * Math.PI * 2, false);
+      p.place = 0;
+      const lo = p.bot || !this.config.loadout?.primary ? brLoadout() : { primary: this.config.loadout.primary, secondary: this.config.loadout.secondary ?? 'p250' };
+      p.primary = null;
+      p.secondary = null;
+      p.armor = 50;
+      p.helmet = false;
+      if (lo.secondary) p.giveWeapon(lo.secondary);
+      if (lo.primary) p.giveWeapon(lo.primary);
+    }
+    this.phase = 'freeze';
+    this.phaseTime = this.rules.freezeTime;
+    this.roundNumber = 1;
+    this.liveTime = 0;
+    for (const br of this.brains.values()) br.newRound();
+    this.emit('round_start', { number: 1 });
+  }
+
+  private nextZone(): void {
+    const z = this.zone;
+    z.stage++;
+    const st = MatchSim.BR_STAGES[Math.min(z.stage, MatchSim.BR_STAGES.length - 1)];
+    z.fromX = z.x;
+    z.fromZ = z.z;
+    z.fromR = z.r;
+    const nr = Math.max(z.stage >= MatchSim.BR_STAGES.length - 1 ? 0 : 4, z.r * st.scale);
+    // novo centro dentro do círculo atual, num ponto caminhável
+    const ang = Math.random() * Math.PI * 2, dist = Math.random() * Math.max(0, z.r - nr) * 0.8;
+    let nx = z.x + Math.cos(ang) * dist, nz = z.z + Math.sin(ang) * dist;
+    const pt = this.nav?.randomNear(nx, nz, Math.max(2, nr * 0.3), Math.random);
+    if (pt) {
+      nx = pt.x;
+      nz = pt.z;
+    }
+    z.toX = nx;
+    z.toZ = nz;
+    z.toR = nr;
+    z.wait = st.wait;
+    z.shrink = st.shrink;
+    z.t = 0;
+    this.emit('zone', { stage: z.stage, x: r2(nx), z: r2(nz), r: r2(nr), wait: st.wait });
+  }
+
+  private stepBr(dt: number): void {
+    if (this.phase !== 'live') return;
+    const z = this.zone;
+    const st = MatchSim.BR_STAGES[Math.min(z.stage, MatchSim.BR_STAGES.length - 1)];
+    z.t += dt;
+    if (z.t > z.wait) {
+      const k = Math.min(1, (z.t - z.wait) / z.shrink);
+      z.x = z.fromX + (z.toX - z.fromX) * k;
+      z.z = z.fromZ + (z.toZ - z.fromZ) * k;
+      z.r = z.fromR + (z.toR - z.fromR) * k;
+      if (k >= 1 && z.stage < MatchSim.BR_STAGES.length - 1) this.nextZone();
+    }
+    // dano fora da zona (a cada meio segundo)
+    z.dmgAcc += dt;
+    if (z.dmgAcc >= 0.5) {
+      z.dmgAcc -= 0.5;
+      for (const p of this.players) {
+        if (!p.alive) continue;
+        const pos = p.ctrl.position;
+        if (Math.hypot(pos.x - z.x, pos.z - z.z) > z.r) this.damage(p, null, st.dps * 0.5, 0, 'zone', false, { x: z.x, y: pos.y, z: z.z });
+      }
+    }
+    const living = this.players.filter(p => p.alive);
+    if (this.players.length > 1 && living.length <= 1) {
+      const w = living[0] ?? null;
+      if (w) {
+        w.place = 1;
+        w.mvps++;
+      }
+      this.phase = 'end';
+      this.phaseTime = this.rules.roundEndTime;
+      this.lastWinner = null;
+      this.lastReason = w ? 'last' : 'draw';
+      this.emit('round_end', { winner: null, reason: this.lastReason, mvp: w?.id ?? null, scoreT: 0, scoreCT: 0, winnerId: w?.id ?? null });
+    } else if (this.phaseTime <= 0) {
+      // tempo esgotado: vence quem tiver mais abates entre os vivos
+      const w = [...living].sort((a, b) => b.kills - a.kills || b.health - a.health)[0];
+      if (w) w.place = 1;
+      for (const p of living) if (p !== w) p.place = 2;
+      this.phase = 'end';
+      this.phaseTime = this.rules.roundEndTime;
+      this.lastReason = 'time';
+      this.emit('round_end', { winner: null, reason: 'time', mvp: w?.id ?? null, scoreT: 0, scoreCT: 0, winnerId: w?.id ?? null });
+    }
   }
 
   /** Mata-mata: ponto de renascimento do time mais longe dos inimigos vivos. */
@@ -381,7 +550,8 @@ export class MatchSim {
     this.spawnAll(!halftime);
     this.nades.clear();
     this.bomb = { state: 'none', pos: { x: 0, y: 0, z: 0 }, carrier: null, timeLeft: 0, site: null, defuser: null, progress: 0, planter: null };
-    const ts = this.alive('T');
+    if (this.duel) for (const p of this.players) this.equipDuel(p);
+    const ts = this.duel ? [] : this.alive('T');
     if (ts.length) {
       const humans = ts.filter(p => !p.bot);
       const pool = Math.random() < 0.5 && humans.length ? humans : ts;
@@ -429,10 +599,34 @@ export class MatchSim {
     this.emit('round_end', { winner, reason, mvp: mvp?.id ?? null, scoreT: this.score[this.groupOf('T')], scoreCT: this.score[this.groupOf('CT')] });
   }
 
+  /** Rodada sem vencedor (X1 empatado no tempo). */
+  private endRoundDraw(): void {
+    if (this.phase !== 'live') return;
+    this.phase = 'end';
+    this.phaseTime = this.rules.roundEndTime;
+    this.lastWinner = null;
+    this.lastReason = 'draw';
+    this.emit('round_end', { winner: null, reason: 'draw', mvp: null, scoreT: this.score[this.groupOf('T')], scoreCT: this.score[this.groupOf('CT')] });
+  }
+
   private finishMatch(): void {
     this.phase = 'over';
     const sA = this.score.A, sB = this.score.B;
-    const wg: Group | null = sA === sB ? null : sA > sB ? 'A' : 'B';
+    const wg: Group | null = this.ffa || sA === sB ? null : sA > sB ? 'A' : 'B';
+    if (this.ffa) {
+      // colocações de quem ainda não tinha (vivos no fim por tempo)
+      const winner = this.players.find(p => p.place === 1) ?? null;
+      for (const p of this.players) if (!p.place) p.place = p.alive ? 2 : this.players.length;
+      this.result = {
+        winner: 'draw', scoreT: 0, scoreCT: 0, winnerId: winner?.id ?? null,
+        players: this.players.map(p => ({
+          id: p.id, name: p.name, bot: p.bot, group: this.groups.get(p.id)!, team: p.team, kills: p.kills, deaths: p.deaths, assists: p.assists,
+          mvps: p.mvps, score: p.score, headshots: p.headshots, damage: p.damageDealt, won: p === winner, place: p.place
+        }))
+      };
+      this.emit('match_end', { winner: 'draw', scoreT: 0, scoreCT: 0, winnerId: winner?.id ?? null });
+      return;
+    }
     this.result = {
       winner: wg ? this.teamOf(wg) : 'draw',
       scoreT: this.score[this.groupOf('T')],
@@ -482,7 +676,7 @@ export class MatchSim {
       this.phaseTime -= dt;
       if (this.phaseTime <= 0) {
         const maxScore = Math.max(this.score.A, this.score.B);
-        if (this.tdm || maxScore >= this.rules.winRounds || this.roundNumber >= this.rules.maxRounds) this.finishMatch();
+        if (this.tdm || this.ffa || maxScore >= this.rules.winRounds || this.roundNumber >= this.rules.maxRounds) this.finishMatch();
         else this.startRound();
       }
     }
@@ -513,6 +707,7 @@ export class MatchSim {
     this.updateBomb(dt);
 
     if (this.tdm) return this.stepTdm(dt);
+    if (this.ffa) return this.stepBr(dt);
 
     // treino: renascimento automático
     if (this.rules.training) {
@@ -540,7 +735,12 @@ export class MatchSim {
       const anyT = this.players.some(p => p.team === 'T'), anyCT = this.players.some(p => p.team === 'CT');
       if (anyCT && ct === 0) this.endRound('T', 'elimination');
       else if (anyT && t === 0 && this.bomb.state !== 'planted') this.endRound('CT', 'elimination');
-      else if (this.phaseTime <= 0 && this.bomb.state !== 'planted') this.endRound('CT', 'time');
+      else if (this.phaseTime <= 0 && this.duel) {
+        // X1: tempo esgotado vence quem tiver mais vida (empate: ninguém pontua)
+        const [a, b] = [this.alive('T')[0], this.alive('CT')[0]];
+        if (a && b && Math.round(a.health) === Math.round(b.health)) this.endRoundDraw();
+        else this.endRound((a?.health ?? 0) > (b?.health ?? 0) ? 'T' : 'CT', 'time');
+      } else if (this.phaseTime <= 0 && this.bomb.state !== 'planted') this.endRound('CT', 'time');
     }
   }
 
@@ -570,7 +770,7 @@ export class MatchSim {
     let best: { victim: SimPlayer; region: 'head' | 'chest' | 'stomach' | 'legs'; distance: number; point: Vec3 } | null = null;
     for (const v of this.players) {
       if (v === p || !v.alive) continue;
-      if (v.team === p.team && !this.rules.friendlyFire) continue;
+      if (this.sameSide(v, p) && !this.rules.friendlyFire) continue;
       const state = lag !== null ? v.positionAt(lag) : { pos: v.ctrl.position, crouched: v.ctrl.crouched };
       const hit = rayBody(origin, dir, best ? best.distance : maxDist, state.pos, state.crouched);
       if (hit) best = { victim: v, ...hit };
@@ -595,14 +795,14 @@ export class MatchSim {
     const real = Math.min(v.health, health);
     v.health -= health;
     v.armor = Math.max(0, v.armor - armor);
-    if (attacker && attacker.team !== v.team) {
+    if (attacker && !this.sameSide(attacker, v)) {
       attacker.damageDealt += real;
       v.roundDamage.set(attacker.id, (v.roundDamage.get(attacker.id) ?? 0) + real);
     }
     this.emit('damage', { pid: v.id, by: attacker?.id ?? null, amount: real, fx: r2(from.x), fz: r2(from.z), hs: headshot });
     this.brains.get(v.id)?.onDamaged(attacker, from);
     // companheiros próximos reagem (proteger aliados)
-    if (attacker && attacker.team !== v.team)
+    if (attacker && !this.sameSide(attacker, v) && !this.ffa)
       for (const [id, b] of this.brains) {
         if (id === v.id) continue;
         const ally = this.byId(id);
@@ -615,6 +815,7 @@ export class MatchSim {
     v.health = 0;
     v.alive = false;
     v.deaths++;
+    if (this.ffa) v.place = this.players.filter(p => p.alive).length + 1;
     v.frozen = false;
     v.plantProgress = v.defuseProgress = 0;
     if (this.bomb.defuser === v.id) {
@@ -623,7 +824,7 @@ export class MatchSim {
     }
     if (v.c4) this.dropBomb(v);
     if (attacker && attacker !== v) {
-      if (attacker.team === v.team) {
+      if (this.sameSide(attacker, v)) {
         attacker.kills = Math.max(0, attacker.kills - 1);
         this.addMoney(attacker, REWARD.teamKill);
       } else {
@@ -662,7 +863,7 @@ export class MatchSim {
     if (n.type === 'he') {
       for (const v of this.players) {
         if (!v.alive) continue;
-        if (v.team === owner?.team && v !== owner && !this.rules.friendlyFire) continue;
+        if (owner && this.sameSide(v, owner) && v !== owner && !this.rules.friendlyFire) continue;
         const c = { x: v.ctrl.position.x, y: v.ctrl.position.y + 1, z: v.ctrl.position.z };
         const dist = Math.hypot(c.x - pos.x, c.y - pos.y, c.z - pos.z);
         if (dist > 8) continue;
@@ -858,6 +1059,7 @@ export class MatchSim {
   canBuyNow(p: SimPlayer): boolean {
     if (!p.alive) return false;
     if (this.rules.training) return true;
+    if (this.duel || this.ffa) return false;
     if (this.tdm) return this.phase === 'live' && this.inBuyZone(p);
     if (this.phase === 'freeze') return this.inBuyZone(p);
     return this.phase === 'live' && this.liveTime < this.rules.buyTime && this.inBuyZone(p);
@@ -906,7 +1108,13 @@ export class MatchSim {
       lastWinner: this.lastWinner,
       lastReason: this.lastReason,
       buyTimeLeft: this.phase === 'freeze' ? this.rules.buyTime + this.phaseTime : Math.max(0, this.rules.buyTime - this.liveTime),
-      halftime: this.swapped
+      halftime: this.swapped,
+      ...(this.ffa
+        ? {
+            zone: { x: r2(this.zone.x), z: r2(this.zone.z), r: r2(this.zone.r), nx: r2(this.zone.toX), nz: r2(this.zone.toZ), nr: r2(this.zone.toR), shrinking: this.zone.t > this.zone.wait, dps: MatchSim.BR_STAGES[Math.min(this.zone.stage, MatchSim.BR_STAGES.length - 1)].dps },
+            aliveCount: this.players.filter(p => p.alive).length
+          }
+        : {})
     };
   }
 
@@ -944,6 +1152,12 @@ export class MatchSim {
       events
     };
   }
+}
+
+/** Battle Royale: arma inicial sorteada (não há compras). */
+function brLoadout(): { primary: string; secondary: string } {
+  const pool = ['ak47', 'm4a4', 'm4a1', 'aug', 'mp5', 'ump45', 'mac10', 'ssg08', 'awp'];
+  return { primary: pool[Math.floor(Math.random() * pool.length)], secondary: ['glock', 'usp', 'p250', 'deagle'][Math.floor(Math.random() * 4)] };
 }
 
 /** Armas dos bots no mata-mata (variadas por equipe). */

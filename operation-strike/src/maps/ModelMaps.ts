@@ -91,7 +91,7 @@ function makeDef(m: ModelMapMeta): MapDefinition {
     },
     ambience: m.ambience,
     model: { glb: `maps/${m.id}.glb`, data: `maps/${m.id}.json` },
-    modes: ['tdm']
+    modes: ['tdm', 'x1', 'br']
   };
 }
 

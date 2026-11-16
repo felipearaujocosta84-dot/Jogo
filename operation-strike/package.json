@@ -18,12 +18,18 @@
     "@babylonjs/loaders": "9.32.1",
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
+    "@colyseus/core": "0.18.25",
+    "@colyseus/schema": "5.0.43",
+    "@colyseus/sdk": "0.18.9",
+    "@colyseus/ws-transport": "0.18.4",
+    "pg": "8.23.1",
     "tsx": "4.20.6",
     "ws": "8.18.3"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3",
     "@types/node": "22.15.30",
+    "@types/pg": "8.23.1",
     "@types/ws": "8.18.1",
     "typescript": "5.9.3",
     "vite": "8.3.3"

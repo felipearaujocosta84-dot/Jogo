@@ -29,6 +29,10 @@ export class SimPlayer {
   readonly ctrl: PlayerController;
   readonly input = new InputState();
   alive = true;
+  /** Todos contra todos (Battle Royale): cada jogador é o próprio lado. */
+  ffa = false;
+  /** Colocação final no Battle Royale (1 = vencedor). */
+  place = 0;
   health = 100;
   armor = 0;
   helmet = false;
@@ -82,6 +86,11 @@ export class SimPlayer {
   private histIdx = 0;
   /** Disparou neste passo (para animação dos outros). */
   firedTick = -1;
+
+  /** Lado para amigo/inimigo: a equipe, ou o próprio jogador no todos contra todos. */
+  get side(): string {
+    return this.ffa ? this.id : this.team;
+  }
 
   constructor(
     public id: string,

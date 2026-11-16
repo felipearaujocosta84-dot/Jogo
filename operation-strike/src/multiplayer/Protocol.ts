@@ -10,6 +10,23 @@ export interface RoomPlayerInfo {
   bot: boolean;
   connected: boolean;
   mmr: number;
+  /** Conta do jogador (vazio para bots). */
+  userId?: string;
+}
+
+/** Configurações da sala (só o dono altera). */
+export interface RoomSettingsInfo {
+  mode: GameMode;
+  mapId: string;
+  difficulty: Difficulty;
+  maxPlayers: number;
+  isPublic: boolean;
+  bots: boolean;
+  rounds: number;
+  primary: string;
+  secondary: string;
+  timeLimit: number;
+  killLimit: number;
 }
 
 export interface RoomInfo {
@@ -24,6 +41,13 @@ export interface RoomInfo {
   avgMmr: number;
   countdown: number;
   players: RoomPlayerInfo[];
+  /** Dono da sala (conta) e configurações completas. */
+  owner?: string;
+  ownerName?: string;
+  settings?: RoomSettingsInfo;
+  hasPassword?: boolean;
+  /** X1: quem já pediu revanche. */
+  rematch?: string[];
 }
 
 export type ClientMsg =

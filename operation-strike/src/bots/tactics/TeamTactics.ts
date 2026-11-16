@@ -143,9 +143,26 @@ export class TeamTactics {
     return { kind: intel ? 'hunt' : 'wander', x: pt.x, z: pt.z };
   }
 
+  /** Battle Royale: cada bot caça sozinho, sempre puxando para dentro da zona segura. */
+  private brTask(bot: SimPlayer): BotTask {
+    const m = this.match, nav = m.nav!;
+    const pos = bot.ctrl.position;
+    const z = m.zone;
+    const tr = Math.max(3, Math.min(z.r, z.toR + 2));
+    let pt = this.roam.get(bot.id);
+    const outside = (q: { x: number; z: number }) => Math.hypot(q.x - z.toX, q.z - z.toZ) > tr;
+    if (!pt || Math.hypot(pt.x - pos.x, pt.z - pos.z) < 2.5 || m.time - pt.t > 25 || outside(pt)) {
+      const p = nav.randomNear(z.toX, z.toZ, tr * 0.8, Math.random) ?? { x: z.toX, z: z.toZ };
+      pt = { x: p.x, z: p.z, t: m.time };
+      this.roam.set(bot.id, pt);
+    }
+    return { kind: 'wander', x: pt.x, z: pt.z };
+  }
+
   task(bot: SimPlayer): BotTask {
     const m = this.match;
-    if (m.tdm) return this.tdmTask(bot, this.slots.get(bot.id) ?? 0);
+    if (m.ffa) return this.brTask(bot);
+    if (m.tdm || m.duel) return this.tdmTask(bot, this.slots.get(bot.id) ?? 0);
     const slot = this.slots.get(bot.id) ?? 0;
     const tac = m.map.def.tactics;
     const bomb = m.bomb;

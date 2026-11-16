@@ -45,6 +45,16 @@ export const RULES: Record<GameMode, RoundRules> = {
     plantTime: 3.2, defuseTime: 10, defuseKitTime: 5, buyTime: 99999, roundEndTime: 3, startMoney: 16000, maxMoney: 16000,
     friendlyFire: false, training: false
   },
+  x1: {
+    mode: 'x1', maxRounds: 9, winRounds: 5, halfAt: 99, freezeTime: 3, roundTime: 90, bombTime: 40,
+    plantTime: 3.2, defuseTime: 10, defuseKitTime: 5, buyTime: 0, roundEndTime: 3, startMoney: 0, maxMoney: 0,
+    friendlyFire: false, training: false
+  },
+  br: {
+    mode: 'br', maxRounds: 1, winRounds: 1, halfAt: 99, freezeTime: 6, roundTime: 600, bombTime: 40,
+    plantTime: 3.2, defuseTime: 10, defuseKitTime: 5, buyTime: 0, roundEndTime: 8, startMoney: 0, maxMoney: 0,
+    friendlyFire: true, training: false
+  },
   training: {
     mode: 'training', maxRounds: 1, winRounds: 1, halfAt: 99, freezeTime: 0, roundTime: 99999, bombTime: 40,
     plantTime: 3.2, defuseTime: 10, defuseKitTime: 5, buyTime: 99999, roundEndTime: 3, startMoney: 16000, maxMoney: 16000,
