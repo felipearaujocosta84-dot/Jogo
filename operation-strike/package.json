@@ -5,8 +5,8 @@
   "description": "OPERATION STRIKE - FPS competitivo 5v5 em Babylon.js + TypeScript, para navegador e Android",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
-    "build": "tsc --noEmit && vite build",
+    "dev": "node scripts/assetmanifest.mjs && vite --host",
+    "build": "node scripts/assetmanifest.mjs && tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "start": "tsx server/index.ts",
     "server": "tsx server/index.ts",

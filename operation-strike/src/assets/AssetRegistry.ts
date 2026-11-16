@@ -65,11 +65,30 @@ export interface AssetReport {
 
 const existsCache = new Map<string, Promise<boolean>>();
 
+/** Índice gerado no build (scripts/assetmanifest.mjs). Sem ele, cada arquivo é consultado na rede. */
+let manifest: Promise<Set<string> | null> | null = null;
+function loadManifest(): Promise<Set<string> | null> {
+  if (!manifest)
+    manifest = (async () => {
+      try {
+        const res = await fetch(ASSET_BASE + 'manifest.json', { cache: 'no-cache' });
+        if (!res.ok || (res.headers.get('content-type') ?? '').includes('text/html')) return null;
+        const data = (await res.json()) as { files?: string[] };
+        return Array.isArray(data.files) ? new Set(data.files) : null;
+      } catch {
+        return null;
+      }
+    })();
+  return manifest;
+}
+
 /** O arquivo existe? (servidores de desenvolvimento devolvem index.html para caminhos inexistentes). */
 export function assetExists(path: string): Promise<boolean> {
   let p = existsCache.get(path);
   if (!p) {
     p = (async () => {
+      const list = await loadManifest();
+      if (list) return list.has(path);
       const url = ASSET_BASE + path;
       for (const method of ['HEAD', 'GET']) {
         try {
@@ -127,6 +146,7 @@ let reportPromise: Promise<AssetReport> | null = null;
 export function assetReport(skinFolders: string[], force = false): Promise<AssetReport> {
   if (force) {
     existsCache.clear();
+    manifest = null;
     reportPromise = null;
     configPromise = null;
   }
