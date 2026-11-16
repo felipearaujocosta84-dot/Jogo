@@ -5,7 +5,7 @@ import { MapRuntime, type Box } from '../maps/MapRuntime';
 import { MAPS } from '../maps/maps';
 import type { Vec3 } from '../physics/CollisionWorld';
 import { PLAYER } from '../player/PlayerController';
-import { RULES, type RoundRules } from '../rounds/RoundRules';
+import { TDM_PROTECTION, TDM_RESPAWN, RULES, type RoundRules } from '../rounds/RoundRules';
 import { REWARD, buyPrice, canBuy, lossBonus } from '../economy/Economy';
 import { WEAPONS, type WeaponDef } from '../weapons/WeaponData';
 import { computeDamage, explosionDamage, rayBody } from '../combat/Hitboxes';
@@ -40,6 +40,11 @@ export interface MatchConfig {
   teamSize: number;
   /** Ativa compensação de latência (servidor). */
   lagComp?: boolean;
+  /** Mata-mata: duração (minutos) e limite de abates da equipe. */
+  timeLimit?: number;
+  killLimit?: number;
+  /** Mata-mata: armas iniciais dos jogadores humanos. */
+  loadout?: { primary: string | null; secondary: string | null };
 }
 
 export interface BombState {
@@ -92,6 +97,9 @@ export class MatchSim {
     const def = MAPS[config.mapId] ?? MAPS.dust_zone;
     this.map = new MapRuntime(def);
     this.rules = RULES[config.mode];
+    if (config.mode === 'tdm') {
+      this.rules = { ...this.rules, roundTime: (config.timeLimit ?? 10) * 60, winRounds: config.killLimit ?? 50 };
+    }
     this.nades = new GrenadeSim(this.map.world);
     this.tactics = { T: new TeamTactics(this, 'T'), CT: new TeamTactics(this, 'CT') };
     this.hooks = {
@@ -104,6 +112,10 @@ export class MatchSim {
   }
 
   // ------------------------------------------------------------------ jogadores
+
+  get tdm(): boolean {
+    return this.config.mode === 'tdm';
+  }
 
   teamOf(group: Group): Team {
     return (group === 'A') !== this.swapped ? 'T' : 'CT';
@@ -245,6 +257,20 @@ export class MatchSim {
       p.team = this.teamOf(this.groups.get(p.id)!);
     }
     this.result = null;
+    if (this.tdm) {
+      this.phase = 'live';
+      this.roundNumber = 1;
+      this.phaseTime = this.rules.roundTime;
+      this.liveTime = 0;
+      this.spawnAll(false);
+      for (const p of this.players) this.equipTdm(p);
+      this.tactics.T.newRound();
+      this.tactics.CT.newRound();
+      for (const b of this.brains.values()) b.newRound();
+      this.emit('round_start', { number: 1 });
+      this.emit('live', {});
+      return;
+    }
     if (this.rules.training) {
       this.phase = 'live';
       this.roundNumber = 1;
@@ -261,6 +287,69 @@ export class MatchSim {
       const sp = this.map.spawn(p.team, idx[p.team]++);
       p.spawn(sp.x, 0.2, sp.z, (sp.yaw * Math.PI) / 180, keep && p.alive);
       if (this.rules.training) p.money = this.rules.maxMoney;
+    }
+  }
+
+  /** Mata-mata: arma escolhida, colete e proteção a cada renascimento. */
+  private equipTdm(p: SimPlayer): void {
+    if (p.bot && !p.loadout.primary) p.loadout = botLoadout(p.team);
+    if (!p.bot && !p.loadout.primary && this.config.loadout) p.loadout = { ...this.config.loadout };
+    if (!p.loadout.primary) p.loadout.primary = p.team === 'T' ? 'ak47' : 'm4a4';
+    p.money = this.rules.maxMoney;
+    p.armor = 100;
+    p.helmet = true;
+    if (p.loadout.secondary) p.giveWeapon(p.loadout.secondary);
+    p.giveWeapon(p.loadout.primary);
+    p.protectUntil = this.time + TDM_PROTECTION;
+  }
+
+  /** Mata-mata: ponto de renascimento do time mais longe dos inimigos vivos. */
+  private tdmSpawn(p: SimPlayer): { x: number; z: number; yaw: number } {
+    const list = this.map.def.spawns[p.team];
+    const enemies = this.players.filter(e => e.alive && e.team !== p.team);
+    let best = list[0], bestD = -1;
+    for (const s of list) {
+      let d = 1e9;
+      for (const e of enemies) d = Math.min(d, Math.hypot(e.ctrl.position.x - s.x, e.ctrl.position.z - s.z));
+      d += Math.random() * 4; // varia entre pontos parecidos
+      if (d > bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  private stepTdm(dt: number): void {
+    for (const p of this.players) {
+      if (p.alive) {
+        p.money = this.rules.maxMoney;
+        continue;
+      }
+      const t = (this.respawnTimers.get(p.id) ?? TDM_RESPAWN) - dt;
+      this.respawnTimers.set(p.id, t);
+      if (t <= 0 && this.phase === 'live') {
+        this.respawnTimers.delete(p.id);
+        const sp = this.tdmSpawn(p);
+        p.spawn(sp.x, 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
+        this.equipTdm(p);
+        this.brains.get(p.id)?.newRound();
+        this.emit('respawn', { pid: p.id });
+      }
+    }
+    if (this.phase === 'live') {
+      const top = Math.max(this.score.A, this.score.B);
+      if (top >= this.rules.winRounds || this.phaseTime <= 0) {
+        this.phase = 'end';
+        this.phaseTime = this.rules.roundEndTime;
+        const sT = this.score[this.groupOf('T')], sCT = this.score[this.groupOf('CT')];
+        this.lastWinner = sT === sCT ? null : sT > sCT ? 'T' : 'CT';
+        this.lastReason = top >= this.rules.winRounds ? 'kills' : 'time';
+        // MVP da partida: quem mais abateu
+        const mvp = [...this.players].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)[0];
+        if (mvp) mvp.mvps++;
+        this.emit('round_end', { winner: this.lastWinner, reason: this.lastReason, mvp: mvp?.id ?? null, scoreT: sT, scoreCT: sCT });
+      }
     }
   }
 
@@ -385,7 +474,7 @@ export class MatchSim {
       this.phaseTime -= dt;
       if (this.phaseTime <= 0) {
         const maxScore = Math.max(this.score.A, this.score.B);
-        if (maxScore >= this.rules.winRounds || this.roundNumber >= this.rules.maxRounds) this.finishMatch();
+        if (this.tdm || maxScore >= this.rules.winRounds || this.roundNumber >= this.rules.maxRounds) this.finishMatch();
         else this.startRound();
       }
     }
@@ -414,6 +503,8 @@ export class MatchSim {
 
     // bomba
     this.updateBomb(dt);
+
+    if (this.tdm) return this.stepTdm(dt);
 
     // treino: renascimento automático
     if (this.rules.training) {
@@ -462,6 +553,7 @@ export class MatchSim {
   // ------------------------------------------------------------------ combate
 
   private resolveShot(p: SimPlayer, w: WeaponDef, origin: Vec3, dir: Vec3, rt?: number): void {
+    p.protectUntil = 0; // atirar encerra a proteção de renascimento
     const melee = w.cls === 'knife';
     const range = melee ? w.range : w.range;
     const wall = this.map.world.raycast(origin, dir, range);
@@ -491,6 +583,7 @@ export class MatchSim {
 
   damage(v: SimPlayer, attacker: SimPlayer | null, health: number, armor: number, weapon: string, headshot: boolean, from: Vec3): void {
     if (!v.alive || health <= 0) return;
+    if (v.protectUntil > this.time) return; // proteção de renascimento
     const real = Math.min(v.health, health);
     v.health -= health;
     v.armor = Math.max(0, v.armor - armor);
@@ -521,6 +614,7 @@ export class MatchSim {
       } else {
         attacker.kills++;
         attacker.roundKills++;
+        if (this.tdm && this.phase === 'live') this.score[this.groupOf(attacker.team)]++;
         attacker.score += 2;
         if (headshot) attacker.headshots++;
         this.addMoney(attacker, WEAPONS[weapon]?.killReward ?? 300);
@@ -749,6 +843,7 @@ export class MatchSim {
   canBuyNow(p: SimPlayer): boolean {
     if (!p.alive) return false;
     if (this.rules.training) return true;
+    if (this.tdm) return this.phase === 'live' && this.inBuyZone(p);
     if (this.phase === 'freeze') return this.inBuyZone(p);
     return this.phase === 'live' && this.liveTime < this.rules.buyTime && this.inBuyZone(p);
   }
@@ -771,6 +866,11 @@ export class MatchSim {
       p.helmet = true;
     } else if (item === 'kit') p.kit = true;
     else p.giveWeapon(item);
+    if (this.tdm) {
+      const slot = WEAPONS[item]?.slot;
+      if (slot === 'primary') p.loadout.primary = item;
+      else if (slot === 'secondary') p.loadout.secondary = item;
+    }
     this.emit('buy', { pid: p.id, item });
     return null;
   }
@@ -803,7 +903,7 @@ export class MatchSim {
       yaw: r3(c.yaw), pitch: r3(c.pitch), crouch: c.crouched, ground: c.onGround, alive: p.alive,
       hp: Math.max(0, Math.round(p.health)), armor: Math.round(p.armor), helmet: p.helmet, kit: p.kit, money: p.money,
       weapon: p.weaponId(), bomb: p.c4, act: p.act, kills: p.kills, deaths: p.deaths, assists: p.assists, score: p.score,
-      mvps: p.mvps, ping: p.ping, connected: p.connected, variant: p.variant, skin: p.skinOf()
+      mvps: p.mvps, ping: p.ping, connected: p.connected, variant: p.variant, skin: p.skinOf(), prot: p.protectUntil > this.time
     };
   }
 
@@ -829,6 +929,16 @@ export class MatchSim {
       events
     };
   }
+}
+
+/** Armas dos bots no mata-mata (variadas por equipe). */
+function botLoadout(team: Team): { primary: string; secondary: string } {
+  const r = Math.random();
+  const primary = team === 'T'
+    ? r < 0.55 ? 'ak47' : r < 0.7 ? 'awp' : r < 0.85 ? 'mac10' : 'ssg08'
+    : r < 0.3 ? 'm4a4' : r < 0.55 ? 'm4a1' : r < 0.68 ? 'aug' : r < 0.8 ? 'awp' : r < 0.9 ? 'mp5' : 'ump45';
+  const secondary = Math.random() < 0.3 ? 'deagle' : Math.random() < 0.5 ? 'p250' : team === 'T' ? 'glock' : 'usp';
+  return { primary, secondary };
 }
 
 function r2(v: number): number {

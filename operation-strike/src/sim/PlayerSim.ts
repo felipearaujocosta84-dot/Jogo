@@ -67,6 +67,10 @@ export class SimPlayer {
   mvps = 0;
   score = 0;
   roundKills = 0;
+  /** Mata-mata: armas escolhidas (recebidas a cada renascimento). */
+  loadout: { primary: string | null; secondary: string | null } = { primary: null, secondary: null };
+  /** Mata-mata: invulnerável até este instante (proteção de renascimento). */
+  protectUntil = 0;
   roundDamage = new Map<string, number>();
   // rede
   cmdQueue: UserCmd[] = [];

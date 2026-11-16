@@ -1,7 +1,7 @@
 // Tipos compartilhados entre cliente, simulação local e servidor.
 export type Team = 'T' | 'CT';
 export type Difficulty = 'easy' | 'normal' | 'hard';
-export type GameMode = 'competitive' | 'casual' | 'training';
+export type GameMode = 'competitive' | 'casual' | 'training' | 'tdm';
 
 /** Botões de um comando (bits). */
 export const BTN = {
@@ -76,6 +76,8 @@ export interface PlayerView {
   variant: number;
   /** Skin da arma em uso. */
   skin: string;
+  /** Proteção de renascimento ativa (mata-mata). */
+  prot?: boolean;
 }
 
 export interface BombView {

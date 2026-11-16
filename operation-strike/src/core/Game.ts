@@ -550,6 +550,7 @@ export class Game {
       if (isMe && alive) continue;
       const reloadT = this.time - c.reloadAt < c.reloadDur ? (this.time - c.reloadAt) / c.reloadDur : 0;
       c.model.update(dt, p, reloadT);
+      c.model.setProtected(!!p.prot && p.alive, this.time);
       // passos dos outros (som espacial)
       if (p.alive && this.footstepTracker(p.id, Math.hypot(p.vx, p.vz), p.ground, dt)) {
         const surf: SurfaceKind = s.map.zoneAt(p.x, p.z) ? 'stone' : 'sand';
@@ -600,14 +601,14 @@ export class Game {
         }
       }
       const buyLabel = this.touchMode ? 'COMPRAR' : '[B] COMPRAR';
-      this.hud.setBuyHint(you.canBuy && st.round.mode !== 'training' ? `${buyLabel} · ${Math.ceil(st.round.buyTimeLeft)}s` : null);
+      this.hud.setBuyHint(you.canBuy && st.round.mode !== 'training' ? (st.round.mode === 'tdm' ? `${buyLabel} · trocar arma na base` : `${buyLabel} · ${Math.ceil(st.round.buyTimeLeft)}s`) : null);
       this.buyMenu.update(
         {
           team: local.team, money: me?.money ?? 0, primary: local.primary?.id, secondary: local.secondary?.id,
           armor: me?.armor ?? 0, helmet: !!me?.helmet, kit: !!me?.kit, nades: { ...local.nades }
         },
         you.canBuy,
-        st.round.mode === 'training' ? 999 : st.round.buyTimeLeft
+        st.round.mode === 'training' || st.round.mode === 'tdm' ? 999 : st.round.buyTimeLeft
       );
     }
     this.hud.setRound(st.round, st.bomb.state === 'planted');
@@ -656,6 +657,11 @@ export class Game {
     const prev = this.lastPhase;
     this.lastPhase = st.round.phase;
     if (st.round.mode === 'training') return;
+    if (st.round.mode === 'tdm') {
+      if (st.round.phase === 'live' && prev !== 'live')
+        this.hud.banner('MATA-MATA EM EQUIPE', `Primeira equipe a ${st.round.winRounds} abates · renascimento automático`, 'info', 3);
+      return;
+    }
     if (st.round.phase === 'freeze') {
       this.fx.clearRound();
       this.hud.banner(`RODADA ${st.round.number}`, st.round.halftime && st.round.number === 13 ? 'TROCA DE LADOS' : 'Tempo de compra', 'info', 2.5);
@@ -717,7 +723,7 @@ export class Game {
         if (e.killer === localId && e.victim !== localId) this.hud.message(e.hs ? 'ABATE NA CABEÇA!' : 'ABATE!', 1);
         if (e.victim === localId) {
           const how = !killer ? 'Você morreu' : killer.id === me?.id ? 'Você se matou' : killer.team === me?.team ? `Morto pelo companheiro ${killer.name}` : `Morto pelo inimigo ${killer.name} (${killer.team === 'T' ? 'TR' : 'CT'})`;
-          this.hud.message(e.weapon === 'c4' ? 'Morto pela explosão da bomba' : how, 3);
+          this.hud.message(e.weapon === 'c4' ? 'Morto pela explosão da bomba' : s.mode === 'tdm' ? how + ' · renascendo em 3 s' : how, 3);
           this.scoreboard.toggle(false);
         }
         break;
@@ -789,9 +795,13 @@ export class Game {
         if (e.pid === localId) this.audio.buy();
         break;
       case 'round_end': {
-        const winner = e.winner as Team;
-        const reasons: Record<string, string> = { elimination: 'Todos os inimigos eliminados', bomb: 'A bomba explodiu', defuse: 'A bomba foi desarmada', time: 'O tempo acabou' };
+        const winner = e.winner as Team | null;
+        const reasons: Record<string, string> = { elimination: 'Todos os inimigos eliminados', bomb: 'A bomba explodiu', defuse: 'A bomba foi desarmada', time: 'O tempo acabou', kills: 'Limite de abates atingido' };
         const mvp = st.players.find(p => p.id === e.mvp);
+        if (!winner) {
+          this.hud.banner('EMPATE', `${reasons[e.reason as string] ?? ''}${mvp ? ' · MVP: ' + mvp.name : ''}`, 'info', 5);
+          break;
+        }
         this.hud.banner(winner === 'T' ? 'TERRORISTAS VENCERAM' : 'CONTRATERRORISTAS VENCERAM', `${reasons[e.reason as string] ?? ''}${mvp ? ' · MVP: ' + mvp.name : ''}`, winner === 'T' ? 't' : 'ct', 5);
         if (me) this.audio.stinger(me.team === winner);
         break;

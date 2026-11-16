@@ -95,7 +95,7 @@ export function applyMatch(
     const perf = Math.max(-6, Math.min(6, (s.kills - s.deaths) * 0.6 + s.mvps));
     mmrDelta = Math.round(40 * (actual - expected) + perf);
   }
-  const xp = Math.max(50, s.kills * 10 + s.assists * 5 + s.mvps * 20 + info.scoreOwn * 15 + (result === 'win' ? 200 : result === 'draw' ? 100 : 50)) * (info.mode === 'competitive' ? 1 : 0.6);
+  const xp = Math.max(50, s.kills * 10 + s.assists * 5 + s.mvps * 20 + info.scoreOwn * (info.mode === 'tdm' ? 2 : 15) + (result === 'win' ? 200 : result === 'draw' ? 100 : 50)) * (info.mode === 'competitive' ? 1 : 0.6);
   p.mmr = Math.max(100, p.mmr + mmrDelta);
   p.xp += Math.round(xp);
   const coins = Math.round(xp / 6) + (result === 'win' ? 25 : 0);

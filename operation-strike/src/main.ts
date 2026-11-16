@@ -177,8 +177,17 @@ function refreshMenuRank(): void {
 
 // ------------------------------------------------------------ escolhas (botões segmentados)
 
-const picks: Record<string, string> = { mode: 'competitive', map: 'dust_zone', difficulty: 'normal', side: 'T', tmap: 'dust_zone', tside: 'T' };
+const picks: Record<string, string> = { mode: 'competitive', map: 'dust_zone', difficulty: 'normal', side: 'T', tmap: 'dust_zone', tside: 'T', tdmTime: '10', tdmKills: '50', tdmPrimary: 'ak47', tdmSecondary: 'glock' };
 Object.assign(picks, Storage.load<Record<string, string>>('picks', {}));
+
+/** Botões de escolha de arma do mata-mata. */
+function renderTdmWeapons(): void {
+  const cat = (ids: string[]) => ids.filter(id => WEAPONS[id]).map(id => `<button data-v="${id}">${WEAPONS[id].name}</button>`).join('');
+  const prim = BUY_CATEGORIES.filter(c => c.id !== 'pistol' && c.id !== 'grenade' && c.id !== 'gear').flatMap(c => c.items);
+  const pist = BUY_CATEGORIES.find(c => c.id === 'pistol')?.items ?? [];
+  $('tdmPrimary').innerHTML = cat(prim);
+  $('tdmSecondary').innerHTML = cat(['glock', 'usp', ...pist.filter(p => p !== 'glock' && p !== 'usp')]);
+}
 
 function renderMapCards(): void {
   for (const box of document.querySelectorAll<HTMLElement>('.maps')) {
@@ -188,6 +197,7 @@ function renderMapCards(): void {
 }
 
 function syncPicks(): void {
+  $('playMenu').classList.toggle('mode-tdm', picks.mode === 'tdm');
   for (const box of document.querySelectorAll<HTMLElement>('[data-pick]')) {
     const key = box.dataset.pick!;
     for (const b of box.querySelectorAll<HTMLElement>('[data-v]')) b.classList.toggle('on', b.dataset.v === picks[key]);
@@ -229,7 +239,10 @@ function startLocal(mode: GameMode, mapId: string, difficulty: Difficulty, side:
   void enterFullscreen();
   const team: Team = side === 'random' ? (Math.random() < 0.5 ? 'T' : 'CT') : (side as Team);
   updateSkinLevel();
-  const session = new LocalSession({ mapId, mode, difficulty, teamSize: 5 }, settings.get('playerName'), team, SkinPrefs.all);
+  const tdm = mode === 'tdm'
+    ? { timeLimit: +picks.tdmTime || 10, killLimit: +picks.tdmKills || 50, loadout: { primary: picks.tdmPrimary || null, secondary: picks.tdmSecondary || null } }
+    : {};
+  const session = new LocalSession({ mapId, mode, difficulty, teamSize: 5, ...tdm }, settings.get('playerName'), team, SkinPrefs.all);
   launch(session);
 }
 
@@ -248,7 +261,7 @@ function showEnd(s: Session): void {
   const won = me ? me.won : null;
   $('endTitle').textContent = won === null ? 'EMPATE' : won ? 'VITÓRIA' : 'DERROTA';
   $('endTitle').className = won === null ? '' : won ? 'win' : 'loss';
-  $('endScore').textContent = `TR ${res.scoreT} x ${res.scoreCT} CT · ${s.mode === 'competitive' ? 'Competitivo' : 'Casual'} · ${MAPS[s.map.def.id].name}`;
+  $('endScore').textContent = `TR ${res.scoreT} x ${res.scoreCT} CT${s.mode === 'tdm' ? ' abates' : ''} · ${s.mode === 'competitive' ? 'Competitivo' : s.mode === 'tdm' ? 'Mata-mata em equipe' : 'Casual'} · ${MAPS[s.map.def.id].name}`;
   const rows = (team: Team) =>
     res.players
       .filter(p => p.team === team)
@@ -270,11 +283,19 @@ function showEnd(s: Session): void {
     pdata = net.profile;
     rec = pdata.history[0];
   }
+  const mine = me
+    ? (() => {
+        const kd = me.deaths ? me.kills / me.deaths : me.kills;
+        const hs = me.kills ? Math.round((me.headshots / me.kills) * 100) : 0;
+        const c = (v: string | number, l: string) => `<div><b>${v}</b><small>${l}</small></div>`;
+        return `<div class="end-me">${c(me.kills, 'ABATES')}${c(me.deaths, 'MORTES')}${c(me.assists, 'ASSIST.')}${c(kd.toFixed(2), 'K/D')}${c(hs + '%', 'NA CABEÇA')}${c(Math.round(me.damage), 'DANO')}${c(me.mvps, 'MVP')}</div>`;
+      })()
+    : '';
   if (pdata && rec) {
     const lv = levelFor(pdata.xp);
-    $('endProfile').innerHTML = `<div><b>+${rec.xp} XP</b> · Nível ${lv.level} <div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div></div>
-      <div>${s.mode === 'competitive' ? `MMR ${rec.mmrDelta >= 0 ? '+' : ''}${rec.mmrDelta} → <b>${pdata.mmr}</b> · ${rankName(pdata.mmr)}` : 'Partida casual não altera o MMR'}</div>`;
-  } else $('endProfile').innerHTML = '';
+    $('endProfile').innerHTML = mine + `<div><b>+${rec.xp} XP</b> · Nível ${lv.level} <div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div></div>
+      <div>${s.mode === 'competitive' ? `MMR ${rec.mmrDelta >= 0 ? '+' : ''}${rec.mmrDelta} → <b>${pdata.mmr}</b> · ${rankName(pdata.mmr)}` : s.mode === 'tdm' ? 'Mata-mata não altera o MMR' : 'Partida casual não altera o MMR'}${rec.coins ? ` · <b>+${rec.coins}</b> moedas` : ''}</div>`;
+  } else $('endProfile').innerHTML = mine;
   if (s.online) net?.send({ t: 'leave' });
   show('endScreen');
 }
@@ -572,6 +593,7 @@ game.onAutoPause = () => {
 // ------------------------------------------------------------ carregamento
 
 renderMapCards();
+renderTdmWeapons();
 syncPicks();
 setInterval(() => {
   if (net) $('netPing').textContent = net.connected ? `${Math.round(net.rtt)} ms` : '';

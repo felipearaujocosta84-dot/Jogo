@@ -74,7 +74,7 @@ export class Hud {
     const m = Math.floor(t / 60), s = Math.floor(t % 60);
     this.text('hudTimer', r.mode === 'training' ? 'TREINO' : `${m}:${s.toString().padStart(2, '0')}`);
     $('hudTimer').classList.toggle('urgent', bombPlanted || (r.phase === 'live' && t < 10));
-    const phase = r.phase === 'freeze' ? 'COMPRA' : r.phase === 'end' ? 'FIM DA RODADA' : r.phase === 'over' ? 'FIM DE JOGO' : `RODADA ${r.number}/${r.maxRounds}`;
+    const phase = r.phase === 'freeze' ? 'COMPRA' : r.phase === 'end' ? (r.mode === 'tdm' ? 'FIM DA PARTIDA' : 'FIM DA RODADA') : r.phase === 'over' ? 'FIM DE JOGO' : r.mode === 'tdm' ? `META ${r.winRounds} ABATES` : `RODADA ${r.number}/${r.maxRounds}`;
     this.text('hudRound', r.mode === 'training' ? 'LIVRE' : phase);
     this.text('scoreT', String(r.scoreT));
     this.text('scoreCT', String(r.scoreCT));

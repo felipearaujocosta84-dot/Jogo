@@ -21,7 +21,7 @@ export class Scoreboard {
     this.lastKey = key;
     $('sbScoreT').textContent = String(round.scoreT);
     $('sbScoreCT').textContent = String(round.scoreCT);
-    $('sbInfo').textContent = `${round.mode === 'competitive' ? 'COMPETITIVO' : round.mode === 'casual' ? 'CASUAL' : 'TREINO'} · ${round.mapId.replace('_', ' ').toUpperCase()} · RODADA ${round.number}`;
+    $('sbInfo').textContent = `${round.mode === 'competitive' ? 'COMPETITIVO' : round.mode === 'casual' ? 'CASUAL' : round.mode === 'tdm' ? 'MATA-MATA EM EQUIPE' : 'TREINO'} · ${round.mapId.replace('_', ' ').toUpperCase()} · ${round.mode === 'tdm' ? `META ${round.winRounds} ABATES` : `RODADA ${round.number}`}`;
     for (const team of ['T', 'CT'] as Team[]) {
       const list = players.filter(p => p.team === team).sort((a, b) => b.score - a.score || b.kills - a.kills);
       const rows = list

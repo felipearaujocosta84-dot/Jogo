@@ -4,8 +4,8 @@ import type { Difficulty } from '../src/sim/types';
 
 const mapId = process.argv[2] ?? 'dust_zone';
 const diff = (process.argv[3] ?? 'normal') as Difficulty;
-const mode = (process.argv[4] ?? 'competitive') as 'competitive' | 'casual';
-const m = new MatchSim({ mapId, mode, difficulty: diff, teamSize: 5 });
+const mode = (process.argv[4] ?? 'competitive') as 'competitive' | 'casual' | 'tdm';
+const m = new MatchSim({ mapId, mode, difficulty: diff, teamSize: 5, timeLimit: +(process.argv[5] ?? 10), killLimit: +(process.argv[6] ?? 50) });
 m.fillBots();
 m.start();
 const counts: Record<string, number> = {};

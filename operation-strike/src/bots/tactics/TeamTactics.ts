@@ -27,6 +27,10 @@ export class TeamTactics {
   rotateSite: 'A' | 'B' | null = null;
   intel = new Map<string, Intel>();
   private slots = new Map<string, number>();
+  /** Mata-mata: objetivo do grupo e da ala de flanco, trocados de tempos em tempos. */
+  private tdmGoal: { x: number; z: number; t: number } | null = null;
+  private tdmFlank: { x: number; z: number; t: number } | null = null;
+  private roam = new Map<string, { x: number; z: number; t: number }>();
   private points = new Map<string, { x: number; z: number }>();
 
   constructor(private match: MatchSim, readonly team: Team) {}
@@ -39,6 +43,8 @@ export class TeamTactics {
     this.intel.clear();
     this.slots.clear();
     this.points.clear();
+    this.roam.clear();
+    this.tdmGoal = this.tdmFlank = null;
     let i = 0;
     for (const p of this.match.players) if (p.team === this.team) this.slots.set(p.id, i++);
   }
@@ -91,8 +97,56 @@ export class TeamTactics {
     return this.point(key, () => nav.randomIn(s.min[0] + shrink, s.min[1] + shrink, s.max[0] - shrink, s.max[1] - shrink, Math.random));
   }
 
+  /** Pontos de interesse do mapa (locais, meio, bases) para patrulha no mata-mata. */
+  private hotspots(): { x: number; z: number }[] {
+    const m = this.match, def = m.map.def;
+    const out = def.sites.map(s => ({ x: (s.min[0] + s.max[0]) / 2, z: (s.min[1] + s.max[1]) / 2 }));
+    for (const p of def.tactics.ctMid) out.push({ x: p[0], z: p[1] });
+    const enemy = m.map.spawnCenter(this.team === 'T' ? 'CT' : 'T');
+    out.push(enemy);
+    return out;
+  }
+
+  /**
+   * Mata-mata: o grupo avança junto para um ponto (o último inimigo visto ou um local do mapa);
+   * no difícil, parte do time vai por outro caminho para flanquear. Ninguém sabe onde o inimigo está
+   * sem ter visto ou ouvido (sem "wallhack").
+   */
+  private tdmTask(bot: SimPlayer, slot: number): BotTask {
+    const m = this.match, nav = m.nav!;
+    const pos = bot.ctrl.position;
+    const intel = this.latestIntel(7);
+    const hs = this.hotspots();
+    const pick = (exclude?: { x: number; z: number }) => {
+      const opts = exclude ? hs.filter(h => Math.hypot(h.x - exclude.x, h.z - exclude.z) > 12) : hs;
+      const h = (opts.length ? opts : hs)[Math.floor(Math.random() * (opts.length || hs.length))];
+      return { x: h.x, z: h.z, t: m.time };
+    };
+    if (!this.tdmGoal || m.time - this.tdmGoal.t > 28) this.tdmGoal = pick();
+    if (intel) this.tdmGoal = { x: intel.x, z: intel.z, t: m.time };
+    if (!this.tdmFlank || m.time - this.tdmFlank.t > 28) this.tdmFlank = pick(this.tdmGoal);
+    const flanker = bot.difficulty === 'hard' ? slot % 3 === 2 : bot.difficulty === 'normal' ? slot % 5 === 4 : false;
+    // flanqueador: primeiro vai ao ponto lateral e depois converge no objetivo
+    let goal = this.tdmGoal;
+    const r = this.roam.get(bot.id);
+    if (flanker && intel) {
+      const reached = r && Math.hypot(r.x - pos.x, r.z - pos.z) < 3;
+      if (!reached) goal = this.tdmFlank;
+    }
+    let pt = this.roam.get(bot.id);
+    if (!pt || Math.hypot(pt.x - pos.x, pt.z - pos.z) < 2.5 || m.time - pt.t > 20 || Math.hypot(pt.x - goal.x, pt.z - goal.z) > 9) {
+      const p = nav.randomNear(goal.x, goal.z, intel ? 4 : 7, Math.random) ?? goal;
+      pt = { x: p.x, z: p.z, t: m.time };
+      this.roam.set(bot.id, pt);
+    }
+    // quando o grupo chega ao ponto sem ver ninguém, troca de objetivo
+    if (!intel && Math.hypot(this.tdmGoal.x - pos.x, this.tdmGoal.z - pos.z) < 5) this.tdmGoal = pick(this.tdmGoal);
+    return { kind: intel ? 'hunt' : 'wander', x: pt.x, z: pt.z };
+  }
+
   task(bot: SimPlayer): BotTask {
     const m = this.match;
+    if (m.tdm) return this.tdmTask(bot, this.slots.get(bot.id) ?? 0);
     const slot = this.slots.get(bot.id) ?? 0;
     const tac = m.map.def.tactics;
     const bomb = m.bomb;

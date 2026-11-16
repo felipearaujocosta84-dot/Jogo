@@ -270,6 +270,12 @@ export class CharacterModel {
     this.root.setEnabled(v);
   }
 
+  /** Proteção de renascimento: o soldado pisca semitransparente. */
+  setProtected(on: boolean, time: number): void {
+    const v = on ? 0.45 + 0.25 * Math.sin(time * 14) : 1;
+    if (this.mesh.visibility !== v) this.mesh.visibility = v;
+  }
+
   get isDeadAnimDone(): boolean {
     return this.deathT >= 1;
   }

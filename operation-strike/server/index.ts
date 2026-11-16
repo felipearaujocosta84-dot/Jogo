@@ -148,7 +148,7 @@ wss.on('connection', (ws: WebSocket) => {
         break;
       case 'create': {
         client!.room?.leave(client!);
-        const mode: GameMode = msg.mode === 'casual' ? 'casual' : 'competitive';
+        const mode: GameMode = msg.mode === 'casual' ? 'casual' : msg.mode === 'tdm' ? 'tdm' : 'competitive';
         const diff: Difficulty = ['easy', 'normal', 'hard'].includes(msg.difficulty) ? msg.difficulty : 'normal';
         const r = createRoom(client!, mode, String(msg.mapId), diff, !!msg.isPublic);
         r.join(client!);

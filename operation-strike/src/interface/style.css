@@ -463,3 +463,13 @@ body.touch .slots { display: none; }
   .lp-equip b, .lp-agent b { font-size: 14px; }
   .hq .howto { display: none; }
 }
+
+/* mata-mata: opções antes da partida */
+.tdm-opts { display: flex; flex-direction: column; gap: 12px; }
+.seg.wrap { flex-wrap: wrap; }
+.seg.wrap button { flex: 0 0 auto; }
+#playMenu:not(.mode-tdm) .tdm-opts { display: none; }
+.end-me { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
+.end-me div { background: rgba(0,0,0,0.35); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; display: flex; flex-direction: column; align-items: center; min-width: 70px; }
+.end-me b { font-size: 20px; }
+.end-me small { color: var(--muted); font-size: 10px; letter-spacing: 0.1em; }

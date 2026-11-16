@@ -420,7 +420,7 @@ export class BotBrain {
   private buy(): void {
     this.bought = true;
     const p = this.p, m = this.m;
-    if (m.rules.training) return;
+    if (m.rules.training || m.tdm) return;
     const b = (item: string) => m.buy(p.id, item) === null;
     const pistolRound = m.roundNumber === 1 || m.roundNumber === m.rules.halfAt + 1;
     const team = m.players.filter(x => x.team === p.team);
