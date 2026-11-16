@@ -47,6 +47,8 @@ export interface DoorDef {
 
 export interface SpawnPoint {
   x: number;
+  /** Altura do chão no ponto (mapas com relevo). */
+  y?: number;
   z: number;
   /** Direção inicial (graus, 0 = +Z/norte). */
   yaw: number;
@@ -99,6 +101,13 @@ export interface MapDefinition {
   tactics: { A: SiteTactics; B: SiteTactics; ctMid: [number, number, number][] };
   /** Descrição curta para o menu. */
   description: string;
+  /** Mapa feito a partir de um modelo 3D (GLB) + colisão gerada (ver ModelMaps.ts). */
+  model?: { glb: string; data: string };
+  /** Caixas de colisão do modelo: [x0, y0, z0, x1, y1, z1, superfície] em centímetros. */
+  colliders?: number[][];
+  modelBounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** Modos permitidos (padrão: todos). */
+  modes?: import('../sim/types').GameMode[];
   ambience: {
     sky: [string, string, string];
     fog: string;

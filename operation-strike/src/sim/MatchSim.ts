@@ -171,7 +171,7 @@ export class MatchSim {
     }
     // entra no meio da rodada: espera a próxima (morto), exceto no aquecimento/compra/treino
     const sp = this.map.spawn(team, variant);
-    p.spawn(sp.x, 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
+    p.spawn(sp.x, (sp.y ?? 0) + 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
     if (this.phase === 'live' && !this.rules.training) {
       p.alive = false;
       p.ctrl.enabled = false;
@@ -293,7 +293,7 @@ export class MatchSim {
     const idx: Record<Team, number> = { T: 0, CT: 0 };
     for (const p of this.players) {
       const sp = this.map.spawn(p.team, idx[p.team]++);
-      p.spawn(sp.x, 0.2, sp.z, (sp.yaw * Math.PI) / 180, keep && p.alive);
+      p.spawn(sp.x, (sp.y ?? 0) + 0.2, sp.z, (sp.yaw * Math.PI) / 180, keep && p.alive);
       if (this.rules.training) p.money = this.rules.maxMoney;
     }
   }
@@ -312,7 +312,7 @@ export class MatchSim {
   }
 
   /** Mata-mata: ponto de renascimento do time mais longe dos inimigos vivos. */
-  private tdmSpawn(p: SimPlayer): { x: number; z: number; yaw: number } {
+  private tdmSpawn(p: SimPlayer): { x: number; y?: number; z: number; yaw: number } {
     const list = this.map.def.spawns[p.team];
     const enemies = this.players.filter(e => e.alive && e.team !== p.team);
     let best = list[0], bestD = -1;
@@ -339,7 +339,7 @@ export class MatchSim {
       if (t <= 0 && this.phase === 'live') {
         this.respawnTimers.delete(p.id);
         const sp = this.tdmSpawn(p);
-        p.spawn(sp.x, 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
+        p.spawn(sp.x, (sp.y ?? 0) + 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
         this.equipTdm(p);
         this.brains.get(p.id)?.newRound();
         this.emit('respawn', { pid: p.id });
@@ -526,7 +526,7 @@ export class MatchSim {
         if (t <= 0) {
           this.respawnTimers.delete(p.id);
           const sp = p.bot ? this.trainingSpot(p) : this.map.spawn(p.team, Math.floor(Math.random() * 5));
-          p.spawn(sp.x, 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
+          p.spawn(sp.x, (sp.y ?? 0) + 0.2, sp.z, (sp.yaw * Math.PI) / 180, false);
           if (p.team === 'T' && !p.bot && this.bomb.state !== 'planted') p.c4 = true;
           this.emit('respawn', { pid: p.id });
         }
@@ -544,7 +544,7 @@ export class MatchSim {
     }
   }
 
-  private trainingSpot(p: SimPlayer): { x: number; z: number; yaw: number } {
+  private trainingSpot(p: SimPlayer): { x: number; y?: number; z: number; yaw: number } {
     if (this.nav) {
       const site = this.map.def.sites[Math.floor(Math.random() * 2)];
       const pt = this.nav.randomIn(site.min[0], site.min[1], site.max[0], site.max[1], Math.random);

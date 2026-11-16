@@ -19,3 +19,20 @@ e separação do pente em uma peça própria ("Magazine") nos fuzis, para a anim
 | weapons/pistols/glock.glb | Pistol_4 |
 | weapons/pistols/p250.glb | Pistol_1 |
 | weapons/extra/AssaultRifle_1.glb, _3, _4, _5 | variantes de AK guardadas para armas futuras |
+
+## Mapas 3D (public/assets/maps/)
+Kit gratuito **"PvP Battle Maps"** da **Shuriken Studio** — https://shuriken.studio/kits/pvp-battle-maps
+Licença: https://shuriken.studio/legal/models (uso livre em jogos, inclusive comercial, sem crédito obrigatório;
+não é permitido vender ou distribuir os arquivos dos modelos sozinhos ou como pacote de recursos).
+
+Conversão para o jogo (Blender 4.2, script `scripts/blender/convert_maps.py`): escala de 0,35 m por unidade,
+malhas unidas por material, portões das bases e portas fechadas removidos, colisão gerada automaticamente
+(caixas + colunas para terreno/peças irregulares) e pontos de nascimento extraídos dos marcadores vermelho/azul.
+
+| Arquivo no jogo | Modelo original |
+|---|---|
+| maps/desert_outpost.glb / .json | desert-outpost-battle-map.glb |
+| maps/city_crossroads.glb / .json | city-crossroads-battle-map.glb |
+| maps/warehouse_yard.glb / .json | warehouse-yard-arena.glb |
+| maps/snowy_bunker.glb / .json | snowy-bunker-battle-map.glb |
+| maps/jungle_ruins.glb / .json | jungle-ruins-arena.glb |

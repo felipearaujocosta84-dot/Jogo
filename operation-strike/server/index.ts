@@ -2,13 +2,15 @@
 // Uso: npm run build && npm start   (porta padrão 8080, ou a variável PORT)
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ProfileStore } from './ProfileStore';
 import { Room, type Client } from './Room';
 import type { ClientMsg, ServerMsg } from '../src/multiplayer/Protocol';
-import { MAPS } from '../src/maps/maps';
+import { MAPS, mapAllows } from '../src/maps/maps';
+import { applyModelData, type ModelMapData } from '../src/maps/ModelMaps';
 import type { Difficulty, GameMode } from '../src/sim/types';
 import { sanitizeSkins } from '../src/weapons/Skins';
 import { levelFor } from '../src/save/Profile';
@@ -19,6 +21,18 @@ const store = new ProfileStore(resolve(process.cwd(), 'data/profiles.json'));
 const rooms = new Map<string, Room>();
 const clients = new Map<string, Client>(); // por token
 const RECONNECT_GRACE = 120_000;
+
+// mapas de modelo 3D: colisão lida do disco (dist/assets ou public/assets) na inicialização
+for (const def of Object.values(MAPS)) {
+  if (!def.model) continue;
+  const file = [join(ROOT, 'assets', def.model.data), resolve(process.cwd(), 'public/assets', def.model.data)].find(f => existsSync(f));
+  if (!file) {
+    console.warn(`[mapas] colisão de ${def.id} não encontrada (${def.model.data}); mapa desativado no servidor`);
+    delete MAPS[def.id];
+    continue;
+  }
+  applyModelData(def, JSON.parse(readFileSync(file, 'utf8')) as ModelMapData);
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
@@ -77,7 +91,10 @@ function roomCode(): string {
 }
 
 function createRoom(c: Client, mode: GameMode, mapId: string, difficulty: Difficulty, isPublic: boolean): Room {
-  const room = new Room(roomCode(), mode, MAPS[mapId] ? mapId : 'dust_zone', difficulty, isPublic, c, store, r => rooms.delete(r.code));
+  const map = MAPS[mapId] ? mapId : 'dust_zone';
+  // mapas de modelo 3D só aceitam mata-mata
+  if (!mapAllows(MAPS[map], mode)) mode = 'tdm';
+  const room = new Room(roomCode(), mode, map, difficulty, isPublic, c, store, r => rooms.delete(r.code));
   rooms.set(room.code, room);
   return room;
 }
@@ -98,7 +115,7 @@ function quickMatch(c: Client, mode: GameMode): void {
     }
   }
   if (!best) {
-    const maps = Object.keys(MAPS);
+    const maps = Object.keys(MAPS).filter(id => mapAllows(MAPS[id], mode));
     const difficulty: Difficulty = mmr > 1250 ? 'hard' : mmr < 900 ? 'easy' : 'normal';
     best = createRoom(c, mode, maps[Math.floor(Math.random() * maps.length)], difficulty, true);
   }

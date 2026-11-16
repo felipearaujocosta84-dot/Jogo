@@ -22,6 +22,8 @@ export interface Collider {
   blocksBullets: boolean;
   /** Informação livre para o jogo (ex.: referência a uma porta). */
   tag?: string;
+  /** Marca interna das consultas (evita testar o mesmo colisor duas vezes). */
+  qs?: number;
 }
 
 export interface RayHit {
@@ -31,14 +33,19 @@ export interface RayHit {
   normal: Vec3;
 }
 
-const CELL = 8; // tamanho da célula da grade espacial (metros)
+const DEFAULT_CELL = 8; // tamanho padrão da célula da grade espacial (metros)
 
 export class CollisionWorld {
   private colliders: Collider[] = [];
   private grid = new Map<string, Collider[]>();
   private nextId = 1;
   private queryStamp = 0;
-  private stamps = new Map<number, number>();
+  /** Tamanho da célula da grade: menor em mapas com muitas caixas (modelos 3D importados). */
+  readonly cell: number;
+
+  constructor(cell = DEFAULT_CELL) {
+    this.cell = cell;
+  }
 
   add(min: Vec3, max: Vec3, surface: SurfaceKind = 'stone', opts: Partial<Collider> = {}): Collider {
     const c: Collider = {
@@ -72,7 +79,8 @@ export class CollisionWorld {
   }
 
   private cellRange(min: Vec3, max: Vec3): [number, number, number, number] {
-    return [Math.floor(min.x / CELL), Math.floor(max.x / CELL), Math.floor(min.z / CELL), Math.floor(max.z / CELL)];
+    const C = this.cell;
+    return [Math.floor(min.x / C), Math.floor(max.x / C), Math.floor(min.z / C), Math.floor(max.z / C)];
   }
 
   private insert(c: Collider): void {
@@ -107,8 +115,8 @@ export class CollisionWorld {
         const list = this.grid.get(x + ',' + z);
         if (!list) continue;
         for (const c of list) {
-          if (!c.enabled || this.stamps.get(c.id) === stamp) continue;
-          this.stamps.set(c.id, stamp);
+          if (!c.enabled || c.qs === stamp) continue;
+          c.qs = stamp;
           if (
             c.max.x > min.x && c.min.x < max.x &&
             c.max.y > min.y && c.min.y < max.y &&
@@ -131,23 +139,40 @@ export class CollisionWorld {
   raycast(origin: Vec3, dir: Vec3, maxDist: number, forBullets = true): RayHit | null {
     const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
     const dx = dir.x / len, dy = dir.y / len, dz = dir.z / len;
-    const end = { x: origin.x + dx * maxDist, y: origin.y + dy * maxDist, z: origin.z + dz * maxDist };
-    const min = { x: Math.min(origin.x, end.x), y: Math.min(origin.y, end.y), z: Math.min(origin.z, end.z) };
-    const max = { x: Math.max(origin.x, end.x), y: Math.max(origin.y, end.y), z: Math.max(origin.z, end.z) };
-    const candidates = this.query(min, max, scratch);
+    const C = this.cell;
+    const stamp = ++this.queryStamp;
     let best: RayHit | null = null;
     let bestT = maxDist;
-    for (const c of candidates) {
-      if (forBullets && !c.blocksBullets) continue;
-      const t = rayBox(origin, dx, dy, dz, c, bestT);
-      if (t === null) continue;
-      bestT = t.t;
-      best = {
-        collider: c,
-        distance: t.t,
-        point: { x: origin.x + dx * t.t, y: origin.y + dy * t.t, z: origin.z + dz * t.t },
-        normal: t.n
-      };
+    // percorre as células atravessadas pelo raio no plano XZ (DDA), da mais próxima para a mais distante
+    let cx = Math.floor(origin.x / C), cz = Math.floor(origin.z / C);
+    const stepX = dx > 0 ? 1 : -1, stepZ = dz > 0 ? 1 : -1;
+    const tdx = Math.abs(dx) > 1e-9 ? C / Math.abs(dx) : Infinity;
+    const tdz = Math.abs(dz) > 1e-9 ? C / Math.abs(dz) : Infinity;
+    let tmx = Math.abs(dx) > 1e-9 ? ((dx > 0 ? (cx + 1) * C - origin.x : origin.x - cx * C) / Math.abs(dx)) : Infinity;
+    let tmz = Math.abs(dz) > 1e-9 ? ((dz > 0 ? (cz + 1) * C - origin.z : origin.z - cz * C) / Math.abs(dz)) : Infinity;
+    let tEnter = 0;
+    for (let guard = 0; guard < 4096; guard++) {
+      const list = this.grid.get(cx + ',' + cz);
+      if (list)
+        for (const c of list) {
+          if (!c.enabled || c.qs === stamp || (forBullets && !c.blocksBullets)) continue;
+          c.qs = stamp;
+          const t = rayBox(origin, dx, dy, dz, c, bestT);
+          if (t === null) continue;
+          bestT = t.t;
+          best = { collider: c, distance: t.t, point: { x: origin.x + dx * t.t, y: origin.y + dy * t.t, z: origin.z + dz * t.t }, normal: t.n };
+        }
+      // próxima célula; para quando já há um impacto antes dela ou o raio acabou
+      if (tmx < tmz) {
+        tEnter = tmx;
+        tmx += tdx;
+        cx += stepX;
+      } else {
+        tEnter = tmz;
+        tmz += tdz;
+        cz += stepZ;
+      }
+      if (tEnter > bestT || tEnter > maxDist || !isFinite(tEnter)) break;
     }
     return best;
   }

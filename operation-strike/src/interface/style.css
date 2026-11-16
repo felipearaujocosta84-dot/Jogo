@@ -478,3 +478,5 @@ body.touch .slots { display: none; }
 .radio-feed div { background: rgba(0, 0, 0, 0.55); padding: 3px 8px; border-radius: 3px; animation: screenIn 0.2s; }
 .radio-feed b.T { color: var(--t); } .radio-feed b.CT { color: var(--ct); }
 body.touch .radio-feed { bottom: auto; top: max(120px, calc(var(--safe-t) + 120px)); left: 50%; transform: translateX(-50%); font-size: 11px; align-items: center; }
+
+.mapbadge { display: inline-block; margin-top: 6px; font-style: normal; font-size: 10px; letter-spacing: 0.12em; font-weight: 800; color: #111; background: var(--accent); padding: 2px 6px; border-radius: 2px; }

@@ -1,10 +1,15 @@
 // Teste sem gráficos: roda partidas inteiras só com bots e mostra o resultado.
+import { readFileSync } from 'node:fs';
 import { MatchSim } from '../src/sim/MatchSim';
+import { MAPS } from '../src/maps/maps';
+import { applyModelData } from '../src/maps/ModelMaps';
 import type { Difficulty } from '../src/sim/types';
 
 const mapId = process.argv[2] ?? 'dust_zone';
 const diff = (process.argv[3] ?? 'normal') as Difficulty;
 const mode = (process.argv[4] ?? 'competitive') as 'competitive' | 'casual' | 'tdm';
+const def = MAPS[mapId];
+if (def?.model) applyModelData(def, JSON.parse(readFileSync(new URL('../public/assets/' + def.model.data, import.meta.url), 'utf8')));
 const m = new MatchSim({ mapId, mode, difficulty: diff, teamSize: 5, timeLimit: +(process.argv[5] ?? 10), killLimit: +(process.argv[6] ?? 50) });
 m.fillBots();
 m.start();

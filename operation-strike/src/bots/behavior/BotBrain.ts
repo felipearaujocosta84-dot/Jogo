@@ -470,10 +470,10 @@ export class BotBrain {
       return;
     }
     if (Math.random() > 0.01) return;
-    const site = m.map.def.sites.find(s => s.name === m.tactics.T.site)!;
-    const cx = (site.min[0] + site.max[0]) / 2, cz = (site.min[1] + site.max[1]) / 2;
+    const site = m.map.def.sites.find(s => s.name === m.tactics.T.site);
+    const cx = site ? (site.min[0] + site.max[0]) / 2 : 0, cz = site ? (site.min[1] + site.max[1]) / 2 : 0;
     const pos = p.ctrl.position;
-    if (p.team === 'T' && task.kind === 'execute' && Math.hypot(cx - pos.x, cz - pos.z) < 26) {
+    if (site && p.team === 'T' && task.kind === 'execute' && Math.hypot(cx - pos.x, cz - pos.z) < 26) {
       const type = p.nades.flash ? 'flash' : p.nades.smoke ? 'smoke' : null;
       if (type) this.nadeIntent = { type, x: cx, y: 1, z: cz, t: m.time };
     } else if (p.nades.he) {

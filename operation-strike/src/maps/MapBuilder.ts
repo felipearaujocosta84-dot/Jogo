@@ -17,6 +17,8 @@ import {
   PBRMaterial,
   Vector3,
   VertexData,
+  LoadAssetContainerAsync,
+  type AssetContainer,
   type Scene
 } from '../core/babylon';
 import type { QualityPreset } from '../core/Quality';
@@ -27,6 +29,12 @@ import type { MapRuntime } from './MapRuntime';
 import { MATERIAL_SCALE, type BoxDef, type MapDefinition, type MaterialName } from './MapTypes';
 
 const CHUNK = 32;
+
+let gltfLoader: Promise<unknown> | null = null;
+function ensureGltf(): Promise<unknown> {
+  if (!gltfLoader) gltfLoader = import('@babylonjs/loaders/glTF/2.0');
+  return gltfLoader;
+}
 
 interface GeoBucket {
   mat: MaterialName;
@@ -65,17 +73,20 @@ export class MapBuilder {
   build(): MapVisual {
     const { def, scene } = this;
     const { minX, maxX, minZ, maxZ } = this.runtime.bounds;
-    const layout = expandMap(def);
-    for (const f of layout.floors) this.addQuadTop(f.x0, f.z0, f.x1, f.z1, f.y, f.mat);
-    for (const b of layout.boxes) {
-      if (b.detail && !this.quality.props) continue;
-      this.addBox(b);
+    if (!def.model) {
+      const layout = expandMap(def);
+      for (const f of layout.floors) this.addQuadTop(f.x0, f.z0, f.x1, f.z1, f.y, f.mat);
+      for (const b of layout.boxes) {
+        if (b.detail && !this.quality.props) continue;
+        this.addBox(b);
+      }
     }
     // chão fora da área jogável (visual)
-    this.addQuadTop(minX - 40, minZ - 40, maxX + 40, minZ, 0, layoutGround(def));
-    this.addQuadTop(minX - 40, maxZ, maxX + 40, maxZ + 40, 0, layoutGround(def));
-    this.addQuadTop(minX - 40, minZ, minX, maxZ, 0, layoutGround(def));
-    this.addQuadTop(maxX, minZ, maxX + 40, maxZ, 0, layoutGround(def));
+    const outer = def.model ? 'dark' : layoutGround(def);
+    this.addQuadTop(minX - 40, minZ - 40, maxX + 40, minZ, 0, outer);
+    this.addQuadTop(minX - 40, maxZ, maxX + 40, maxZ + 40, 0, outer);
+    this.addQuadTop(minX - 40, minZ, minX, maxZ, 0, outer);
+    this.addQuadTop(maxX, minZ, maxX + 40, maxZ, 0, outer);
     const meshes = this.flush();
 
     const amb = def.ambience;
@@ -129,6 +140,41 @@ export class MapBuilder {
     scene.clearColor = Color4.FromColor3(hex(amb.fog), 1);
     scene.ambientColor = new Color3(0.25, 0.22, 0.2);
 
+    // mapa de modelo 3D: o arquivo GLB entra assim que termina de carregar
+    let container: AssetContainer | null = null;
+    let disposed = false;
+    if (def.model) {
+      const url = './assets/' + def.model.glb;
+      const quality = this.quality;
+      void ensureGltf()
+        .then(() => LoadAssetContainerAsync(url, scene))
+        .then(c => {
+          if (disposed) return c.dispose();
+          container = c;
+          c.addAllToScene();
+          for (const m of c.meshes) {
+            m.isPickable = false;
+            m.receiveShadows = !!shadow;
+            if (shadow && m.getTotalVertices() > 0) shadow.addShadowCaster(m, false);
+            m.freezeWorldMatrix();
+            m.doNotSyncBoundingInfo = true;
+          }
+          for (const mat of c.materials) {
+            const pm = mat as PBRMaterial;
+            if (!(pm instanceof PBRMaterial)) continue;
+            // cores chapadas do kit: superfícies foscas; brilho próprio em luzes/fogo/telas
+            pm.environmentIntensity = quality.pbr ? 0.5 : 0.25;
+            pm.directIntensity = 1.35;
+            if (/glow|fire|screen|lamp|crystal/i.test(mat.name)) pm.emissiveColor = pm.albedoColor.scale(0.8);
+            if (!quality.pbr) pm.specularIntensity = 0.3;
+            mat.freeze();
+          }
+          // sombra estática: desenha de novo agora que o cenário chegou
+          shadow?.getShadowMap()?.resetRefreshCounter();
+        })
+        .catch(e => console.error('[mapa] falha ao carregar', url, e));
+    }
+
     this.createSiteMarkers(meshes);
     const doorMeshes = this.createDoors(meshes);
     const runtime = this.runtime;
@@ -153,6 +199,8 @@ export class MapBuilder {
       },
       update: updateDoors,
       dispose: () => {
+        disposed = true;
+        (container as AssetContainer | null)?.dispose();
         for (const m of meshes) m.dispose(false, true);
         shadow?.dispose();
         hemi.dispose();

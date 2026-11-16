@@ -34,6 +34,19 @@ export class Radar {
     g.fillStyle = 'rgba(20,24,28,0.9)';
     g.fillRect(0, 0, w, h);
     const def = this.map.def;
+    if (def.model) {
+      // mapa de modelo 3D: varre o chão (caminhável = claro, mais alto = mais claro; obstáculo = escuro)
+      const step = 0.5;
+      for (let z = minZ; z < maxZ; z += step)
+        for (let x = minX; x < maxX; x += step) {
+          const gr = this.map.groundAt(x + step / 2, z + step / 2, 0.2);
+          if (!gr.free) continue;
+          const v = Math.min(200, 120 + gr.y * 18);
+          g.fillStyle = `rgb(${v},${v - 8},${v - 22})`;
+          g.fillRect((x - minX) * PX_PER_M, (maxZ - z - step) * PX_PER_M, step * PX_PER_M + 0.5, step * PX_PER_M + 0.5);
+        }
+      return c;
+    }
     for (let r = 0; r < def.grid.length; r++)
       for (let col = 0; col < def.grid[r].length; col++) {
         const kind = def.legend[def.grid[r][col]];

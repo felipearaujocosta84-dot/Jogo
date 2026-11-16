@@ -53,7 +53,10 @@ class Heap {
 }
 
 export class NavGrid {
-  readonly res = 1;
+  readonly res: number;
+  /** Altura do chão por célula (mapas com relevo/andares). */
+  readonly height: Float32Array;
+  private hasHeight: boolean;
   readonly cols: number;
   readonly rows: number;
   readonly minX: number;
@@ -70,12 +73,16 @@ export class NavGrid {
 
   constructor(map: MapRuntime) {
     const b = map.bounds;
+    // arenas de modelo 3D: células menores e altura do chão (degraus, rampas, terreno)
+    this.hasHeight = !!map.def.model;
+    this.res = this.hasHeight ? 0.5 : 1;
     this.minX = b.minX;
     this.minZ = b.minZ;
     this.cols = Math.ceil((b.maxX - b.minX) / this.res);
     this.rows = Math.ceil((b.maxZ - b.minZ) / this.res);
     const n = this.cols * this.rows;
     this.walk = new Uint8Array(n);
+    this.height = new Float32Array(n);
     this.penalty = new Float32Array(n);
     this.g = new Float32Array(n);
     this.parent = new Int32Array(n);
@@ -85,11 +92,16 @@ export class NavGrid {
     const doorColliders = map.doors.flatMap(d => d.leaves.map(l => l.collider));
     const prev = doorColliders.map(c => c.enabled);
     for (const c of doorColliders) c.enabled = false;
-    const r = 0.36;
+    const r = this.hasHeight ? 0.3 : 0.36;
     for (let j = 0; j < this.rows; j++)
       for (let i = 0; i < this.cols; i++) {
         const x = this.minX + (i + 0.5) * this.res, z = this.minZ + (j + 0.5) * this.res;
-        const free = !map.world.overlaps({ x: x - r, y: 0.06, z: z - r }, { x: x + r, y: 1.75, z: z + r });
+        let free: boolean;
+        if (this.hasHeight) {
+          const g = map.groundAt(x, z, r);
+          free = g.free;
+          this.height[j * this.cols + i] = g.y;
+        } else free = !map.world.overlaps({ x: x - r, y: 0.06, z: z - r }, { x: x + r, y: 1.75, z: z + r });
         if (free) {
           this.walk[j * this.cols + i] = 1;
           this.walkable.push(j * this.cols + i);
@@ -111,6 +123,13 @@ export class NavGrid {
   walkAt(i: number, j: number): boolean {
     if (i < 0 || j < 0 || i >= this.cols || j >= this.rows) return false;
     return this.walk[j * this.cols + i] === 1;
+  }
+
+  /** Dá para ir da célula a para a vizinha b? (subir até 0,56 m; descer até 2,5 m) */
+  private step(a: number, b: number): boolean {
+    if (!this.hasHeight) return true;
+    const dh = this.height[b] - this.height[a];
+    return dh <= 0.5 && dh >= -2.5;
   }
 
   cellX(x: number): number {
@@ -148,9 +167,15 @@ export class NavGrid {
     const dist = Math.hypot(dx, dz);
     const steps = Math.ceil(dist / (this.res * 0.5));
     const nx = dist > 0 ? -dz / dist : 0, nz = dist > 0 ? dx / dist : 0;
+    let prev = -1;
     for (let s = 0; s <= steps; s++) {
       const t = steps ? s / steps : 0;
       const x = ax + dx * t, z = az + dz * t;
+      if (this.hasHeight) {
+        const k = this.cellZ(z) * this.cols + this.cellX(x);
+        if (s > 0 && prev >= 0 && k !== prev && Math.abs(this.height[k] - this.height[prev]) > 0.5) return false;
+        prev = k;
+      }
       if (!this.isWalkable(x, z) || !this.isWalkable(x + nx * 0.3, z + nz * 0.3) || !this.isWalkable(x - nx * 0.3, z - nz * 0.3)) return false;
     }
     return true;
@@ -191,7 +216,7 @@ export class NavGrid {
           if (!this.walkAt(ni, nj)) continue;
           if (di && dj && (!this.walkAt(ci + di, cj) || !this.walkAt(ci, cj + dj))) continue; // sem cortar quinas
           const nk = nj * cols + ni;
-          if (this.closed[nk] === id) continue;
+          if (this.closed[nk] === id || !this.step(cur, nk)) continue;
           const ng = this.g[cur] + (di && dj ? SQRT2 : 1) + this.penalty[nk];
           if (this.stamp[nk] !== id || ng < this.g[nk]) {
             this.stamp[nk] = id;

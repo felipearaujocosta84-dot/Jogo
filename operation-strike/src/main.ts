@@ -4,7 +4,8 @@ import { Settings, type SettingsData } from './core/Settings';
 import { LocalSession, OnlineSession, type Session } from './core/Session';
 import { NetClient } from './multiplayer/NetClient';
 import type { RoomInfo } from './multiplayer/Protocol';
-import { MAP_LIST, MAPS } from './maps/maps';
+import { MAP_LIST, MAPS, mapAllows } from './maps/maps';
+import { ensureMapData } from './maps/ModelMaps';
 import { applyMatch, BOT_MMR, levelFor, rankName, type ProfileData } from './save/Profile';
 import { loadLocalProfile, saveLocalProfile } from './save/LocalProfile';
 import { Storage } from './save/Storage';
@@ -192,7 +193,9 @@ function renderTdmWeapons(): void {
 function renderMapCards(): void {
   for (const box of document.querySelectorAll<HTMLElement>('.maps')) {
     const key = box.dataset.pick!;
-    box.innerHTML = MAP_LIST.map(m => `<button data-v="${m.id}" class="mapcard ${picks[key] === m.id ? 'on' : ''}" style="--sky:${m.ambience.sky[1]};--ground:${m.ambience.fog}"><b>${m.name}</b><small>${m.description}</small></button>`).join('');
+    // treino usa os locais de bomba: só mapas clássicos
+    const list = key === 'tmap' ? MAP_LIST.filter(m => !m.model) : MAP_LIST;
+    box.innerHTML = list.map(m => `<button data-v="${m.id}" class="mapcard ${picks[key] === m.id ? 'on' : ''}" style="--sky:${m.ambience.sky[1]};--ground:${m.ambience.fog}"><b>${m.name}</b><small>${m.description}</small>${m.model ? '<i class="mapbadge">MATA-MATA · 3D</i>' : ''}</button>`).join('');
   }
 }
 
@@ -208,7 +211,17 @@ document.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('[data-v]');
   const box = b?.closest<HTMLElement>('[data-pick]');
   if (b && box) {
-    picks[box.dataset.pick!] = b.dataset.v!;
+    const key = box.dataset.pick!;
+    picks[key] = b.dataset.v!;
+    // mapas de modelo 3D só têm mata-mata; modos com bomba voltam para um mapa clássico
+    const map = MAPS[picks.map];
+    if (key === 'map' && map && !mapAllows(map, picks.mode)) {
+      picks.mode = 'tdm';
+      toast(`${map.name}: mapa de Mata-mata em equipe`);
+    } else if (key === 'mode' && map && !mapAllows(map, picks.mode)) {
+      picks.map = MAP_LIST.find(m => mapAllows(m, picks.mode))!.id;
+      toast(`Modo com bomba: mapa trocado para ${MAPS[picks.map].name}`);
+    }
     Storage.save('picks', picks);
     syncPicks();
     game.audio.unlock();
@@ -235,8 +248,26 @@ document.addEventListener('click', e => {
 
 // ------------------------------------------------------------ partidas
 
-function startLocal(mode: GameMode, mapId: string, difficulty: Difficulty, side: string): void {
+let starting = false;
+
+async function startLocal(mode: GameMode, mapId: string, difficulty: Difficulty, side: string): Promise<void> {
+  if (starting) return;
+  const def = MAPS[mapId] ?? MAPS.dust_zone;
+  if (!mapAllows(def, mode)) mode = 'tdm';
   void enterFullscreen();
+  if (def.model && !def.colliders) {
+    starting = true;
+    toast('Carregando mapa…', 8000);
+    try {
+      await ensureMapData(def);
+      toast(`${def.name} pronto`, 900);
+    } catch (e) {
+      toast('Não foi possível carregar o mapa: ' + (e as Error).message, 4000);
+      return;
+    } finally {
+      starting = false;
+    }
+  }
   const team: Team = side === 'random' ? (Math.random() < 0.5 ? 'T' : 'CT') : (side as Team);
   updateSkinLevel();
   const tdm = mode === 'tdm'
@@ -333,9 +364,14 @@ async function ensureNet(): Promise<NetClient> {
             show(null);
             break;
           }
-          const session = new OnlineSession(net!, msg.mapId, msg.mode, msg.you);
-          void enterFullscreen();
-          launch(session);
+          const def = MAPS[msg.mapId];
+          void (def ? ensureMapData(def) : Promise.resolve())
+            .then(() => {
+              const session = new OnlineSession(net!, msg.mapId, msg.mode, msg.you);
+              void enterFullscreen();
+              launch(session);
+            })
+            .catch(e => toast('Não foi possível carregar o mapa: ' + (e as Error).message, 4000));
           break;
         }
         case 'error':
@@ -365,7 +401,7 @@ async function ensureNet(): Promise<NetClient> {
 function renderRooms(rooms: RoomInfo[]): void {
   $('roomList').innerHTML = rooms.length
     ? rooms
-        .map(r => `<button class="room" data-room="${r.code}"><b>${r.code}</b> ${MAPS[r.mapId]?.name ?? r.mapId} · ${r.mode === 'competitive' ? 'Competitivo' : 'Casual'} · ${r.humans}/10 humanos · ${r.state === 'lobby' ? 'no lobby' : 'em jogo'} · MMR ${r.avgMmr}</button>`)
+        .map(r => `<button class="room" data-room="${r.code}"><b>${r.code}</b> ${MAPS[r.mapId]?.name ?? r.mapId} · ${r.mode === 'competitive' ? 'Competitivo' : r.mode === 'tdm' ? 'Mata-mata' : 'Casual'} · ${r.humans}/10 humanos · ${r.state === 'lobby' ? 'no lobby' : 'em jogo'} · MMR ${r.avgMmr}</button>`)
         .join('')
     : '<p class="roadmap">Nenhuma sala pública. Use “Encontrar partida” ou crie uma.</p>';
 }
@@ -378,7 +414,7 @@ $('roomList').addEventListener('click', e => {
 function renderLobby(r: RoomInfo): void {
   $('lobbyCode').textContent = r.code;
   const diff = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' }[r.difficulty];
-  $('lobbyInfo').textContent = `${MAPS[r.mapId]?.name} · ${r.mode === 'competitive' ? 'Competitivo' : 'Casual'} · bots ${diff}${r.countdown > 0 && r.state === 'lobby' ? ` · começa em ${r.countdown}s` : ''}`;
+  $('lobbyInfo').textContent = `${MAPS[r.mapId]?.name} · ${r.mode === 'competitive' ? 'Competitivo' : r.mode === 'tdm' ? 'Mata-mata' : 'Casual'} · bots ${diff}${r.countdown > 0 && r.state === 'lobby' ? ` · começa em ${r.countdown}s` : ''}`;
   const li = (team: Team) =>
     r.players
       .filter(p => p.team === team)
@@ -514,9 +550,9 @@ document.addEventListener('click', e => {
   if (lobbyAction(btn.dataset.action!)) return;
   switch (btn.dataset.action) {
     case 'start-bots':
-      return startLocal(picks.mode as GameMode, picks.map, picks.difficulty as Difficulty, picks.side);
+      return void startLocal(picks.mode as GameMode, picks.map, picks.difficulty as Difficulty, picks.side);
     case 'start-training':
-      return startLocal('training', picks.tmap, 'easy', picks.tside);
+      return void startLocal('training', MAPS[picks.tmap]?.model ? 'dust_zone' : picks.tmap, 'easy', picks.tside);
     case 'quick-competitive':
     case 'quick-casual':
       void ensureNet().then(n => {
@@ -531,7 +567,7 @@ document.addEventListener('click', e => {
       return;
     }
     case 'create-room':
-      void ensureNet().then(n => n.send({ t: 'create', mode: picks.mode === 'casual' ? 'casual' : 'competitive', mapId: picks.map, difficulty: picks.difficulty as Difficulty, isPublic: $<HTMLInputElement>('roomPublic').checked })).catch(() => {});
+      void ensureNet().then(n => n.send({ t: 'create', mode: picks.mode === 'casual' ? 'casual' : picks.mode === 'tdm' ? 'tdm' : 'competitive', mapId: picks.map, difficulty: picks.difficulty as Difficulty, isPublic: $<HTMLInputElement>('roomPublic').checked })).catch(() => {});
       return;
     case 'refresh-rooms':
       void ensureNet().then(n => n.send({ t: 'list' })).catch(() => {});
