@@ -285,3 +285,23 @@ function makeRock(seed, crystal) {
 }
 const ROCK_IMGS = [makeRock(5, false), makeRock(9, false), makeRock(13, true)];
 const STUMP = pixelCanvas(16, 8, g => { g.fillStyle = '#2a1a10'; g.fillRect(2, 1, 12, 7); g.fillStyle = '#8a5a34'; g.fillRect(3, 2, 10, 5); g.fillStyle = '#c99a6a'; g.fillRect(5, 3, 6, 2); });
+function makeBush(seed, flowers) {
+  const R = mulberry(seed), W2 = 36, H2 = 24, P = ['#1f3d1f', '#2f6b2a', '#3f8a37', '#5fae4a', '#8fd36a'];
+  return pixelCanvas(W2, H2, g => {
+    const blobs = [[18, 14, 10]];
+    for (let i = 0; i < 4; i++) blobs.push([8 + R() * 20, 11 + R() * 6, 6 + R() * 4]);
+    const inside = (x, y) => y < 23 && blobs.some(([bx, by, br]) => (x - bx) ** 2 + (y - by) ** 2 <= br * br);
+    for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+      if (!inside(x + 0.5, y + 0.5)) continue;
+      const edge = !inside(x - 0.5, y + 0.5) || !inside(x + 1.5, y + 0.5) || !inside(x + 0.5, y - 0.5) || !inside(x + 0.5, y + 1.5);
+      const l = ((18 - x) * 0.5 + (12 - y) * 0.9) / 10 + (R() - 0.5) * 0.5;
+      g.fillStyle = edge ? P[0] : l > 0.75 ? P[4] : l > 0.2 ? P[3] : l > -0.4 ? P[2] : P[1];
+      g.fillRect(x, y, 1, 1);
+    }
+    if (flowers) for (let i = 0; i < 10; i++) {
+      const x = Math.floor(4 + R() * 28), y = Math.floor(4 + R() * 16);
+      if (inside(x - 1, y) && inside(x + 2, y + 1)) { g.fillStyle = flowers; g.fillRect(x, y, 2, 2); }
+    }
+  });
+}
+const BUSH_IMGS = [makeBush(3), makeBush(8), makeBush(21, '#ff9ec7'), makeBush(34, '#ffe066'), makeBush(55, '#ffffff')];

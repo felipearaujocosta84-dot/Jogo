@@ -66,7 +66,7 @@ const REGIONS = {
     start: [80, 915]
   },
   penhasco: {
-    name: 'Penhasco do Vento', img: 'assets/penhasco.jpg', amb: 'embers', ox: 300, oy: 2300,
+    name: 'Penhasco do Vento', img: 'assets/penhasco.jpg', amb: 'embers', ox: 300, oy: 2300, frame: 'tl',
     walk: [[[60, 700], [260, 700], [300, 655], [420, 605], [440, 520], [430, 430], [470, 350], [520, 360], [560, 480],
       [660, 560], [680, 620], [640, 720], [600, 800], [520, 880], [440, 930], [320, 960], [230, 968], [60, 962], [20, 900], [20, 760]],
       [[55, 0], [205, 0], [205, 730], [55, 730]]],
@@ -152,6 +152,9 @@ function buildRegionMask(r, im) {
   const d = g.getImageData(0, 0, mw, mh).data, m = new Uint8Array(mw * mh);
   for (let i = 0; i < m.length; i++) m[i] = d[i * 4] > 127 ? 1 : 0;
   r.iw = iw; r.ih = ih; r.mask = { w: mw, h: mh, m };
+  const pc = document.createElement('canvas'); pc.width = mw; pc.height = mh;
+  const pg = pc.getContext('2d'); pg.drawImage(im, 0, 0, mw, mh);
+  try { r.pix = pg.getImageData(0, 0, mw, mh).data; } catch (e) { r.pix = null; }
 }
 // borda esfumada para a ilustração se misturar ao campo
 function featherImage(im) {
@@ -246,7 +249,45 @@ function placeProps() {
     for (let y = y0 + 80; y <= y1; y += 120) { per.push([x0 - 40, y]); per.push([x1 + 40, y]); }
     for (const [px, py] of per) {
       const x = px + (R() - 0.5) * 30, y = py + R() * 30;
-      if (R() < 0.75 && !regionAt(x, y, 0) && clearOf(x, y, 60, [1, 2, 3]) && !nearEnt(x, y, 200)) tree(x, y);
+      if (R() < 0.95 && !regionAt(x, y, 0) && clearOf(x, y, 60, [1, 2, 3]) && !nearEnt(x, y, 200)) tree(x, y);
+    }
+  }
+  // moldura de mata sobre as bordas das ilustrações: esconde as casas cortadas na borda
+  const localWalk = (r, lx, ly) => {
+    const mk = r.mask, mx = Math.floor(lx / 4), my = Math.floor(ly / 4);
+    return mx >= 0 && my >= 0 && mx < mk.w && my < mk.h && mk.m[my * mk.w + mx] === 1;
+  };
+  const watery = (r, lx, ly) => {
+    if (!r.pix) return false;
+    const mx = clamp(Math.floor(lx / 4), 0, r.mask.w - 1), my = clamp(Math.floor(ly / 4), 0, r.mask.h - 1), i = (my * r.mask.w + mx) * 4;
+    const R0 = r.pix[i], G0 = r.pix[i + 1], B0 = r.pix[i + 2];
+    return B0 > G0 + 8 && B0 > R0 + 30;
+  };
+  for (const r of REGION_LIST) {
+    const sides = r.frame || 'tlrb';
+    const cand = [];
+    for (const depth of [4, 20]) {
+      const step = depth === 4 ? 58 : 66, off = depth === 4 ? 30 : 0;
+      for (let lx = off; lx <= r.iw; lx += step) {
+        if (sides.includes('t')) cand.push([lx, depth + 18, depth]);
+        if (sides.includes('b')) cand.push([lx, r.ih - depth + 30, depth]);
+      }
+      for (let ly = off + 40; ly <= r.ih; ly += step) {
+        if (sides.includes('l')) cand.push([depth, ly, depth]);
+        if (sides.includes('r')) cand.push([r.iw - depth, ly, depth]);
+      }
+    }
+    for (const [lx0, ly0, depth] of cand) {
+      const lx = lx0 + (R() - 0.5) * 18, ly = ly0 + (R() - 0.5) * 14;
+      let clear = true;
+      for (let a = 0; a < 12 && clear; a++) for (const rad of [0, 35, 60]) {
+        if (localWalk(r, lx + Math.cos(a * 0.524) * rad, ly - 20 + Math.sin(a * 0.524) * rad * 0.8)) { clear = false; break; }
+      }
+      if (!clear || watery(r, lx, ly) || watery(r, lx, ly - 40)) continue;
+      const [x, y] = toWorld(r, lx, ly);
+      if (nearEnt(x, y, 230)) continue;
+      if (depth === 4 || R() < 0.25) addProp({ t: 'bush', x, y, img: BUSH_IMGS[Math.floor(R() * BUSH_IMGS.length)], s: 4 + R() * 1.5 });
+      else addProp({ t: 'tree', x, y, img: TREE_IMGS[Math.floor(R() * 5)].img, stock: 3, regrow: 0, shake: 0, s: 4 + R() * 0.8, frame: true });
     }
   }
   const meadow = (x, y, pad) => x > 200 && y > 200 && x < WW - 200 && y < WH - 200 && !regionAt(x, y, pad) && clearOf(x, y, 30, [1, 2, 3]);
@@ -275,7 +316,7 @@ function placeProps() {
   }
   // colisão de troncos e rochas
   for (const p of props) {
-    if (p.t === 'tree') stampGrid(worldGrid, p.x, p.y - 6, 20, 0);
+    if (p.t === 'tree' && !p.frame) stampGrid(worldGrid, p.x, p.y - 6, 20, 0);
     if (p.t === 'rock') stampGrid(worldGrid, p.x, p.y - 8, 30, 0);
   }
   buckets = Array.from({ length: BC * BR }, () => []);

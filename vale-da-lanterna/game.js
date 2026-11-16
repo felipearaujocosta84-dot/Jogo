@@ -788,7 +788,7 @@ function ambient(dt) {
 
 // ---------------------------------------------------------------- câmera
 function computeView() {
-  if (area === 'world') view.s = Math.min(H, W * 0.75) / 820;
+  if (area === 'world') view.s = window.__zoom || Math.min(H, W * 0.75) / 820;
   else { const I = interiorDef; view.s = Math.min(H / (I.ph + 150), W / (I.pw + 260)); }
   view.vw = W / view.s; view.vh = H / view.s;
 }
@@ -971,6 +971,12 @@ function drawProp(p) {
     const behind = player.y < p.y - 10 && player.y > p.y - h * 0.9 && Math.abs(player.x - p.x) < w * 0.42 && area === 'world';
     if (behind) ctx.globalAlpha = 0.5;
     ctx.drawImage(p.img, p.x - w / 2 + sh, p.y - h + 6, w, h);
+    ctx.globalAlpha = 1;
+  } else if (p.t === 'bush') {
+    const w = p.img.width * p.s, h = p.img.height * p.s;
+    const behind = player.y < p.y - 4 && player.y > p.y - h && Math.abs(player.x - p.x) < w * 0.45;
+    if (behind) ctx.globalAlpha = 0.55;
+    ctx.drawImage(p.img, p.x - w / 2, p.y - h + 8, w, h);
     ctx.globalAlpha = 1;
   } else if (p.t === 'rock') {
     if (p.stock <= 0) return;
