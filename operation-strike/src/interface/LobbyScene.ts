@@ -1,13 +1,15 @@
-// Lobby 3D: o esquadrão (o jogador + 3 companheiros da mesma equipe) em fila, armados, num pátio industrial
-// à noite — neblina azulada, holofotes com fachos de luz, fita de isolamento vermelha e branca, contêineres,
-// cerca e torre de andaime ao fundo. Usa o mesmo motor do jogo (outra cena): nenhum contexto WebGL extra no celular.
-// Tudo gerado por código (identidade visual própria); os personagens são os modelos 3D das equipes.
+// Lobby 3D: o "esconderijo" do esquadrão — sala de tijolos à noite com sofá, estante, mesa com luminária e monitor,
+// cartazes e letreiro de néon próprios, porta com placa de saída, tapete e luz quente + néon roxo/ciano.
+// O jogador fica no centro; à esquerda e à direita, círculos de convite ("+") para o modo online.
+// Usa o mesmo motor do jogo (outra cena): nenhum contexto WebGL extra no celular. Tudo gerado por código.
 import {
   Color3,
   Color4,
   CreateBox,
   CreateCylinder,
   CreatePlane,
+  CreateSphere,
+  PointLight,
   DirectionalLight,
   FreeCamera,
   HemisphericLight,
@@ -15,7 +17,6 @@ import {
   Mesh,
   PBRMaterial,
   ParticleSystem,
-  Quaternion,
   Scene,
   ShadowGenerator,
   SpotLight,
@@ -44,10 +45,12 @@ export interface SquadMember {
   look?: string;
   /** O próprio jogador (fica em destaque). */
   me?: boolean;
+  /** Lugar vago: mostra o círculo de convite em vez de um personagem. */
+  invite?: boolean;
 }
 
-/** Posições na fila (x, z, yaw em graus). O jogador ocupa a 2ª posição, como líder do esquadrão. */
-const SLOTS: [number, number, number][] = [[-1.55, 0.1, 10], [0.0, 0.35, -4], [1.5, 0.15, -10], [3.0, -0.1, -16]];
+/** Posições (x, z, yaw em graus): o jogador no centro, convites/companheiros nos lados. */
+const SLOTS: [number, number, number][] = [[-1.3, 0.75, 14], [0.0, 0.2, 0], [1.3, 0.75, -14], [3.2, 0.0, -18]];
 
 export class LobbyScene {
   readonly scene: Scene;
@@ -57,8 +60,8 @@ export class LobbyScene {
   private shadow: ShadowGenerator | null = null;
   private post: PostFx;
   private t = 0;
-  private lights: { light: SpotLight; base: number; phase: number }[] = [];
-  private beams: Mesh[] = [];
+  private lights: { light: { intensity: number }; base: number; phase: number }[] = [];
+  private invitePads: Mesh[] = [];
   /** Câmera: 0 = plano geral, 1 = mais perto do jogador (telas de perfil). */
   private zoom = 0;
   private zoomTarget = 0;
@@ -75,53 +78,61 @@ export class LobbyScene {
   constructor(engine: Engine, private preset: QualityPreset) {
     const scene = new Scene(engine);
     this.scene = scene;
-    scene.clearColor = new Color4(0.08, 0.115, 0.155, 1);
-    scene.ambientColor = new Color3(0.12, 0.15, 0.2);
+    scene.clearColor = new Color4(0.02, 0.02, 0.03, 1);
+    scene.ambientColor = new Color3(0.1, 0.09, 0.12);
     scene.fogMode = Scene.FOGMODE_EXP2;
-    scene.fogDensity = 0.032;
-    scene.fogColor = new Color3(0.1, 0.14, 0.19);
+    scene.fogDensity = 0.03;
+    scene.fogColor = new Color3(0.05, 0.04, 0.07);
     scene.skipPointerMovePicking = true;
-    applyStudioEnvironment(scene, '#3c5a78', '#22313f', '#0c1014');
+    applyStudioEnvironment(scene, '#4a3b5c', '#2a2230', '#0e0b0c');
 
-    const cam = new FreeCamera('lobbyCam', new Vector3(0.75, 1.15, 5.0), scene);
+    const cam = new FreeCamera('lobbyCam', new Vector3(0, 1.25, 4.6), scene);
     cam.minZ = 0.05;
-    cam.maxZ = 90;
-    cam.fov = 0.78;
-    cam.setTarget(new Vector3(0.75, 1.05, 0));
+    cam.maxZ = 40;
+    cam.fov = 0.8;
+    cam.setTarget(new Vector3(0, 1.1, 0));
     this.camera = cam;
 
-    // luz: céu noturno frio, lua (sombras), holofotes atrás à direita e recorte azul-ciano
+    // luz: ambiente fraco arroxeado, luz principal na frente (sombra), luminária quente à esquerda,
+    // néon roxo/ciano atrás (recorte) e uma luz fria vinda da porta à direita
     const hemi = new HemisphericLight('lobbyHemi', new Vector3(0, 1, 0), scene);
-    hemi.intensity = 0.55;
-    hemi.diffuse = new Color3(0.55, 0.68, 0.85);
-    hemi.groundColor = new Color3(0.06, 0.07, 0.09);
-    const moon = new DirectionalLight('lobbyMoon', new Vector3(-0.35, -0.75, -0.55), scene);
-    moon.position = new Vector3(6, 12, 10);
-    moon.intensity = 1.25;
-    moon.diffuse = new Color3(0.72, 0.82, 1);
-    const front = new SpotLight('lobbyFront', new Vector3(0.8, 4.2, 6.5), new Vector3(0, -0.55, -0.85), 1.0, 6, scene);
-    front.intensity = 150;
-    front.diffuse = new Color3(0.86, 0.92, 1);
-    front.range = 16;
-    // recorte azul-ciano por trás (separa as silhuetas da neblina, como num retrato de esquadrão)
-    for (const [x, z] of [[-3.5, -3.2], [4.5, -3.0]] as const) {
-      const rim = new SpotLight('lobbyRim', new Vector3(x, 3.6, z), new Vector3(0.75 - x * 0.12, -0.45, 1).normalize(), 1.2, 4, scene);
-      rim.diffuse = new Color3(0.45, 0.72, 1);
-      rim.intensity = 90;
-      rim.range = 12;
-    }
+    hemi.intensity = 0.35;
+    hemi.diffuse = new Color3(0.62, 0.55, 0.75);
+    hemi.groundColor = new Color3(0.08, 0.06, 0.07);
+    const key = new DirectionalLight('lobbyKey', new Vector3(0.25, -0.7, -0.65), scene);
+    key.position = new Vector3(-2, 6, 6);
+    key.intensity = 0.9;
+    key.diffuse = new Color3(1, 0.93, 0.85);
+    const front = new SpotLight('lobbyFront', new Vector3(0.4, 3.6, 4.2), new Vector3(-0.08, -0.55, -0.85), 0.9, 4, scene);
+    front.intensity = 70;
+    front.diffuse = new Color3(1, 0.92, 0.82);
+    front.range = 12;
+    const lamp = new PointLight('lobbyLamp', new Vector3(-2.65, 1.35, -0.9), scene);
+    lamp.diffuse = new Color3(1, 0.62, 0.3);
+    lamp.intensity = 6;
+    lamp.range = 6;
+    this.lights.push({ light: lamp, base: 6, phase: 1.3 });
+    const neonL = new PointLight('lobbyNeon', new Vector3(0.4, 2.7, -2.2), scene);
+    neonL.diffuse = new Color3(0.75, 0.3, 1);
+    neonL.intensity = 5;
+    neonL.range = 7;
+    this.lights.push({ light: neonL, base: 5, phase: 4.1 });
+    const door = new SpotLight('lobbyDoor', new Vector3(3.4, 2.5, -1.8), new Vector3(-0.8, -0.35, 0.5), 1.2, 3, scene);
+    door.diffuse = new Color3(0.45, 0.75, 1);
+    door.intensity = 35;
+    door.range = 8;
     if (preset.shadows) {
-      const sg = new ShadowGenerator(Math.min(2048, preset.shadowMapSize || 1024), moon);
+      const sg = new ShadowGenerator(Math.min(2048, preset.shadowMapSize || 1024), key);
       sg.useBlurExponentialShadowMap = true;
       sg.blurKernel = 16;
       sg.depthScale = 60;
       this.shadow = sg;
     }
 
-    this.buildGround();
-    this.buildBackdrop();
-    this.buildFloodlights();
-    this.buildTape();
+    this.buildRoom();
+    this.buildFurniture();
+    this.buildArt();
+    this.buildPads();
     this.buildHaze();
     this.post = new PostFx(scene, cam);
     this.post.apply(preset);
@@ -184,246 +195,420 @@ export class LobbyScene {
 
   // ------------------------------------------------------------------ cenário
 
-  private buildGround(): void {
+  private buildRoom(): void {
     const s = this.scene;
-    // asfalto molhado (rugosidade baixa = reflexo dos holofotes)
-    const g = this.place(CreateBox('lobbyGround', { width: 60, height: 0.2, depth: 60 }, s), false);
-    g.position.y = -0.1;
-    g.material = this.mat('asphalt', 14, '#5d646c', 0.1, 0.38);
-    // poças
-    const pud = this.plain('#0d1218', 0.6, 0.06);
-    for (const [x, z, w, d] of [[-2.4, 1.6, 2.2, 1.1], [2.2, 2.2, 1.6, 0.8], [0.6, -2.5, 3, 1.2]] as const) {
-      const p = this.place(CreateBox('lobbyPuddle', { width: w, height: 0.01, depth: d }, s), false);
-      p.position.set(x, 0.005, z);
-      p.material = pud;
+    // piso de concreto polido, paredes de tijolo, teto escuro com canos e vigas
+    const floor = this.place(CreateBox('lobbyFloor', { width: 9, height: 0.2, depth: 8 }, s), false);
+    floor.position.set(0, -0.1, 0.6);
+    floor.material = this.mat('concrete', 3, '#6d6a67', 0, 0.45);
+    const brick = this.mat('brick', 2.2, '#9b8f88');
+    const back = this.place(CreateBox('lobbyWallBack', { width: 9, height: 4, depth: 0.2 }, s), false);
+    back.position.set(0, 2, -2.6);
+    back.material = brick;
+    for (const sx of [-1, 1]) {
+      const side = this.place(CreateBox('lobbyWallSide', { width: 0.2, height: 4, depth: 8 }, s), false);
+      side.position.set(sx * 4.5, 2, 0.6);
+      side.material = brick;
     }
-  }
-
-  private buildBackdrop(): void {
-    const s = this.scene;
-    // contêineres empilhados ao fundo (vermelho escuro, azul, verde)
-    const cont: [number, number, number, number, string][] = [
-      [-7.5, 1.3, -8.5, 0.15, '#6b2a24'], [-1.8, 1.3, -10.5, -0.05, '#28465e'], [-1.8, 3.9, -10.5, -0.05, '#3e4a33'],
-      [4.2, 1.3, -9.2, 0.25, '#7a3328'], [4.2, 3.9, -9.4, 0.2, '#2c3f52'], [9.5, 1.3, -6.5, 0.6, '#5a2c26']
-    ];
-    for (const [x, y, z, r, tint] of cont) {
-      const c = this.place(CreateBox('lobbyCont', { width: 6.1, height: 2.6, depth: 2.45 }, s));
-      c.position.set(x, y, z);
-      c.rotation.y = r;
-      c.material = this.mat('container', 1, tint, 0.45, 0.55);
+    const ceil = this.place(CreateBox('lobbyCeil', { width: 9, height: 0.2, depth: 8 }, s), false);
+    ceil.position.set(0, 4.05, 0.6);
+    ceil.material = this.plain('#141316', 0.2, 0.8);
+    const pipe = this.plain('#3a3c40', 0.8, 0.4);
+    for (const [z, d] of [[-2.2, 0.16], [-1.9, 0.1], [1.2, 0.12]] as const) {
+      const p = this.place(CreateCylinder('lobbyPipe', { diameter: d, height: 9, tessellation: 14 }, s));
+      p.rotation.z = Math.PI / 2;
+      p.position.set(0, 3.7 - d, z);
+      p.material = pipe;
     }
-    // cerca de alambrado
-    const fenceTex = paintedTexture(s, 'lobbyFence', 128, (g, n) => {
-      g.clearRect(0, 0, n, n);
-      g.strokeStyle = 'rgba(150,165,180,0.85)';
-      g.lineWidth = 2;
-      for (let i = -n; i < n * 2; i += 16) {
-        g.beginPath(); g.moveTo(i, 0); g.lineTo(i + n, n); g.stroke();
-        g.beginPath(); g.moveTo(i + n, 0); g.lineTo(i, n); g.stroke();
-      }
-    });
-    fenceTex.uScale = 14;
-    fenceTex.vScale = 1.4;
-    const fm = new StandardMaterial('lobbyFenceMat', s);
-    fm.diffuseTexture = fenceTex;
-    fm.useAlphaFromDiffuseTexture = true;
-    fm.backFaceCulling = false;
-    fm.specularColor = Color3.Black();
-    // tela do alambrado em painéis entre os postes (textura sem repetir demais, para não virar listras)
-    fenceTex.uScale = 2.2;
-    fenceTex.vScale = 1.5;
-    for (let x = -13; x < 13; x += 3.25) {
-      const panel = CreatePlane('lobbyFenceMesh', { width: 3.25, height: 2.8 }, s);
-      panel.position.set(x + 1.625, 1.4, -5.6);
-      panel.material = fm;
-      panel.isPickable = false;
+    const beam = this.plain('#1d1d20', 0.6, 0.55);
+    for (const x of [-2.8, 0, 2.8]) {
+      const b = this.place(CreateBox('lobbyBeam', { width: 0.22, height: 0.3, depth: 8 }, s));
+      b.position.set(x, 3.8, 0.6);
+      b.material = beam;
     }
-    const post = this.plain('#3a4148', 0.7, 0.5);
-    for (let x = -13; x <= 13; x += 3.25) {
-      const p = this.place(CreateCylinder('lobbyFencePost', { diameter: 0.07, height: 3, tessellation: 8 }, s));
-      p.position.set(x, 1.5, -5.6);
-      p.material = post;
-    }
-    // torre de andaime à esquerda
-    const scaf = this.plain('#4b5359', 0.75, 0.45);
-    for (const [x, z] of [[-6.2, -3.2], [-4.6, -3.2], [-6.2, -4.6], [-4.6, -4.6]] as const) {
-      const p = this.place(CreateCylinder('lobbyScafPost', { diameter: 0.08, height: 9, tessellation: 8 }, s));
-      p.position.set(x, 4.5, z);
-      p.material = scaf;
-    }
-    for (const y of [2.2, 4.4, 6.6, 8.6]) {
-      const deck = this.place(CreateBox('lobbyScafDeck', { width: 1.8, height: 0.08, depth: 1.6 }, s));
-      deck.position.set(-5.4, y, -3.9);
-      deck.material = this.mat('metal', 1, '#59606a', 0.7, 0.5);
-      for (const z of [-3.2, -4.6]) {
-        const rail = this.place(CreateBox('lobbyScafRail', { width: 1.7, height: 0.05, depth: 0.05 }, s));
-        rail.position.set(-5.4, y + 0.9, z);
-        rail.material = scaf;
-      }
-    }
-    // barreiras de concreto e caixas
-    const jersey = this.mat('concrete', 1, '#8d8f8f', 0, 0.9);
-    for (const [x, z, r] of [[-3.6, -1.6, 0.3], [5.4, -1.2, -0.4], [6.8, 1.6, -0.9]] as const) {
-      const b = this.place(CreateBox('lobbyJersey', { width: 2.0, height: 0.8, depth: 0.45 }, s));
-      b.position.set(x, 0.4, z);
-      b.rotation.y = r;
-      b.material = jersey;
-    }
-    const crate = this.mat('crate', 1, '#b9b2a4', 0, 0.8);
-    for (const [x, y, z, sz] of [[-4.9, 0.45, 0.2, 0.9], [-4.4, 1.2, 0.3, 0.6], [5.6, 0.5, 0.6, 1.0]] as const) {
-      const c = this.place(CreateBox('lobbyCrate', { size: sz }, s));
-      c.position.set(x, y, z);
-      c.rotation.y = x * 0.3;
-      c.material = crate;
-    }
-  }
-
-  private buildFloodlights(): void {
-    const s = this.scene;
-    const glowTex = paintedTexture(s, 'lobbyGlow', 128, (g, n) => {
-      const grd = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-      grd.addColorStop(0, 'rgba(255,255,255,1)');
-      grd.addColorStop(0.18, 'rgba(225,238,255,0.85)');
-      grd.addColorStop(0.5, 'rgba(150,190,255,0.18)');
-      grd.addColorStop(1, 'rgba(120,170,255,0)');
-      g.fillStyle = grd;
+    // rodapé e tomadas
+    const base = this.plain('#1a1918', 0, 0.6);
+    const sk = this.place(CreateBox('lobbySkirt', { width: 9, height: 0.12, depth: 0.04 }, s), false);
+    sk.position.set(0, 0.06, -2.49);
+    sk.material = base;
+    // tapete
+    const rugTex = paintedTexture(s, 'lobbyRug', 256, (g, n) => {
+      g.fillStyle = '#2a1820';
       g.fillRect(0, 0, n, n);
+      g.strokeStyle = '#7a3b2e';
+      g.lineWidth = n * 0.04;
+      g.strokeRect(n * 0.06, n * 0.06, n * 0.88, n * 0.88);
+      g.strokeStyle = '#b07a3c';
+      g.lineWidth = n * 0.012;
+      g.strokeRect(n * 0.12, n * 0.12, n * 0.76, n * 0.76);
+      for (let i = 0; i < 6; i++) {
+        g.save();
+        g.translate(n / 2, n / 2);
+        g.rotate((i * Math.PI) / 3);
+        g.fillStyle = 'rgba(176,122,60,0.35)';
+        g.fillRect(-n * 0.02, -n * 0.3, n * 0.04, n * 0.6);
+        g.restore();
+      }
+      for (let i = 0; i < 4000; i++) {
+        g.fillStyle = `rgba(0,0,0,${Math.random() * 0.12})`;
+        g.fillRect(Math.random() * n, Math.random() * n, 1, 1);
+      }
     });
-    const glowMat = new StandardMaterial('lobbyGlowMat', s);
-    glowMat.emissiveTexture = glowTex;
-    glowMat.opacityTexture = glowTex;
-    glowMat.disableLighting = true;
-    glowMat.alphaMode = 1; // aditivo
-    glowMat.fogEnabled = false;
-    // facho de luz volumétrico (cone translúcido com degradê)
-    const beamTex = paintedTexture(s, 'lobbyBeam', 64, (g, n) => {
+    const rugMat = new StandardMaterial('lobbyRugMat', s);
+    rugMat.diffuseTexture = rugTex;
+    rugMat.specularColor = Color3.Black();
+    const rug = this.place(CreateBox('lobbyRug', { width: 3.4, height: 0.02, depth: 2.2 }, s), false);
+    rug.position.set(0.9, 0.01, -0.3);
+    rug.material = rugMat;
+  }
+
+  private buildFurniture(): void {
+    const s = this.scene;
+    // sofá de couro escuro à esquerda
+    const leather = this.plain('#2b1b16', 0.1, 0.42);
+    const sofa: [number, number, number, number, number, number][] = [
+      [-2.7, 0.25, -1.6, 2.1, 0.45, 0.9], [-2.7, 0.75, -2.0, 2.1, 0.6, 0.22], [-3.68, 0.5, -1.6, 0.24, 0.55, 0.9], [-1.72, 0.5, -1.6, 0.24, 0.55, 0.9]
+    ];
+    for (const [x, y, z, w, h, d] of sofa) {
+      const p = this.place(CreateBox('lobbySofa', { width: w, height: h, depth: d }, s));
+      p.position.set(x, y, z);
+      p.material = leather;
+    }
+    const cushion = this.plain('#4a2e22', 0, 0.6);
+    for (const x of [-3.15, -2.25]) {
+      const c = this.place(CreateBox('lobbyCushion', { width: 0.85, height: 0.14, depth: 0.7 }, s));
+      c.position.set(x, 0.55, -1.52);
+      c.material = cushion;
+    }
+    // mesa de centro com caixa de munição e luminária
+    const wood = this.mat('crate', 1, '#8a6a4a');
+    const table = this.place(CreateBox('lobbyTable', { width: 1.3, height: 0.08, depth: 0.7 }, s));
+    table.position.set(-2.2, 0.45, -0.4);
+    table.material = wood;
+    const leg = this.plain('#1f1f22', 0.7, 0.4);
+    for (const [dx, dz] of [[-0.58, -0.28], [0.58, -0.28], [-0.58, 0.28], [0.58, 0.28]]) {
+      const l = this.place(CreateBox('lobbyLeg', { width: 0.05, height: 0.42, depth: 0.05 }, s));
+      l.position.set(-2.2 + dx, 0.21, -0.4 + dz);
+      l.material = leg;
+    }
+    const ammo = this.place(CreateBox('lobbyAmmo', { width: 0.36, height: 0.2, depth: 0.2 }, s));
+    ammo.position.set(-2.0, 0.59, -0.35);
+    ammo.material = this.plain('#3f4a2c', 0.2, 0.6);
+    // luminária com cúpula acesa
+    const lampPole = this.place(CreateCylinder('lobbyLampPole', { diameter: 0.03, height: 0.55, tessellation: 8 }, s));
+    lampPole.position.set(-2.65, 0.77, -0.6);
+    lampPole.material = leg;
+    const shade = CreateCylinder('lobbyLampShade', { diameterTop: 0.16, diameterBottom: 0.3, height: 0.22, tessellation: 20 }, s);
+    shade.position.set(-2.65, 1.12, -0.6);
+    shade.material = this.plain('#000000', 0, 1, '#ffb066');
+    shade.isPickable = false;
+    // estante de metal com caixas e capacetes
+    const shelf = this.plain('#2c2e31', 0.7, 0.45);
+    for (const y of [0.05, 0.6, 1.15, 1.7]) {
+      const b = this.place(CreateBox('lobbyShelf', { width: 1.5, height: 0.04, depth: 0.45 }, s));
+      b.position.set(-3.5, y, -2.25);
+      b.material = shelf;
+    }
+    for (const x of [-4.22, -2.78]) {
+      const p = this.place(CreateBox('lobbyShelfPost', { width: 0.04, height: 1.8, depth: 0.45 }, s));
+      p.position.set(x, 0.9, -2.25);
+      p.material = shelf;
+    }
+    const boxes: [number, number, string][] = [[-3.9, 0.22, '#5d4a2e'], [-3.35, 0.22, '#3b4630'], [-3.75, 0.77, '#2f3a44'], [-3.1, 0.77, '#6b5536'], [-3.6, 1.32, '#45392a']];
+    for (const [x, y, c] of boxes) {
+      const b = this.place(CreateBox('lobbyBox', { width: 0.42, height: 0.3, depth: 0.34 }, s));
+      b.position.set(x, y, -2.25);
+      b.material = this.mat('crate', 1, c);
+    }
+    const helm = this.place(CreateSphere('lobbyHelmet', { diameter: 0.3, slice: 0.5, segments: 16 }, s));
+    helm.position.set(-3.1, 1.32, -2.25);
+    helm.material = this.plain('#4b5236', 0.1, 0.55);
+    // mesa de trabalho à direita com monitor aceso e cadeira
+    const desk = this.place(CreateBox('lobbyDesk', { width: 1.5, height: 0.06, depth: 0.7 }, s));
+    desk.position.set(3.3, 0.78, -1.9);
+    desk.material = wood;
+    for (const dx of [-0.68, 0.68]) {
+      const l = this.place(CreateBox('lobbyDeskLeg', { width: 0.05, height: 0.76, depth: 0.6 }, s));
+      l.position.set(3.3 + dx, 0.38, -1.9);
+      l.material = leg;
+    }
+    const screenTex = paintedTexture(s, 'lobbyScreen', 256, (g, n) => {
       const grd = g.createLinearGradient(0, 0, 0, n);
-      grd.addColorStop(0, 'rgba(190,215,255,0.11)');
-      grd.addColorStop(1, 'rgba(190,215,255,0)');
+      grd.addColorStop(0, '#0b2a3a');
+      grd.addColorStop(1, '#06121a');
       g.fillStyle = grd;
       g.fillRect(0, 0, n, n);
+      g.strokeStyle = '#3fe0ff';
+      g.lineWidth = 2;
+      g.strokeRect(n * 0.08, n * 0.12, n * 0.5, n * 0.5);
+      g.beginPath();
+      g.arc(n * 0.33, n * 0.37, n * 0.18, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = '#3fe0ff';
+      for (let i = 0; i < 7; i++) g.fillRect(n * 0.64, n * (0.14 + i * 0.07), n * (0.12 + Math.random() * 0.18), n * 0.025);
+      g.fillStyle = '#ffb347';
+      g.fillRect(n * 0.08, n * 0.72, n * 0.84, n * 0.03);
     });
-    const beamMat = new StandardMaterial('lobbyBeamMat', s);
-    beamMat.emissiveTexture = beamTex;
-    beamMat.opacityTexture = beamTex;
-    beamMat.disableLighting = true;
-    beamMat.alphaMode = 1;
-    beamMat.backFaceCulling = false;
-    beamMat.disableDepthWrite = true;
-    const pole = this.plain('#2f353b', 0.7, 0.5);
-    const lampMat = this.plain('#000000', 0, 1, '#eef4ff');
-    // torres de holofote: atrás à direita (como no fundo de um pátio) e uma à esquerda
-    const towers: [number, number, number, Vector3][] = [
-      [5.5, 7.2, -7.5, new Vector3(-0.45, -0.75, 0.55)], [8.2, 7.6, -6.0, new Vector3(-0.6, -0.7, 0.45)], [-8.5, 6.5, -6.8, new Vector3(0.55, -0.7, 0.5)]
-    ];
-    for (const [x, y, z, dir] of towers) {
-      const p = this.place(CreateCylinder('lobbyFloodPole', { diameter: 0.18, height: y, tessellation: 8 }, s));
-      p.position.set(x, y / 2, z);
-      p.material = pole;
-      for (const dx of [-0.35, 0.35]) {
-        const head = CreateBox('lobbyFloodHead', { width: 0.55, height: 0.45, depth: 0.18 }, s);
-        head.position.set(x + dx, y + 0.2, z);
-        head.material = pole;
-        head.isPickable = false;
-        const lens = CreatePlane('lobbyFloodLens', { width: 0.46, height: 0.36 }, s);
-        lens.position.set(x + dx, y + 0.2, z + 0.1);
-        lens.rotation.y = Math.PI;
-        lens.material = lampMat;
-        lens.isPickable = false;
-        const glow = CreatePlane('lobbyFloodGlow', { size: 2.6 }, s);
-        glow.position.set(x + dx, y + 0.2, z + 0.2);
-        glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
-        glow.material = glowMat;
-        glow.isPickable = false;
-      }
-      // cone largo com queda suave (sem borda dura)
-      const light = new SpotLight('lobbyFlood', new Vector3(x, y, z), dir, 1.5, 10, s);
-      light.diffuse = new Color3(0.75, 0.85, 1);
-      light.intensity = 60;
-      light.range = 22;
-      this.lights.push({ light, base: 60, phase: Math.random() * 10 });
-      if (this.preset.particles >= 12) {
-        // cone do facho apontando para a direção da luz
-        const len = 11;
-        const beam = CreateCylinder('lobbyBeam', { diameterTop: 0.5, diameterBottom: 3.2, height: len, tessellation: 24, cap: Mesh.NO_CAP }, s);
-        const d = dir.normalize();
-        beam.position = new Vector3(x, y, z).add(d.scale(len / 2));
-        const up = new Vector3(0, 1, 0);
-        const axis = Vector3.Cross(up, d.negate()).normalize();
-        const ang = Math.acos(Vector3.Dot(up, d.negate()));
-        beam.rotationQuaternion = Quaternion.RotationAxis(axis, ang);
-        beam.material = beamMat;
-        beam.isPickable = false;
-        beam.applyFog = false;
-        this.beams.push(beam);
-      }
+    const scrMat = new StandardMaterial('lobbyScreenMat', s);
+    scrMat.emissiveTexture = screenTex;
+    scrMat.diffuseColor = Color3.Black();
+    scrMat.specularColor = Color3.Black();
+    const mon = this.place(CreateBox('lobbyMonitor', { width: 0.8, height: 0.5, depth: 0.05 }, s));
+    mon.position.set(3.2, 1.15, -2.15);
+    mon.material = this.plain('#111113', 0.3, 0.4);
+    const scr = CreatePlane('lobbyScreen', { width: 0.74, height: 0.44 }, s);
+    scr.position.set(3.2, 1.15, -2.12);
+    scr.rotation.y = Math.PI;
+    scr.material = scrMat;
+    scr.isPickable = false;
+    const chair = this.plain('#7a1f22', 0.1, 0.5);
+    const seat = this.place(CreateBox('lobbyChair', { width: 0.5, height: 0.08, depth: 0.5 }, s));
+    seat.position.set(3.0, 0.5, -1.2);
+    seat.material = chair;
+    const backrest = this.place(CreateBox('lobbyChairBack', { width: 0.5, height: 0.55, depth: 0.06 }, s));
+    backrest.position.set(3.0, 0.8, -0.97);
+    backrest.material = chair;
+    const cpole = this.place(CreateCylinder('lobbyChairPole', { diameter: 0.05, height: 0.45, tessellation: 8 }, s));
+    cpole.position.set(3.0, 0.24, -1.2);
+    cpole.material = leg;
+    // porta de metal com placa de saída
+    const doorM = this.place(CreateBox('lobbyDoor', { width: 1.05, height: 2.15, depth: 0.08 }, s), false);
+    doorM.position.set(1.95, 1.07, -2.47);
+    doorM.material = this.plain('#3a2422', 0.5, 0.5);
+    const frame = this.plain('#141414', 0.6, 0.5);
+    for (const [x, y, w, h] of [[1.38, 1.1, 0.08, 2.25], [2.52, 1.1, 0.08, 2.25], [1.95, 2.22, 1.22, 0.08]] as const) {
+      const f = this.place(CreateBox('lobbyDoorFrame', { width: w, height: h, depth: 0.12 }, s), false);
+      f.position.set(x, y, -2.46);
+      f.material = frame;
+    }
+    const exitTex = paintedTexture(s, 'lobbyExit', 128, (g, n) => {
+      g.fillStyle = '#b01818';
+      g.fillRect(0, n * 0.25, n, n * 0.5);
+      g.fillStyle = '#fff';
+      g.font = `bold ${n * 0.28}px sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText('SAÍDA', n / 2, n / 2 + 2);
+    });
+    const exitMat = new StandardMaterial('lobbyExitMat', s);
+    exitMat.emissiveTexture = exitTex;
+    exitMat.opacityTexture = exitTex;
+    exitMat.disableLighting = true;
+    const ex = CreatePlane('lobbyExitSign', { width: 0.5, height: 0.5 }, s);
+    ex.position.set(1.95, 2.55, -2.48);
+    ex.rotation.y = Math.PI;
+    ex.material = exitMat;
+    ex.isPickable = false;
+    // lâmpadas penduradas
+    const bulbMat = this.plain('#000000', 0, 1, '#ffd29a');
+    for (const [x, z] of [[-1.6, -0.6], [1.7, 0.4]] as const) {
+      const wire = this.place(CreateCylinder('lobbyWire', { diameter: 0.01, height: 0.9, tessellation: 4 }, s), false);
+      wire.position.set(x, 3.5, z);
+      wire.material = leg;
+      const b = CreateSphere('lobbyBulb', { diameter: 0.1, segments: 10 }, s);
+      b.position.set(x, 3.02, z);
+      b.material = bulbMat;
+      b.isPickable = false;
     }
   }
 
-  private buildTape(): void {
+  /** Cartazes e letreiro de néon (arte própria). */
+  private buildArt(): void {
     const s = this.scene;
-    // fita de isolamento: listras vermelhas e brancas com texto
-    const tex = paintedTexture(s, 'lobbyTape', 256, (g, n) => {
-      g.fillStyle = '#d8d6d0';
-      g.fillRect(0, 0, n, n);
-      g.fillStyle = '#b3161b';
-      for (let x = -n; x < n * 2; x += 44) {
-        g.beginPath();
-        g.moveTo(x, 0); g.lineTo(x + 22, 0); g.lineTo(x + 22 - n * 0.35, n); g.lineTo(x - n * 0.35, n);
-        g.closePath();
-        g.fill();
+    const poster = (name: string, x: number, y: number, w: number, h: number, paint: (g: CanvasRenderingContext2D, n: number) => void, wall: 'back' | 'left' | 'right' = 'back') => {
+      const tex = paintedTexture(s, name, 512, paint);
+      tex.hasAlpha = false;
+      const m = new StandardMaterial(name + 'Mat', s);
+      m.diffuseTexture = tex;
+      m.emissiveColor = new Color3(0.12, 0.1, 0.1);
+      m.specularColor = new Color3(0.05, 0.05, 0.05);
+      const p = CreatePlane(name, { width: w, height: h }, s);
+      if (wall === 'back') {
+        p.position.set(x, y, -2.48);
+        p.rotation.y = Math.PI;
+      } else {
+        p.position.set(wall === 'left' ? -4.38 : 4.38, y, x);
+        p.rotation.y = wall === 'left' ? -Math.PI / 2 : Math.PI / 2;
       }
-      g.fillStyle = 'rgba(25,8,8,0.85)';
-      g.font = `900 ${Math.round(n * 0.55)}px sans-serif`;
-      g.textBaseline = 'middle';
-      g.fillText('PERIGO · NÃO ULTRAPASSE', 6, n / 2);
-    });
-    tex.wrapU = 1;
-    tex.uScale = 3; // texto repetido ao longo da fita (textura compartilhada: clonar textura de canvas sai vazia)
-    const tm = new StandardMaterial('lobbyTapeMat', s);
-    tm.diffuseTexture = tex;
-    tm.emissiveColor = new Color3(0.18, 0.12, 0.12);
-    tm.backFaceCulling = false;
-    tm.specularColor = new Color3(0.2, 0.2, 0.2);
-    const tape = (a: Vector3, b: Vector3, width = 0.09) => {
-      const len = Vector3.Distance(a, b);
-      const m = CreatePlane('lobbyTapeStrip', { width: len, height: width }, s);
-      m.position = a.add(b).scale(0.5);
-      m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
-      m.rotation.z = Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z));
-      m.material = tm;
-      m.isPickable = false;
-      return m;
+      p.material = m;
+      p.isPickable = false;
+      p.receiveShadows = !!this.shadow;
     };
-    // postes/cones que seguram a fita
-    const coneMat = this.plain('#c8341f', 0, 0.6);
-    const stripeMat = this.plain('#e9e6df', 0, 0.6);
-    const posts: Vector3[] = [new Vector3(-5.8, 0, -2.4), new Vector3(-2.6, 0, -2.9), new Vector3(1.2, 0, -2.2), new Vector3(4.6, 0, -2.8), new Vector3(7.4, 0, -1.3),
-      new Vector3(4.2, 0, 2.4), new Vector3(7.0, 0, 3.2)];
-    for (const p of posts) {
-      const cone = this.place(CreateCylinder('lobbyCone', { diameterTop: 0.06, diameterBottom: 0.36, height: 0.75, tessellation: 14 }, s));
-      cone.position.set(p.x, 0.375, p.z);
-      cone.material = coneMat;
-      const band = CreateCylinder('lobbyConeBand', { diameterTop: 0.17, diameterBottom: 0.22, height: 0.12, tessellation: 14 }, s);
-      band.position.set(p.x, 0.45, p.z);
-      band.material = stripeMat;
-      band.isPickable = false;
-      const pole = CreateCylinder('lobbyConePole', { diameter: 0.04, height: 0.55, tessellation: 6 }, s);
-      pole.position.set(p.x, 0.95, p.z);
-      pole.material = stripeMat;
-      pole.isPickable = false;
+    const grunge = (g: CanvasRenderingContext2D, n: number) => {
+      for (let i = 0; i < 1800; i++) {
+        g.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,240,220'},${Math.random() * 0.12})`;
+        g.fillRect(Math.random() * n, Math.random() * n, 1 + Math.random() * 3, 1 + Math.random() * 3);
+      }
+      g.strokeStyle = 'rgba(0,0,0,0.25)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(n * 0.1, 0);
+      g.lineTo(n * 0.18, n);
+      g.stroke();
+    };
+    // cartaz da equipe: silhueta de soldado com mira, título e faixas
+    poster('lobbyPoster1', -1.15, 2.05, 1.0, 1.45, (g, n) => {
+      const grd = g.createLinearGradient(0, 0, 0, n);
+      grd.addColorStop(0, '#d8572a');
+      grd.addColorStop(1, '#3a1410');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, n, n);
+      g.fillStyle = '#120a08';
+      g.beginPath();
+      g.arc(n * 0.5, n * 0.3, n * 0.11, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.moveTo(n * 0.24, n * 0.95);
+      g.lineTo(n * 0.3, n * 0.48);
+      g.quadraticCurveTo(n * 0.5, n * 0.38, n * 0.7, n * 0.48);
+      g.lineTo(n * 0.76, n * 0.95);
+      g.fill();
+      g.fillRect(n * 0.55, n * 0.52, n * 0.38, n * 0.05);
+      g.strokeStyle = '#ffd36b';
+      g.lineWidth = 6;
+      g.beginPath();
+      g.arc(n * 0.5, n * 0.3, n * 0.2, 0, Math.PI * 2);
+      g.moveTo(n * 0.5, n * 0.04);
+      g.lineTo(n * 0.5, n * 0.56);
+      g.moveTo(n * 0.24, n * 0.3);
+      g.lineTo(n * 0.76, n * 0.3);
+      g.stroke();
+      g.fillStyle = '#ffe9c4';
+      g.font = `900 ${n * 0.1}px sans-serif`;
+      g.textAlign = 'center';
+      g.fillText('STRIKE', n / 2, n * 0.9);
+      grunge(g, n);
+    });
+    // cartaz "procurado" de recrutamento
+    poster('lobbyPoster2', 0.95, 2.15, 0.85, 1.15, (g, n) => {
+      g.fillStyle = '#d9c7a1';
+      g.fillRect(0, 0, n, n);
+      g.fillStyle = '#2a1d14';
+      g.font = `900 ${n * 0.13}px serif`;
+      g.textAlign = 'center';
+      g.fillText('RECRUTA-SE', n / 2, n * 0.16);
+      g.fillStyle = '#6b1d16';
+      g.fillRect(n * 0.12, n * 0.22, n * 0.76, n * 0.5);
+      g.fillStyle = '#d9c7a1';
+      g.beginPath();
+      g.moveTo(n * 0.5, n * 0.28);
+      g.lineTo(n * 0.78, n * 0.38);
+      g.lineTo(n * 0.7, n * 0.62);
+      g.lineTo(n * 0.5, n * 0.68);
+      g.lineTo(n * 0.3, n * 0.62);
+      g.lineTo(n * 0.22, n * 0.38);
+      g.closePath();
+      g.fill();
+      g.fillStyle = '#6b1d16';
+      g.font = `900 ${n * 0.16}px sans-serif`;
+      g.fillText('OS', n / 2, n * 0.56);
+      g.fillStyle = '#2a1d14';
+      g.font = `700 ${n * 0.07}px sans-serif`;
+      g.fillText('ESQUADRÃO DE ELITE', n / 2, n * 0.82);
+      g.fillText('APRESENTE-SE NA BASE', n / 2, n * 0.92);
+      grunge(g, n);
+    });
+    // mapa tático na parede esquerda
+    poster('lobbyMap', -0.6, 1.9, 1.5, 1.0, (g, n) => {
+      g.fillStyle = '#1d2a33';
+      g.fillRect(0, 0, n, n);
+      g.strokeStyle = 'rgba(120,180,210,0.35)';
+      g.lineWidth = 1;
+      for (let i = 0; i < n; i += n / 16) {
+        g.beginPath(); g.moveTo(i, 0); g.lineTo(i, n); g.stroke();
+        g.beginPath(); g.moveTo(0, i); g.lineTo(n, i); g.stroke();
+      }
+      g.fillStyle = 'rgba(200,170,120,0.55)';
+      for (const [x, y, w, h] of [[0.1, 0.2, 0.3, 0.2], [0.5, 0.15, 0.35, 0.3], [0.2, 0.55, 0.25, 0.3], [0.6, 0.6, 0.3, 0.25]]) g.fillRect(x * n, y * n, w * n, h * n);
+      g.strokeStyle = '#ff3b3b';
+      g.lineWidth = 4;
+      g.beginPath(); g.moveTo(n * 0.15, n * 0.85); g.bezierCurveTo(n * 0.4, n * 0.5, n * 0.5, n * 0.45, n * 0.75, n * 0.3); g.stroke();
+      g.fillStyle = '#ff3b3b';
+      g.font = `900 ${n * 0.12}px sans-serif`;
+      g.fillText('A', n * 0.68, n * 0.28);
+      g.fillText('B', n * 0.25, n * 0.72);
+    }, 'left');
+    // letreiro de néon na parede do fundo
+    const neonTex = paintedTexture(s, 'lobbyNeonSign', 512, (g, n) => {
+      g.clearRect(0, 0, n, n);
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      const glow = (txt: string, y: number, size: number, col: string) => {
+        g.font = `italic 900 ${size}px sans-serif`;
+        g.shadowColor = col;
+        for (const b of [30, 16, 6]) {
+          g.shadowBlur = b;
+          g.fillStyle = col;
+          g.fillText(txt, n / 2, y);
+        }
+        g.shadowBlur = 0;
+        g.fillStyle = '#fff6ff';
+        g.fillText(txt, n / 2, y);
+      };
+      glow('OPERATION', n * 0.38, n * 0.13, '#c04dff');
+      glow('STRIKE', n * 0.6, n * 0.2, '#3fe7ff');
+    });
+    const neonMat = new StandardMaterial('lobbyNeonMat', s);
+    neonMat.emissiveTexture = neonTex;
+    neonMat.opacityTexture = neonTex;
+    neonMat.disableLighting = true;
+    neonMat.fogEnabled = false;
+    const neon = CreatePlane('lobbyNeonSign', { width: 2.2, height: 2.2 }, s);
+    neon.position.set(0.0, 2.85, -2.47);
+    neon.rotation.y = Math.PI;
+    neon.material = neonMat;
+    neon.isPickable = false;
+  }
+
+  /** Círculos no chão: o do jogador e os de convite (com "+"). */
+  private buildPads(): void {
+    const s = this.scene;
+    const padTex = paintedTexture(s, 'lobbyPad', 256, (g, n) => {
+      g.clearRect(0, 0, n, n);
+      const grd = g.createRadialGradient(n / 2, n / 2, n * 0.3, n / 2, n / 2, n / 2);
+      grd.addColorStop(0, 'rgba(90,230,200,0.05)');
+      grd.addColorStop(0.75, 'rgba(90,230,200,0.35)');
+      grd.addColorStop(1, 'rgba(90,230,200,0)');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, n, n);
+      g.strokeStyle = 'rgba(140,255,225,0.9)';
+      g.lineWidth = n * 0.02;
+      g.beginPath();
+      g.arc(n / 2, n / 2, n * 0.42, 0, Math.PI * 2);
+      g.stroke();
+      g.lineWidth = n * 0.008;
+      g.beginPath();
+      g.arc(n / 2, n / 2, n * 0.34, 0, Math.PI * 2);
+      g.stroke();
+    });
+    const plusTex = paintedTexture(s, 'lobbyPlus', 128, (g, n) => {
+      g.clearRect(0, 0, n, n);
+      g.fillStyle = 'rgba(200,255,240,0.95)';
+      g.fillRect(n * 0.44, n * 0.15, n * 0.12, n * 0.7);
+      g.fillRect(n * 0.15, n * 0.44, n * 0.7, n * 0.12);
+    });
+    const padMat = new StandardMaterial('lobbyPadMat', s);
+    padMat.emissiveTexture = padTex;
+    padMat.opacityTexture = padTex;
+    padMat.disableLighting = true;
+    padMat.alphaMode = 1;
+    padMat.disableDepthWrite = true;
+    const plusMat = new StandardMaterial('lobbyPlusMat', s);
+    plusMat.emissiveTexture = plusTex;
+    plusMat.opacityTexture = plusTex;
+    plusMat.disableLighting = true;
+    plusMat.alphaMode = 1;
+    plusMat.backFaceCulling = false;
+    for (let i = 0; i < 3; i++) {
+      const [x, z] = SLOTS[i];
+      const pad = CreatePlane('lobbyPad', { size: i === 1 ? 1.5 : 1.2 }, s);
+      pad.rotation.x = Math.PI / 2;
+      pad.position.set(x, 0.02, z);
+      pad.material = padMat;
+      pad.isPickable = false;
+      if (i === 1) continue;
+      this.invitePads.push(pad);
     }
-    // atrás do esquadrão (em zigue-zague) e na frente à direita
-    for (let i = 0; i < 4; i++) {
-      const a = posts[i], b = posts[i + 1];
-      tape(new Vector3(a.x, 1.2, a.z), new Vector3(b.x, 1.12, b.z));
-      tape(new Vector3(a.x, 0.75, a.z), new Vector3(b.x, 0.7, b.z), 0.07);
-    }
-    tape(new Vector3(posts[5].x, 1.2, posts[5].z), new Vector3(posts[6].x, 1.15, posts[6].z));
-    tape(new Vector3(posts[4].x, 1.18, posts[4].z), new Vector3(posts[6].x, 1.1, posts[6].z));
-    // fita caída no chão em primeiro plano
-    const floor = tape(new Vector3(-3.2, 0.012, 2.6), new Vector3(2.8, 0.012, 3.4), 0.1);
-    floor.rotation.x = Math.PI / 2;
   }
 
   private buildHaze(): void {
@@ -437,12 +622,12 @@ export class LobbyScene {
       g.fillStyle = grd;
       g.fillRect(0, 0, n, n);
     });
-    ps.emitter = new Vector3(1, 2.5, -1);
-    ps.minEmitBox = new Vector3(-7, -2.5, -5);
-    ps.maxEmitBox = new Vector3(7, 4, 4);
-    ps.color1 = new Color4(0.75, 0.85, 1, 0.35);
-    ps.color2 = new Color4(0.6, 0.72, 0.95, 0.2);
-    ps.colorDead = new Color4(0.6, 0.72, 0.95, 0);
+    ps.emitter = new Vector3(0, 2, 0);
+    ps.minEmitBox = new Vector3(-4, -1.9, -2.4);
+    ps.maxEmitBox = new Vector3(4, 1.8, 3);
+    ps.color1 = new Color4(1, 0.85, 0.7, 0.3);
+    ps.color2 = new Color4(0.8, 0.7, 1, 0.18);
+    ps.colorDead = new Color4(0.8, 0.7, 1, 0);
     ps.minSize = 0.01;
     ps.maxSize = 0.04;
     ps.minLifeTime = 6;
@@ -485,12 +670,12 @@ export class LobbyScene {
     for (let i = 0; i < SLOTS.length; i++) {
       const m = this.squad[i];
       // o modelo 3D da equipe pode terminar de carregar depois: a chave muda e o personagem é recriado
-      const key = m ? this.team + loaded + (CharacterModel.pbr ? 'p' : 's') + i : '';
+      const key = m && !m.invite ? this.team + loaded + (CharacterModel.pbr ? 'p' : 's') + i : '';
       if (key !== this.charKeys[i]) {
         this.chars[i]?.dispose();
         this.chars[i] = null;
         this.charKeys[i] = key;
-        if (m) {
+        if (m && !m.invite) {
           const c = new CharacterModel(this.scene, this.team, i, this.shadow);
           if (this.shadow) for (const mesh of c.root.getChildMeshes()) this.shadow.addShadowCaster(mesh, false);
           this.chars[i] = c;
@@ -527,7 +712,7 @@ export class LobbyScene {
     const e = 1 - Math.pow(1 - this.intro, 3);
     for (let i = 0; i < SLOTS.length; i++) {
       const c = this.chars[i], m = this.squad[i];
-      if (!c || !m) continue;
+      if (!c || !m || m.invite) continue;
       const [x, z, yaw] = SLOTS[i];
       const v = this.views[i];
       v.team = this.team;
@@ -545,13 +730,10 @@ export class LobbyScene {
     // câmera: entrada suave, leve deriva; perfil aproxima do jogador
     this.zoom += (this.zoomTarget - this.zoom) * Math.min(1, dt * 3);
     const z = this.zoom;
-    const meX = SLOTS[Math.max(0, this.squad.findIndex(m => m.me))][0];
-    // telas largas (celular deitado): o esquadrão vai mais para a direita, livre do painel da esquerda
-    const aspect = this.scene.getEngine().getRenderWidth() / Math.max(1, this.scene.getEngine().getRenderHeight());
-    const base = 1.0 + Math.max(0, aspect - 1.78) * 1.1;
-    const tx = base + (meX - base) * z;
-    this.camera.position.set(tx + Math.sin(this.t * 0.11) * 0.12, 1.15 + Math.sin(this.t * 0.17) * 0.03 + z * 0.2, 5.0 - z * 2.1 + (1 - e) * 1.6);
-    this.camera.setTarget(new Vector3(tx, 1.05 + z * 0.25, 0));
+    // o jogador no centro, entre os painéis da esquerda e da direita
+    for (const [k, pad] of this.invitePads.entries()) pad.scaling.setAll(1 + Math.sin(this.t * 2 + k) * 0.04);
+    this.camera.position.set(Math.sin(this.t * 0.11) * 0.1, 1.3 + Math.sin(this.t * 0.17) * 0.03 - z * 0.05, 4.4 - z * 1.9 + (1 - e) * 1.4);
+    this.camera.setTarget(new Vector3(0, 1.08 + z * 0.3, 0));
     for (const l of this.lights) l.light.intensity = l.base * (0.95 + Math.sin(this.t * 6 + l.phase) * 0.02 + Math.sin(this.t * 11.7 + l.phase) * 0.03);
     this.scene.render();
     // posição das plaquinhas de nome (altura dos joelhos de cada integrante)
@@ -562,7 +744,8 @@ export class LobbyScene {
     const cssW = eng.getRenderingCanvas()?.clientWidth ?? w, cssH = eng.getRenderingCanvas()?.clientHeight ?? h;
     for (let i = 0; i < SLOTS.length; i++) {
       const [x, zz] = SLOTS[i];
-      const p = Vector3.Project(new Vector3(x, 0.6, zz + 0.3), Matrix.Identity(), tm, vp);
+      const inv = !!this.squad[i]?.invite;
+      const p = Vector3.Project(new Vector3(x, inv ? 0.75 : 2.0, zz), Matrix.Identity(), tm, vp);
       this.plates[i].x = (p.x / w) * cssW;
       this.plates[i].y = (p.y / h) * cssH;
       this.plates[i].visible = !!this.squad[i] && p.z > 0 && p.z < 1;

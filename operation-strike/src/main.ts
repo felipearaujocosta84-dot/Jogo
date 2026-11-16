@@ -15,6 +15,7 @@ import { isNativeApp } from './core/Platform';
 import { SkinPrefs } from './save/SkinPrefs';
 import { randomCosmetics } from './cosmetics/Cosmetics';
 import { ArsenalScreen } from './interface/ArsenalScreen';
+import { SettingsView } from './interface/SettingsView';
 import { CHARACTER_FILES } from './player/CharacterAssets';
 import type { SquadMember } from './interface/LobbyScene';
 import { BUY_CATEGORIES, WEAPONS } from './weapons/WeaponData';
@@ -74,6 +75,26 @@ function renderLobbyCard(): void {
   $('lpXp').style.width = Math.round((lv.into / lv.need) * 100) + '%';
   $('lpXpText').textContent = `${lv.into} / ${lv.need} XP para o nível ${lv.level + 1}`;
   $('lpCoins').textContent = (p.coins ?? 0).toLocaleString('pt-BR');
+  $('lpMmr').textContent = String(p.mmr);
+  $('lpWins').textContent = String(p.wins);
+  // patente: nível, nome e progresso dentro da patente (10 marcas)
+  $('tierLevel').textContent = String(lv.level);
+  $('tierRank').textContent = rankName(p.mmr);
+  $('tierMmr').textContent = `${p.mmr} MMR · ${p.matches} partidas`;
+  const into = Math.max(0, Math.min(1, (((p.mmr - 600) % 75) + 75) % 75 / 75));
+  $('tierPips').innerHTML = Array.from({ length: 10 }, (_, i) => `<i class="${i < Math.round(into * 10) ? 'on' : ''}"></i>`).join('');
+  // missões: próxima meta de cada estatística do perfil
+  const goals: [string, number, number][] = [
+    ['Elimine {n} inimigos', p.kills, 50], ['Acerte {n} tiros na cabeça', p.headshots, 25], ['Vença {n} partidas', p.wins, 5],
+    ['Seja o MVP {n} vezes', p.mvps, 5], ['Jogue {n} partidas', p.matches, 10], ['Ajude em {n} abates', p.assists, 20]
+  ];
+  $('missionList').innerHTML = goals.map(([txt, v, step]) => {
+    const next = (Math.floor(v / step) + 1) * step;
+    const k = (v - (next - step)) / step;
+    return `<div class="sq-mis"><p>${txt.replace('{n}', String(next))}</p><em>${v}/${next}</em><div class="bar"><i style="width:${Math.round(k * 100)}%"></i></div></div>`;
+  }).join('');
+  for (const b of document.querySelectorAll<HTMLElement>('.sq-modes [data-action]')) b.classList.toggle('on', b.dataset.action === (picks.mode === 'tdm' ? 'mode-tdm' : 'mode-competitive'));
+  $('missionTag').textContent = picks.mode === 'tdm' ? 'MATA-MATA' : 'CONTRA BOTS';
   $('sqTeam').textContent = `Equipe: ${agent.team === 'T' ? 'TR' : 'CT'} · ${CHARACTER_FILES[agent.team].name}`;
   // cartão da missão: modo, mapa e regras escolhidos (o botão INICIAR começa com eles)
   const map = MAPS[picks.map] ?? MAPS.dust_zone;
@@ -83,7 +104,7 @@ function renderLobbyCard(): void {
     ? `${picks.tdmTime} min · ${picks.tdmKills} abates · ${WEAPONS[picks.tdmPrimary]?.name ?? ''}`
     : `Lado inicial: ${picks.side === 'T' ? 'TR' : picks.side === 'CT' ? 'CT' : 'aleatório'}`;
   $('missionDiff').textContent = 'Bots ' + (DIFF_LABEL[picks.difficulty] ?? picks.difficulty);
-  $('missionCard').style.background = `linear-gradient(0deg, rgba(5,9,13,0.85), rgba(5,9,13,0.1) 70%), linear-gradient(160deg, ${map.ambience.sky[0]}, ${map.ambience.sky[1]} 45%, ${map.ambience.fog} 70%, #2a2622)`;
+  $('missionCard').style.background = `linear-gradient(160deg, ${map.ambience.sky[0]}, ${map.ambience.sky[1]} 40%, ${map.ambience.fog} 70%, #2a2622)`;
   renderSquad();
 }
 
@@ -106,14 +127,19 @@ function squadMembers(): SquadMember[] {
     return { name: 'BOT ' + SQUAD_NAMES[k % SQUAD_NAMES.length], level: 8 + ((k * 7 + i * 5) % 33), weapon, skin: cos[weapon] ?? 'default', att: cos['a_' + weapon] ?? '', look: cos['lk_' + agent.team] ?? '' };
   });
   const me: SquadMember = { name: profile.name, level: lv, weapon: agent.weapon, skin: SkinPrefs.get(agent.weapon), att: SkinPrefs.attachments(agent.weapon).join('.'), look: SkinPrefs.lookString(agent.team), me: true };
-  return [bots[0], me, bots[1], bots[2]];
+  void bots;
+  // o jogador no centro; nos lados, convites para jogar online
+  return [{ ...me, name: '', invite: true }, me, { ...me, name: '', invite: true }];
 }
 
 function renderSquad(): void {
   const box = $('squadPlates');
   const list = squadMembers();
   const color = agent.team === 'T' ? 'var(--t)' : 'var(--ct)';
-  box.innerHTML = list.map(m => `<div class="sq-plate${m.me ? ' me' : ''}" style="--pc:${color}"><span class="av">${esc(m.name.replace('BOT ', '')[0] ?? '?')}</span><div><b>${m.me ? '<span class="lead">★</span>' : ''}${esc(m.name)}</b><small>Nv ${m.level} · ${WEAPONS[m.weapon]?.name ?? ''}</small></div></div>`).join('');
+  void color;
+  box.innerHTML = list.map(m => m.invite
+    ? `<button class="sq-invite" data-action="online-play" aria-label="Convidar para jogar online">+<small>CONVIDAR</small></button>`
+    : `<div class="sq-plate me"><b><span class="lead">★</span>${esc(m.name)}</b><small>Nv ${m.level} · ${WEAPONS[m.weapon]?.name ?? ''}</small></div>`).join('');
 }
 
 // plaquinhas acompanham os personagens na tela
@@ -126,7 +152,7 @@ function updatePlates(): void {
     const p = l.plates[i];
     const el = els[i] as HTMLElement;
     el.style.display = p?.visible ? '' : 'none';
-    if (p?.visible) el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translateX(-50%)`;
+    if (p?.visible) el.style.transform = el.classList.contains('sq-invite') ? `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -50%)` : `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -100%)`;
   }
 }
 requestAnimationFrame(updatePlates);
@@ -153,7 +179,13 @@ function lobbyAction(action: string): boolean {
       break;
     case 'mode-competitive':
     case 'mode-tdm':
+      // troca o modo direto no lobby (o cartão JOGAR mostra o escolhido)
       picks.mode = action === 'mode-tdm' ? 'tdm' : 'competitive';
+      Storage.save('picks', picks);
+      syncPicks();
+      break;
+    case 'event-tdm':
+      picks.mode = 'tdm';
       Storage.save('picks', picks);
       syncPicks();
       show('playMenu');
@@ -548,6 +580,8 @@ function formatValue(key: string, v: number): string {
 }
 
 function syncSettingsForm(): void {
+  for (const el of document.querySelectorAll<HTMLSelectElement>('[data-pick]')) el.value = picks[el.dataset.pick!] ?? el.value;
+  queueMicrotask(() => settingsView.refresh());
   for (const el of fields) {
     const key = el.dataset.setting as keyof SettingsData;
     const value = settings.get(key);
@@ -578,6 +612,17 @@ for (const el of fields) {
     if (key === 'serverUrl') Storage.save('serverUrl', value);
     const out = el.parentElement?.querySelector('output');
     if (out) out.textContent = formatValue(key, Number(value));
+  });
+}
+
+const settingsView = new SettingsView();
+// escolhas de partida (dificuldade/modo) também ajustáveis nas configurações
+for (const el of document.querySelectorAll<HTMLSelectElement>('[data-pick]')) {
+  el.addEventListener('change', () => {
+    picks[el.dataset.pick!] = el.value;
+    Storage.save('picks', picks);
+    syncPicks();
+    renderLobbyCard();
   });
 }
 
