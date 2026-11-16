@@ -814,6 +814,11 @@ export class Game {
         if (me) this.audio.stinger(me.team === winner);
         break;
       }
+      case 'radio': {
+        const from = st.players.find(p => p.id === e.pid);
+        if (from && me && from.team === me.team && from.id !== localId) this.hud.radio(from.name, from.team, e.text as string);
+        break;
+      }
       case 'halftime':
         this.hud.banner('INTERVALO', 'Os times trocaram de lado', 'info', 3);
         break;

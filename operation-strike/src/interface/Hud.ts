@@ -185,6 +185,24 @@ export class Hud {
     while (this.feed.length > 5) this.feed.pop()!.el.remove();
   }
 
+  private radioFeed: { el: HTMLElement; t: number }[] = [];
+
+  /** Mensagem de rádio de um companheiro (bots avisam posições, recuos, abates). */
+  radio(name: string, team: Team, text: string): void {
+    let box = document.getElementById('radioFeed');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'radioFeed';
+      box.className = 'radio-feed';
+      $('killfeed').parentElement!.appendChild(box);
+    }
+    const el = document.createElement('div');
+    el.innerHTML = `<b class="${team}">📻 ${esc(name)}:</b> ${esc(text)}`;
+    box.appendChild(el);
+    this.radioFeed.push({ el, t: 5 });
+    while (this.radioFeed.length > 4) this.radioFeed.shift()!.el.remove();
+  }
+
   /** Nomes sobre os companheiros (posições de tela já calculadas). */
   setTags(tags: { x: number; y: number; name: string; hp: number; team?: string }[]): void {
     const box = $('nameTags');
@@ -236,12 +254,16 @@ export class Hud {
       if (f.t <= 0) f.el.remove();
     }
     this.feed = this.feed.filter(f => f.t > 0);
+    for (const f of this.radioFeed) if ((f.t -= dt) <= 0) f.el.remove();
+    this.radioFeed = this.radioFeed.filter(f => f.t > 0);
     this.radar?.draw(x, z, yaw, dots);
   }
 
   clearFeed(): void {
     for (const f of this.feed) f.el.remove();
     this.feed = [];
+    for (const f of this.radioFeed) f.el.remove();
+    this.radioFeed = [];
   }
 }
 

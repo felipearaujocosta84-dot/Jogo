@@ -61,6 +61,12 @@ export class BotBrain {
   private usePulse = false;
   private lastTaskKind = '';
   private holdLookT = 0;
+  /** Memória: onde o último inimigo foi visto (sem ver através de paredes). */
+  private lastSeen: { x: number; y: number; z: number; t: number } | null = null;
+  /** Inimigos visíveis na última percepção. */
+  private visibleCount = 0;
+  /** Investigar um som/aliado ferido (vai até lá). */
+  private investigate: { x: number; z: number; t: number } | null = null;
 
   constructor(private m: MatchSim, private p: SimPlayer, private passive = false) {
     this.skill = SKILL[p.difficulty];
@@ -78,6 +84,22 @@ export class BotBrain {
     this.nadeIntent = null;
     this.yaw = this.p.ctrl.yaw;
     this.pitch = 0;
+    this.lastSeen = null;
+    this.investigate = null;
+    this.visibleCount = 0;
+  }
+
+  /** Quanto tempo o bot lembra/persegue a última posição vista. */
+  private get memory(): number {
+    return this.p.difficulty === 'hard' ? 7 : this.p.difficulty === 'normal' ? 5 : 2.5;
+  }
+
+  onAllyHurt(ally: SimPlayer, from: Vec3): void {
+    const pos = this.p.ctrl.position, ap = ally.ctrl.position;
+    if (this.target || Math.hypot(ap.x - pos.x, ap.z - pos.z) > 24) return;
+    this.alertPos = { x: from.x, z: from.z, t: this.m.time };
+    // no mata-mata (ou quando livre) vai ajudar o companheiro
+    if (this.m.tdm || this.p.difficulty !== 'easy') this.investigate = { x: ap.x, z: ap.z, t: this.m.time };
   }
 
   onDamaged(attacker: SimPlayer | null, from: Vec3): void {
@@ -93,6 +115,10 @@ export class BotBrain {
     if (victim.id === this.targetId) {
       this.target = null;
       this.targetId = null;
+    }
+    if (killer === this.p && victim.team !== this.p.team) {
+      const left = this.m.alive(victim.team).length;
+      if (Math.random() < 0.6) this.m.radio(this.p, this.m.tdm ? 'Abati um!' : left ? `Abati um! Restam ${left}.` : 'Último inimigo abatido!');
     }
     if (killer && killer.team !== this.p.team && victim.team === this.p.team) {
       const d = Math.hypot(victim.ctrl.position.x - this.p.ctrl.position.x, victim.ctrl.position.z - this.p.ctrl.position.z);
@@ -161,7 +187,7 @@ export class BotBrain {
 
       // rajadas
       if (this.pauseT > 0) this.pauseT -= dt;
-      const canShoot = this.reactT <= 0 && err < tolerance && this.pauseT <= 0;
+      const canShoot = this.reactT <= 0 && err < tolerance && this.pauseT <= 0 && !(inst && inst.ammo === 0);
       if (canShoot) {
         if (w.automatic) {
           buttons |= BTN.FIRE;
@@ -174,6 +200,19 @@ export class BotBrain {
         } else if (p.cooldown <= 0 && this.pulse()) buttons |= BTN.FIRE;
       }
 
+      // em menor número (vê vários inimigos e tem poucos aliados perto): recua para cobertura
+      if (!this.retreat && this.visibleCount >= 2 && m.bomb.state !== 'planted') {
+        const allies = m.players.filter(a => a !== p && a.alive && a.team === p.team && Math.hypot(a.ctrl.position.x - pos.x, a.ctrl.position.z - pos.z) < 14).length;
+        const chance = p.difficulty === 'hard' ? 0.08 : p.difficulty === 'normal' ? 0.04 : 0.01;
+        if (allies + 1 < this.visibleCount && Math.random() < chance) {
+          this.findCover(t);
+          if (this.retreat) m.radio(p, 'Estão em maior número, recuando!');
+        }
+      }
+      if (inst && inst.ammo === 0 && flat > 10 && !this.retreat && p.difficulty !== 'easy') {
+        this.findCover(t);
+        m.radio(p, 'Recarregando, me cobre!');
+      }
       // movimento em combate
       const hp = p.health;
       if (hp < 35 && !this.retreat && Math.random() < 0.02 && m.bomb.state !== 'planted') this.findCover(t);
@@ -210,11 +249,29 @@ export class BotBrain {
       if (inst && inst.ammo < WEAPONS[inst.id].magazine * 0.45 && inst.reserve > 0 && p.reloadT <= 0) buttons |= BTN.RELOAD;
       if (p.active === 'knife' || (p.active === 'c4' && task.kind !== 'plant')) sel = p.primary ? 1 : 2;
 
-      if (!arrived) {
-        [mx, my] = this.followTo(task.x, task.z, dt, true);
-        // corre fora de perigo; anda mais devagar perto de inimigos conhecidos
-        const intel = tac.latestIntel(3);
+      // perseguição: vai até onde viu o inimigo pela última vez (mata-mata, caçada, ataque)
+      const ls = this.lastSeen;
+      const chase = ls && m.time - ls.t < this.memory && (m.tdm || task.kind === 'hunt' || task.kind === 'execute' || task.kind === 'wander') && Math.hypot(ls.x - pos.x, ls.z - pos.z) > 1.5;
+      // investigar sons e aliados feridos
+      if (this.investigate && (m.time - this.investigate.t > 8 || Math.hypot(this.investigate.x - pos.x, this.investigate.z - pos.z) < 2)) this.investigate = null;
+      const inv = !chase && this.investigate && (m.tdm || task.kind === 'wander' || task.kind === 'hunt') ? this.investigate : null;
+      const intel = tac.latestIntel(3);
+      if (chase || inv) {
+        const g = chase ? ls! : inv!;
+        [mx, my] = this.followTo(g.x, g.z, dt, false);
+        // pré-mira: anda olhando para onde o inimigo deve estar, devagar e agachando de vez em quando
+        const eye = p.eye();
+        const aimY = (chase ? ls!.y : pos.y) + 1.4;
+        this.turnTo(Math.atan2(g.x - pos.x, g.z - pos.z), Math.atan2(aimY - eye.y, Math.max(1, Math.hypot(g.x - pos.x, g.z - pos.z))), dt);
+        if (this.skill.strafe > 0.3) buttons |= BTN.WALK;
+      } else if (!arrived) {
+        const preaim = intel && Math.hypot(intel.x - pos.x, intel.z - pos.z) < 25 && this.p.difficulty !== 'easy';
+        [mx, my] = this.followTo(task.x, task.z, dt, !preaim);
+        if (preaim) this.turnTo(Math.atan2(intel!.x - pos.x, intel!.z - pos.z), 0, dt);
+        // anda mais devagar perto de inimigos conhecidos (não corre de frente para eles)
         if (intel && Math.hypot(intel.x - pos.x, intel.z - pos.z) < 18 && this.skill.strafe > 0.5) buttons |= BTN.WALK;
+        // longe de qualquer inimigo conhecido e com caminho longo: corre (sprint)
+        else if (!tac.latestIntel(8) && d > 14 && this.skill.strafe > 0.3 && Math.abs(my) > 0.7 && !this.alertPos) buttons |= BTN.SPRINT;
       } else {
         this.path = null;
         if (task.yaw !== undefined) this.holdLook(task.yaw, dt);
@@ -227,7 +284,9 @@ export class BotBrain {
       }
 
       // alerta (dano, tiros, companheiro morto): olha para lá
-      if (this.alertPos && m.time - this.alertPos.t < 3 && !(buttons & BTN.USE)) {
+      if (this.alertPos && m.time - this.alertPos.t < 0.15 && !this.investigate && (m.tdm || task.kind === 'wander') && p.difficulty !== 'easy')
+        this.investigate = { x: this.alertPos.x, z: this.alertPos.z, t: m.time };
+      if (this.alertPos && m.time - this.alertPos.t < 3 && !(buttons & BTN.USE) && !chase) {
         this.turnTo(Math.atan2(this.alertPos.x - pos.x, this.alertPos.z - pos.z), 0, dt);
       }
 
@@ -274,6 +333,7 @@ export class BotBrain {
       return;
     }
     let best: Sighting | null = null;
+    let count = 0;
     for (const e of m.players) {
       if (!e.alive || e.team === p.team) continue;
       const s = canSee(m, p, e, this.target?.enemy === e ? 200 : this.skill.fov);
@@ -284,9 +344,18 @@ export class BotBrain {
         continue;
       }
       m.tactics[p.team].report(e);
+      count++;
       if (!best || s.dist < best.dist) best = s;
     }
+    this.visibleCount = count;
     if (best) {
+      const ep = best.enemy.ctrl.position;
+      this.lastSeen = { x: ep.x, y: ep.y, z: ep.z, t: m.time };
+      this.investigate = null;
+      if (!this.targetId && Math.random() < 0.7) {
+        const zone = m.map.zoneAt(ep.x, ep.z);
+        m.radio(p, count > 1 ? `${count} inimigos${zone ? ' em ' + zone : ''}!` : `Inimigo${zone ? ' em ' + zone : ' avistado'}!`);
+      }
       if (best.enemy.id !== this.targetId) {
         this.targetId = best.enemy.id;
         const [a, b] = this.skill.reaction;

@@ -92,6 +92,14 @@ export class MatchSim {
   private hooks: SimHooks;
   private botNameIdx = Math.floor(Math.random() * BOT_NAMES.length);
   private respawnTimers = new Map<string, number>();
+  private radioAt: Record<Team, number> = { T: -99, CT: -99 };
+
+  /** Rádio simulado dos bots (avisos curtos para o time, com intervalo mínimo por equipe). */
+  radio(p: SimPlayer, text: string, force = false): void {
+    if (!force && this.time - this.radioAt[p.team] < 2.2) return;
+    this.radioAt[p.team] = this.time;
+    this.emit('radio', { pid: p.id, team: p.team, text });
+  }
 
   constructor(readonly config: MatchConfig) {
     const def = MAPS[config.mapId] ?? MAPS.dust_zone;
@@ -593,6 +601,13 @@ export class MatchSim {
     }
     this.emit('damage', { pid: v.id, by: attacker?.id ?? null, amount: real, fx: r2(from.x), fz: r2(from.z), hs: headshot });
     this.brains.get(v.id)?.onDamaged(attacker, from);
+    // companheiros próximos reagem (proteger aliados)
+    if (attacker && attacker.team !== v.team)
+      for (const [id, b] of this.brains) {
+        if (id === v.id) continue;
+        const ally = this.byId(id);
+        if (ally && ally.alive && ally.team === v.team) b.onAllyHurt(v, from);
+      }
     if (v.health <= 0) this.kill(v, attacker, weapon, headshot);
   }
 
