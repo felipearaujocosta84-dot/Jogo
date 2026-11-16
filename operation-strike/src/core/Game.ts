@@ -554,6 +554,7 @@ export class Game {
       const reloadT = this.time - c.reloadAt < c.reloadDur ? (this.time - c.reloadAt) / c.reloadDur : 0;
       c.model.update(dt, p, reloadT);
       c.model.setProtected(!!p.prot && p.alive, this.time);
+      c.model.victory = (st.round.phase === 'end' || st.round.phase === 'over') && st.round.lastWinner === p.team && p.alive;
       // passos dos outros (som espacial)
       if (p.alive && this.footstepTracker(p.id, Math.hypot(p.vx, p.vz), p.ground, dt)) {
         const surf: SurfaceKind = s.map.zoneAt(p.x, p.z) ? 'stone' : 'sand';
@@ -712,7 +713,9 @@ export class Game {
         }
         break;
       }
-      case 'damage':
+      case 'damage': {
+        const victim = st.players.find(p => p.id === e.pid);
+        if (victim) this.chars.get(e.pid as string)?.model.hit(Math.atan2((e.fx as number) - victim.x, (e.fz as number) - victim.z));
         if (e.pid === localId) {
           const ang = Math.atan2((e.fx as number) - (me?.x ?? 0), (e.fz as number) - (me?.z ?? 0)) - this.look.yaw;
           this.hud.damage(ang);
@@ -720,6 +723,7 @@ export class Game {
           this.camera.addShake(0.3);
         }
         break;
+      }
       case 'kill': {
         const killer = st.players.find(p => p.id === e.killer);
         const victim = st.players.find(p => p.id === e.victim);

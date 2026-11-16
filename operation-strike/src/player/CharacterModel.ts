@@ -91,6 +91,25 @@ export class CharacterModel {
   private crouchT = 0;
   private deathT = -1;
   private deathDir = 1;
+  private deathMode: 'side' | 'back' | 'front' = 'side';
+  // máquina de estados da animação: pesos suavizados de cada estado
+  private airT = 0;
+  private riseT = 0;
+  private fallV = 0;
+  private landT = 0;
+  private sprintW = 0;
+  private switchT = 0;
+  private lastWeapon = '';
+  private hitT = 0;
+  private hitSide = 1;
+  private hitAngle: number | null = null;
+  private calmT = 0;
+  private relaxW = 0;
+  private aimHold = 0;
+  private idleT = Math.random() * 10;
+  private victoryW = 0;
+  /** Comemoração (fim de partida vencida / lobby). */
+  victory = false;
   private kick = 0;
   private q = new Quaternion();
   private visible = true;
@@ -262,6 +281,17 @@ export class CharacterModel {
   fire(): void {
     this.kick = 1;
     this.flashT = 0.06;
+    this.aimHold = 1;
+    this.calmT = 0;
+  }
+
+  /** Reação a dano: tranco do tronco/cabeça. fromAngle = direção (mundo) de onde veio o tiro. */
+  hit(fromAngle: number | null): void {
+    this.hitT = 1;
+    this.hitSide = Math.random() < 0.5 ? -1 : 1;
+    this.hitAngle = fromAngle;
+    this.calmT = 0;
+    this.aimHold = 1;
   }
 
   setVisible(v: boolean): void {
@@ -332,106 +362,201 @@ export class CharacterModel {
     this.setWeapon(p.weapon, p.skin);
     const cls = WEAPONS[p.weapon]?.cls ?? 'rifle';
 
-    // morte
+    // ---------------------------------------------------------------- estado: morte (direção conforme o tiro)
     if (!p.alive) {
       if (this.deathT < 0) {
         this.deathT = 0;
-        this.deathDir = Math.random() < 0.5 ? -1 : 1;
+        // atingido pela frente cai de costas; por trás cai de frente; dos lados, para o lado
+        const rel = this.hitAngle === null ? Math.random() * Math.PI * 2 : angWrap(this.hitAngle - p.yaw);
+        this.deathMode = Math.abs(rel) < Math.PI / 4 ? 'back' : Math.abs(rel) > (Math.PI * 3) / 4 ? 'front' : 'side';
+        this.deathDir = rel > 0 ? 1 : -1;
       }
       this.deathT = Math.min(1, this.deathT + dt * 2.2);
       const e = 1 - Math.pow(1 - this.deathT, 3);
-      this.rot(B.root, -this.deathDir * e * (Math.PI / 2) * 0.98);
-      this.bones[B.root].position = new Vector3(0, 0.12 * e, 0);
+      // primeiro os joelhos cedem, depois o corpo tomba
+      const knees = Math.min(1, this.deathT * 2.5);
+      const fall = Math.max(0, (this.deathT - 0.15) / 0.85);
+      const f = 1 - Math.pow(1 - fall, 3);
+      if (this.deathMode === 'side') this.rot(B.root, 0, 0, -this.deathDir * f * (Math.PI / 2) * 0.98);
+      else this.rot(B.root, (this.deathMode === 'back' ? -1 : 1) * f * (Math.PI / 2) * 0.96, 0, 0);
+      this.bones[B.root].position = new Vector3(0, 0.12 * f, this.deathMode === 'back' ? -0.25 * f : this.deathMode === 'front' ? 0.25 * f : 0);
+      this.bones[B.hips].position = new Vector3(0, 0.95 - 0.25 * knees * (1 - f), 0);
+      this.rot(B.spine, (this.deathMode === 'front' ? 0.3 : -0.25) * e);
+      this.rot(B.head, (this.deathMode === 'back' ? -0.5 : 0.35) * e, 0, 0.2 * this.deathDir * e);
       this.rot(B.uaR, -0.3 * e, 0, 0.8 * e);
       this.rot(B.uaL, -0.3 * e, 0, -0.8 * e);
-      this.rot(B.faR, 0);
-      this.rot(B.faL, 0);
-      this.rot(B.thR, -0.4 * e);
-      this.rot(B.shR, 0.6 * e);
-      this.rot(B.thL, 0.1 * e);
-      this.rot(B.shL, 0.2 * e);
+      this.rot(B.faR, -0.3 * e);
+      this.rot(B.faL, -0.2 * e);
+      this.rot(B.thR, -0.4 * e - 0.5 * knees * (1 - f));
+      this.rot(B.shR, 0.6 * e + 0.8 * knees * (1 - f));
+      this.rot(B.thL, 0.1 * e - 0.4 * knees * (1 - f));
+      this.rot(B.shL, 0.2 * e + 0.7 * knees * (1 - f));
       this.gunNode.setEnabled(false);
       this.flash.setEnabled(false);
       return;
     }
     if (this.deathT >= 0) {
       this.deathT = -1;
+      this.hitAngle = null;
       this.rot(B.root, 0);
       this.bones[B.root].position = Vector3.Zero();
       this.gunNode.setEnabled(true);
     }
 
+    // ---------------------------------------------------------------- entradas da máquina de estados
     const speed = Math.hypot(p.vx, p.vz);
     this.speedSmoothed += (speed - this.speedSmoothed) * Math.min(1, dt * 10);
     const kneel = p.act === 2 || p.act === 3;
     const crouch = p.crouch || kneel ? 1 : 0;
-    this.crouchT += (crouch - this.crouchT) * Math.min(1, dt * 10);
+    const k = (rate: number) => Math.min(1, dt * rate);
+    this.crouchT += (crouch - this.crouchT) * k(10);
     const ct = this.crouchT;
+    // no ar: subindo (pulo) ou caindo
+    const airborne = !p.ground;
+    this.airT += ((airborne ? 1 : 0) - this.airT) * k(airborne ? 12 : 16);
+    if (airborne) this.fallV = Math.min(this.fallV, p.vy);
+    else if (this.fallV < -3.5) {
+      // estado aterrissar: amortece proporcional à queda
+      this.landT = Math.min(1, -this.fallV / 10);
+      this.fallV = 0;
+    } else this.fallV = 0;
+    this.landT = Math.max(0, this.landT - dt * 3.2);
+    const rising = p.vy > 0.5 ? 1 : 0;
+    this.riseT += (rising - this.riseT) * k(10);
+    // corrida (sprint): acima da velocidade de corrida normal
+    const sprintW = p.ground && !p.crouch ? Math.max(0, Math.min(1, (this.speedSmoothed - 5.9) / 0.8)) : 0;
+    this.sprintW += (sprintW - this.sprintW) * k(6);
+    // troca de arma: abaixa e levanta
+    if (p.weapon !== this.lastWeapon) {
+      if (this.lastWeapon) this.switchT = 1;
+      this.lastWeapon = p.weapon;
+    }
+    this.switchT = Math.max(0, this.switchT - dt * 2.4);
+    // reação a dano
+    this.hitT = Math.max(0, this.hitT - dt * 4);
+    // parado há um tempo sem atirar: arma em posição relaxada
+    this.calmT = this.kick > 0.05 || this.speedSmoothed > 0.5 || reloadT > 0 ? 0 : this.calmT + dt;
+    const relax = Math.max(0, Math.min(1, (this.calmT - 2.5) / 0.6)) * (1 - this.aimHold);
+    this.relaxW += (relax - this.relaxW) * k(4);
+    this.aimHold = Math.max(0, this.aimHold - dt * 0.5);
+    this.victoryW += ((this.victory ? 1 : 0) - this.victoryW) * k(4);
+    this.idleT += dt;
 
-    // direção do movimento em relação ao corpo (andar para trás inverte o ciclo)
+    // ---------------------------------------------------------------- pernas (locomoção + ar + aterrissagem)
     const fwd = p.vx * Math.sin(p.yaw) + p.vz * Math.cos(p.yaw);
     const side = p.vx * Math.cos(p.yaw) - p.vz * Math.sin(p.yaw);
     const sp = this.speedSmoothed;
     this.phase += dt * (sp > 0.2 ? 2.2 + sp * 1.25 : 0) * (fwd < -0.3 ? -1 : 1);
-    const amp = Math.min(1, sp / 5.5) * (p.ground ? 0.62 : 0.15) * (1 - ct * 0.5);
+    const ground = 1 - this.airT;
+    const amp = Math.min(1, sp / 5.5) * (0.62 + this.sprintW * 0.3) * ground * (1 - ct * 0.5);
     const s = Math.sin(this.phase);
     const lateral = Math.abs(side) > Math.abs(fwd) ? Math.sign(side) * 0.25 * Math.min(1, sp / 4) : 0;
+    const breath = Math.sin(this.idleT * 1.8) * (1 - Math.min(1, sp)) * 0.012;
 
-    // quadril (bob e agachamento)
     const bob = Math.abs(Math.cos(this.phase)) * 0.035 * amp;
-    this.bones[B.hips].position = new Vector3(0, 0.95 - ct * 0.4 - bob, 0);
-    // pernas
-    const tc = -1.1 * ct, kc = 1.95 * ct;
-    this.rot(B.thR, tc - s * amp, 0, lateral);
-    this.rot(B.shR, kc + Math.max(0, s) * amp * 1.3 + (p.ground ? 0 : 0.5));
+    const land = this.landT * this.landT;
+    this.bones[B.hips].position = new Vector3(0, 0.95 - ct * 0.4 - bob - land * 0.16 + breath * 0.3, 0);
+    const tc = -1.1 * ct - land * 0.45, kc = 1.95 * ct + land * 0.85;
+    // pulo: pernas recolhidas; queda: pernas estendidas à frente se preparando
+    const air = this.airT;
+    const tuckR = (-0.55 * this.riseT - 0.25 * (1 - this.riseT)) * air;
+    const tuckL = (-0.15 * this.riseT - 0.35 * (1 - this.riseT)) * air;
+    this.rot(B.thR, tc - s * amp + tuckR, 0, lateral);
+    this.rot(B.shR, kc + Math.max(0, s) * amp * 1.3 + (0.95 * this.riseT + 0.35) * air);
     this.rot(B.ftR, -0.85 * ct * 0.5);
-    this.rot(B.thL, tc + s * amp, 0, lateral);
-    this.rot(B.shL, kc + Math.max(0, -s) * amp * 1.3 + (p.ground ? 0 : 0.5));
+    this.rot(B.thL, tc + s * amp + tuckL, 0, lateral);
+    this.rot(B.shL, kc + Math.max(0, -s) * amp * 1.3 + (0.5 * this.riseT + 0.5) * air);
     this.rot(B.ftL, -0.85 * ct * 0.5);
     if (kneel) {
       this.rot(B.thL, -0.2, 0, 0);
       this.rot(B.shL, 1.9);
     }
 
-    // tronco acompanha a mira
+    // ---------------------------------------------------------------- tronco (mira, corrida, dano, vitória)
     this.kick *= Math.exp(-dt * 14);
-    const pitch = Math.max(-1.2, Math.min(1.2, p.pitch));
+    const pitch = Math.max(-1.2, Math.min(1.2, p.pitch)) * (1 - this.sprintW * 0.7);
+    const hit = Math.sin(this.hitT * Math.PI) * this.hitT;
+    const lean = this.sprintW * 0.22 + land * 0.2;
     this.rot(B.hips, 0, Math.sin(this.phase) * 0.06 * amp, 0);
-    this.rot(B.spine, -pitch * 0.35 + ct * 0.25 + (kneel ? 0.35 : 0), 0, 0);
-    this.rot(B.chest, -pitch * 0.4 - this.kick * 0.06, 0, 0);
-    this.rot(B.neck, -pitch * 0.1);
-    this.rot(B.head, -pitch * 0.15);
+    this.rot(B.spine, -pitch * 0.35 + ct * 0.25 + (kneel ? 0.35 : 0) + lean - hit * 0.18 + breath, hit * 0.12 * this.hitSide, 0);
+    this.rot(B.chest, -pitch * 0.4 - this.kick * 0.06 - hit * 0.22 - this.victoryW * 0.15 + breath, -this.sprintW * 0.25, 0);
+    this.rot(B.neck, -pitch * 0.1 - this.sprintW * 0.12);
+    this.rot(B.head, -pitch * 0.15 + hit * 0.25 - this.victoryW * 0.2, hit * 0.3 * this.hitSide, 0);
 
-    // braços
+    // ---------------------------------------------------------------- braços e arma (mira, fogo, recarga, troca, corrida, relaxado, vitória)
     const pose = weaponPose(cls);
     const grip = pose.grip.clone();
     grip.z -= this.kick * 0.04;
+    let gunPitch = -this.kick * 0.15;
+    let gunYaw = 0;
+    // corrida: arma atravessada no peito, cano para baixo/esquerda
+    const longGun = cls !== 'pistol' && cls !== 'knife' && cls !== 'grenade' && cls !== 'c4';
+    if (this.sprintW > 0.01) {
+      const w = this.sprintW;
+      grip.x += (longGun ? -0.02 : 0.02) * w;
+      grip.y -= 0.12 * w;
+      grip.z -= 0.1 * w;
+      gunPitch += 0.55 * w;
+      gunYaw -= (longGun ? 0.75 : 0.3) * w;
+    }
+    // relaxado (parado sem combate): cano apontado para o chão
+    if (this.relaxW > 0.01) {
+      grip.y -= 0.06 * this.relaxW;
+      gunPitch += 0.45 * this.relaxW;
+      gunYaw -= 0.2 * this.relaxW;
+    }
+    // troca de arma: desce para fora da vista e sobe com a nova
+    const sw = Math.sin(this.switchT * Math.PI);
+    grip.y -= 0.25 * sw;
+    gunPitch += 0.9 * sw;
+    // recarga
+    if (reloadT > 0) gunPitch += 0.35 * Math.sin(Math.min(1, reloadT) * Math.PI);
+    // vitória: arma erguida
+    if (this.victoryW > 0.01) {
+      const v = this.victoryW;
+      grip.y += 0.32 * v;
+      grip.z -= 0.12 * v;
+      gunPitch -= 1.05 * v;
+    }
     if (kneel) {
       this.ik(1, new Vector3(0.12, -0.42, 0.42));
       this.ik(-1, new Vector3(-0.08, -0.42, 0.42));
       this.gunNode.setEnabled(false);
     } else {
-      this.gunNode.setEnabled(true);
+      this.gunNode.setEnabled(this.switchT < 0.45 || this.switchT > 0.55);
       this.ik(1, grip.add(new Vector3(0, -0.02, -0.02)));
-      if (pose.left) {
-        const left = pose.left.clone();
+      if (pose.left && sw < 0.6 && this.victoryW < 0.5) {
+        // mão de apoio acompanha a arma (girada junto com o cano)
+        const left = pose.left.clone().subtract(pose.grip);
+        const qGun = Quaternion.FromEulerAngles(gunPitch, gunYaw, 0);
+        const rel = new Vector3();
+        left.rotateByQuaternionToRef(qGun, rel);
+        const target = grip.add(rel);
         if (reloadT > 0) {
-          const k = Math.sin(Math.min(1, reloadT) * Math.PI);
-          left.y -= 0.25 * k;
-          left.z -= 0.15 * k;
-          left.x += 0.08 * k;
+          const r = Math.sin(Math.min(1, reloadT) * Math.PI);
+          target.y -= 0.25 * r;
+          target.z -= 0.15 * r;
+          target.x += 0.08 * r;
         }
-        this.ik(-1, left);
+        this.ik(-1, target);
+      } else if (this.victoryW > 0.5) {
+        this.ik(-1, new Vector3(-0.26, 0.42 * this.victoryW, 0.08));
       } else {
         this.ik(-1, new Vector3(-0.28, -0.42, 0.08 + Math.sin(this.phase) * 0.08 * amp));
       }
     }
     this.gunNode.position.copyFrom(grip);
-    this.gunNode.rotation.set(reloadT > 0 ? 0.35 * Math.sin(Math.min(1, reloadT) * Math.PI) : -this.kick * 0.15, 0, 0);
+    this.gunNode.rotation.set(gunPitch, gunYaw, 0);
 
     if (this.flashT > 0) {
       this.flashT -= dt;
       this.flash.setEnabled(this.flashT > 0);
     }
   }
+}
+
+function angWrap(a: number): number {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
 }
