@@ -2,8 +2,8 @@
 import { Game } from './core/Game';
 import { Settings, type SettingsData } from './core/Settings';
 import { LocalSession, OnlineSession, type Session } from './core/Session';
-import { NetClient } from './multiplayer/NetClient';
-import type { RoomInfo } from './multiplayer/Protocol';
+import { NetClient, normalizeServer } from './multiplayer/NetClient';
+import { OnlineScreen } from './interface/OnlineScreen';
 import { MAP_LIST, MAPS, mapAllows } from './maps/maps';
 import { ensureMapData } from './maps/ModelMaps';
 import { applyMatch, BOT_MMR, levelFor, rankName, type ProfileData } from './save/Profile';
@@ -26,7 +26,7 @@ const settings = new Settings();
 const arsenal = new ArsenalScreen();
 arsenal.onToast = msg => toast(msg);
 arsenal.onEquip = () => {
-  if (net?.connected) net.send({ t: 'skins', skins: SkinPrefs.all });
+  if (net?.connected) void net.saveCosmetics(SkinPrefs.all);
 };
 arsenal.onWeapon = id => {
   agent.weapon = id;
@@ -37,7 +37,7 @@ const game = new Game(canvas, settings);
 document.body.classList.toggle('touch', game.isTouch);
 document.body.classList.toggle('native', isNativeApp());
 
-const SCREENS = ['loading', 'mainMenu', 'playMenu', 'lobbyScreen', 'trainingMenu', 'arsenalScreen', 'profileScreen', 'rankingScreen', 'pauseMenu', 'endScreen', 'settingsMenu'] as const;
+const SCREENS = ['loading', 'mainMenu', 'playMenu', 'lobbyScreen', 'onlineScreen', 'trainingMenu', 'arsenalScreen', 'profileScreen', 'rankingScreen', 'pauseMenu', 'endScreen', 'settingsMenu'] as const;
 type ScreenId = (typeof SCREENS)[number] | null;
 let current: ScreenId = 'loading';
 let settingsReturn: ScreenId = 'mainMenu';
@@ -191,8 +191,16 @@ function lobbyAction(action: string): boolean {
       show('playMenu');
       return true;
     case 'online-play':
-      show('playMenu');
-      (document.querySelector('.tab[data-tab="online"]') as HTMLElement | null)?.click();
+      online.open('play');
+      show('onlineScreen');
+      return true;
+    case 'online-x1':
+      online.open('x1');
+      show('onlineScreen');
+      return true;
+    case 'online-friends':
+      online.open('friends');
+      show('onlineScreen');
       return true;
     case 'inventory':
       arsenal.prepare('inventory', agent.weapon);
@@ -329,7 +337,7 @@ document.addEventListener('click', e => {
     const name = t.dataset.tab!;
     for (const x of document.querySelectorAll<HTMLElement>('.tab[data-tab]')) x.classList.toggle('active', x.dataset.tab === name);
     for (const x of document.querySelectorAll<HTMLElement>('[data-tab-body]')) x.classList.toggle('hidden', x.dataset.tabBody !== name);
-    if (name === 'online') void ensureNet().then(() => net?.send({ t: 'list' })).catch(() => {});
+    void name;
   }
   const pt = (e.target as HTMLElement).closest<HTMLElement>('[data-ptab]');
   if (pt) {
@@ -420,36 +428,43 @@ function showEnd(s: Session): void {
     $('endProfile').innerHTML = mine + `<div><b>+${rec.xp} XP</b> · Nível ${lv.level} <div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div></div>
       <div>${s.mode === 'competitive' ? `MMR ${rec.mmrDelta >= 0 ? '+' : ''}${rec.mmrDelta} → <b>${pdata.mmr}</b> · ${rankName(pdata.mmr)}` : s.mode === 'tdm' ? 'Mata-mata não altera o MMR' : 'Partida casual não altera o MMR'}${rec.coins ? ` · <b>+${rec.coins}</b> moedas` : ''}</div>`;
   } else $('endProfile').innerHTML = mine;
-  if (s.online) net?.send({ t: 'leave' });
+  // X1 online: a sala continua aberta para a revanche
+  const duel = s.online && s.mode === 'x1';
+  $('btnRematch').classList.toggle('hidden', !duel);
+  $('btnEndRoom').classList.toggle('hidden', !duel);
+  if (s.online && !duel) void net?.leaveGame();
+  if (s.online && s.mode === 'br' && me) {
+    const place = res.players.find(p => p.id === s.localId)?.place ?? 0;
+    $('endTitle').textContent = place === 1 ? '1º LUGAR — VITÓRIA!' : `${place}º LUGAR`;
+    $('endTitle').className = place === 1 ? 'win' : 'loss';
+    $('endScore').textContent = `Battle Royale · ${res.players.length} participantes · ${MAPS[s.map.def.id].name}`;
+  }
   show('endScreen');
 }
 
 // ------------------------------------------------------------ online
 
 function httpBase(): string {
-  const url = net?.url ?? (settings.get('serverUrl') || NetClient.defaultUrl());
-  return url.replace(/^ws/, 'http').replace(/\/ws$/, '');
+  return net?.url ?? (normalizeServer(settings.get('serverUrl') || '') || NetClient.defaultUrl());
 }
 
-async function ensureNet(): Promise<NetClient> {
-  if (net && net.connected) return net;
-  const url = settings.get('serverUrl') || NetClient.defaultUrl();
-  if (!url) {
-    toast('Informe o endereço do servidor em Configurações → Servidor online (ex.: ws://192.168.0.10:8080/ws)', 5000);
-    throw new Error('Servidor não configurado');
-  }
+/** Cliente de rede para o endereço configurado (sem conectar). */
+function getNet(): NetClient | null {
+  const url = normalizeServer(settings.get('serverUrl') || '') || NetClient.defaultUrl();
+  if (!url) return null;
   if (!net || net.url !== url) {
     net?.close();
-    net = new NetClient(url, settings.get('playerName'), profile.id);
-    net.onStatus = st => ($('netStatus').textContent = st);
+    net = new NetClient(url);
+    online.bind(net);
+    net.onStatus = () => online.render();
     net.on(msg => {
       switch (msg.t) {
-        case 'rooms':
-          renderRooms(msg.rooms);
-          break;
         case 'room':
-          renderLobby(msg.room);
-          if (msg.room.state === 'lobby' && current !== 'lobbyScreen' && !game.session) show('lobbyScreen');
+          online.setRoom(msg.room);
+          if (msg.room.state === 'lobby' && current !== 'onlineScreen' && !game.session) {
+            online.open('room');
+            show('onlineScreen');
+          }
           break;
         case 'start': {
           if (game.session?.online && (game.session as OnlineSession).localId === msg.you) {
@@ -476,48 +491,49 @@ async function ensureNet(): Promise<NetClient> {
           break;
         case 'welcome':
           updateSkinLevel();
-          net!.send({ t: 'skins', skins: SkinPrefs.all });
-          if (msg.resumed) toast('Reconectado à partida');
+          void net!.saveCosmetics(SkinPrefs.all);
+          online.render();
+          break;
+        case 'info':
+          if (msg.msg === 'left') online.setRoom(null);
           break;
       }
     });
   }
-  try {
-    await net.connect();
-  } catch (e) {
-    toast((e as Error).message + '. Rode o servidor com "npm start".', 4000);
-    throw e;
-  }
   return net;
 }
 
-function renderRooms(rooms: RoomInfo[]): void {
-  $('roomList').innerHTML = rooms.length
-    ? rooms
-        .map(r => `<button class="room" data-room="${r.code}"><b>${r.code}</b> ${MAPS[r.mapId]?.name ?? r.mapId} · ${r.mode === 'competitive' ? 'Competitivo' : r.mode === 'tdm' ? 'Mata-mata' : 'Casual'} · ${r.humans}/10 humanos · ${r.state === 'lobby' ? 'no lobby' : 'em jogo'} · MMR ${r.avgMmr}</button>`)
-        .join('')
-    : '<p class="roadmap">Nenhuma sala pública. Use “Encontrar partida” ou crie uma.</p>';
+/** Conectado e com login (abre a tela de conta se faltar). */
+async function ensureNet(): Promise<NetClient> {
+  const n = getNet();
+  if (!n) {
+    online.open('account');
+    show('onlineScreen');
+    throw new Error('Informe o endereço do servidor');
+  }
+  if (!n.loggedIn) {
+    online.open('account');
+    show('onlineScreen');
+    throw new Error('Faça login para jogar online');
+  }
+  await n.connect();
+  return n;
 }
 
-$('roomList').addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest<HTMLElement>('[data-room]');
-  if (b) void ensureNet().then(n => n.send({ t: 'join', code: b.dataset.room! }));
-});
-
-function renderLobby(r: RoomInfo): void {
-  $('lobbyCode').textContent = r.code;
-  const diff = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' }[r.difficulty];
-  $('lobbyInfo').textContent = `${MAPS[r.mapId]?.name} · ${r.mode === 'competitive' ? 'Competitivo' : r.mode === 'tdm' ? 'Mata-mata' : 'Casual'} · bots ${diff}${r.countdown > 0 && r.state === 'lobby' ? ` · começa em ${r.countdown}s` : ''}`;
-  const li = (team: Team) =>
-    r.players
-      .filter(p => p.team === team)
-      .map(p => `<li class="${p.id === net?.you ? 'me' : ''}">${esc(p.name)} <small>${p.bot ? 'BOT' : rankName(p.mmr)}${p.connected ? '' : ' (caiu)'}</small></li>`)
-      .join('') || '<li class="empty">— vazio (bots entram) —</li>';
-  $('lobbyT').innerHTML = li('T');
-  $('lobbyCT').innerHTML = li('CT');
-  const isHost = !!net && r.host === net.clientId;
-  $('btnStartRoom').classList.toggle('hidden', r.isPublic || !isHost);
-}
+const online = new OnlineScreen(() => getNet(), () => ensureNet());
+online.onToast = (m, ms) => toast(m, ms);
+online.getServer = () => settings.get('serverUrl') || '';
+online.setServer = v => {
+  settings.set('serverUrl', v);
+  Storage.save('serverUrl', v);
+  getNet();
+  online.render();
+};
+online.onBadge = n => {
+  const el = $('olBadgeMain');
+  el.textContent = String(n);
+  el.classList.toggle('hidden', n === 0);
+};
 
 // ------------------------------------------------------------ telas informativas
 
@@ -662,32 +678,17 @@ document.addEventListener('click', e => {
     case 'quick-competitive':
     case 'quick-casual':
       void ensureNet().then(n => {
-        n.send({ t: 'quick', mode: btn.dataset.action === 'quick-casual' ? 'casual' : 'competitive' });
-        toast('Procurando partida pelo seu nível…');
-      }).catch(() => {});
+        n.sendSocial('quick', { mode: btn.dataset.action === 'quick-casual' ? 'casual' : 'competitive' });
+        toast('Procurando partida…');
+      }).catch(e => toast((e as Error).message));
       return;
-    case 'join-code': {
-      const code = $<HTMLInputElement>('joinCode').value.trim().toUpperCase();
-      if (code.length < 4) return toast('Digite o código da sala');
-      void ensureNet().then(n => n.send({ t: 'join', code })).catch(() => {});
+    case 'end-rematch':
+      net?.gameSend('rematch');
+      toast('Revanche pedida — esperando o outro jogador');
       return;
-    }
-    case 'create-room':
-      void ensureNet().then(n => n.send({ t: 'create', mode: picks.mode === 'casual' ? 'casual' : picks.mode === 'tdm' ? 'tdm' : 'competitive', mapId: picks.map, difficulty: picks.difficulty as Difficulty, isPublic: $<HTMLInputElement>('roomPublic').checked })).catch(() => {});
-      return;
-    case 'refresh-rooms':
-      void ensureNet().then(n => n.send({ t: 'list' })).catch(() => {});
-      return;
-    case 'team-T':
-    case 'team-CT':
-      net?.send({ t: 'team', team: btn.dataset.action === 'team-T' ? 'T' : 'CT' });
-      return;
-    case 'start-room':
-      net?.send({ t: 'start' });
-      return;
-    case 'leave-room':
-      net?.send({ t: 'leave' });
-      return show('playMenu');
+    case 'end-room':
+      online.open('room');
+      return show('onlineScreen');
     case 'refresh-ranking':
       return void loadRanking();
     case 'resume':
@@ -711,7 +712,7 @@ document.addEventListener('click', e => {
       return;
     }
     case 'quit-match':
-      if (game.session?.online) net?.send({ t: 'leave' });
+      if (game.session?.online) void net?.leaveGame();
       game.endSession();
       return show('mainMenu');
     case 'end-menu':
@@ -738,8 +739,8 @@ renderMapCards();
 renderTdmWeapons();
 syncPicks();
 setInterval(() => {
-  if (net) $('netPing').textContent = net.connected ? `${Math.round(net.rtt)} ms` : '';
-}, 1000);
+  if (current === 'onlineScreen') online.renderStatus();
+}, 2000);
 const fill = $('loadingFill');
 const text = $('loadingText');
 game
@@ -749,9 +750,11 @@ game
   })
   .then(() => {
     game.setMenuView();
+    $('stDevice').textContent = game.quality.deviceSummary;
     show('mainMenu');
     // reconexão automática a uma partida online em andamento
-    if (Storage.load<string | null>('netToken', null)) void ensureNet().catch(() => {});
+    // conta salva: conecta (amigos, convites) e retoma uma partida em andamento
+    if (Storage.load<string | null>('netSession', null) && getNet()) void ensureNet().catch(() => {});
   })
   .catch(err => {
     console.error(err);

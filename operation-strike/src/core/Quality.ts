@@ -67,6 +67,39 @@ export function detectDefaultLevel(): QualityLevel {
   return 'medium';
 }
 
+/** Capacidade real do aparelho (GPU, memória, núcleos) medida na inicialização. */
+export interface DeviceCapability {
+  tier: 'low' | 'mid' | 'high';
+  gpu: string;
+  maxTexture: number;
+  memoryGB: number;
+  cores: number;
+  webgl2: boolean;
+  /** Nível mais alto que o aparelho aguenta com todos os efeitos. */
+  maxLevel: QualityLevel;
+}
+
+const LOW_GPU = /SwiftShader|llvmpipe|Mali-4\d\d|Mali-T[67]\d\d|Adreno \(TM\) [34]\d\d|Adreno \(TM\) 5[0-3]\d|PowerVR SGX|PowerVR Rogue GE|Intel\(R\) HD Graphics [2-5]\d\d\d?/i;
+const HIGH_GPU = /NVIDIA|GeForce|RTX|Radeon|AMD|Apple M\d|Apple GPU|Adreno \(TM\) (7[3-9]\d|8\d\d)|Mali-G7[1-9]\d|Mali-G[89]\d\d|Immortalis|Xclipse|Iris Xe|Arc/i;
+
+export function probeDevice(engine: Engine): DeviceCapability {
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const info = engine.getGlInfo?.() ?? { renderer: '', vendor: '', version: '' };
+  const gpu = `${info.renderer ?? ''}`.trim() || 'desconhecida';
+  const caps = engine.getCaps();
+  const maxTexture = caps.maxTextureSize ?? 4096;
+  const memoryGB = nav.deviceMemory ?? (isMobile() ? 4 : 8);
+  const cores = navigator.hardwareConcurrency || 4;
+  const webgl2 = engine.webGLVersion >= 2;
+  let tier: DeviceCapability['tier'] = 'mid';
+  if (LOW_GPU.test(gpu) || maxTexture < 4096 || memoryGB <= 2 || !webgl2) tier = 'low';
+  else if (HIGH_GPU.test(gpu) && memoryGB >= 4 && (!isMobile() || memoryGB >= 6)) tier = 'high';
+  const maxLevel: QualityLevel = tier === 'low' ? 'medium' : tier === 'mid' ? (isMobile() ? 'high' : 'ultra') : 'ultrareal';
+  return { tier, gpu, maxTexture, memoryGB, cores, webgl2, maxLevel };
+}
+
+const ORDER: QualityLevel[] = ['low', 'medium', 'high', 'ultra', 'ultrareal'];
+
 export class Quality {
   mode: QualityMode;
   level: QualityLevel;
@@ -78,8 +111,13 @@ export class Quality {
   private timer = 0;
   private lowStreak = 0;
   private mobile = isMobile();
+  /** Capacidade medida do aparelho (o Ultra só liga o que ele aguenta). */
+  readonly device: DeviceCapability;
+  /** Segundos seguidos com FPS muito baixo mesmo na resolução mínima (travamento/aquecimento). */
+  private sustainedLow = 0;
 
   constructor(private engine: Engine, mode: QualityMode) {
+    this.device = probeDevice(engine);
     this.dpr = Math.min(window.devicePixelRatio || 1, 3);
     this.mode = mode;
     this.level = mode === 'auto' ? detectDefaultLevel() : mode;
@@ -87,8 +125,35 @@ export class Quality {
     window.addEventListener('resize', () => this.applyScaling());
   }
 
+  /**
+   * Preset efetivo: o escolhido, limitado pela capacidade real do aparelho. Ex.: num celular intermediário o
+   * Ultra mantém texturas e sombras melhores, mas sem SSAO/reflexos; num aparelho fraco fica no nível Média.
+   */
   get preset(): QualityPreset {
-    return QUALITY[this.level];
+    const base = QUALITY[this.level];
+    const d = this.device;
+    if (ORDER.indexOf(this.level) <= ORDER.indexOf(d.maxLevel)) return this.mobile && base.pbrRes === '4k' ? { ...base, pbrRes: '2k' } : base;
+    const cap = QUALITY[d.maxLevel];
+    return {
+      ...base,
+      label: base.label,
+      ssao: cap.ssao,
+      ssr: cap.ssr,
+      pcss: cap.pcss,
+      shadowMapSize: Math.min(base.shadowMapSize, cap.shadowMapSize),
+      maxDpr: Math.min(base.maxDpr, cap.maxDpr),
+      maxPixels: Math.min(base.maxPixels, cap.maxPixels),
+      pbrRes: cap.pbrRes,
+      particles: Math.min(base.particles, cap.particles),
+      characterLod: Math.min(base.characterLod, cap.characterLod)
+    };
+  }
+
+  /** Texto para as configurações: o que foi detectado. */
+  get deviceSummary(): string {
+    const d = this.device;
+    const name = { low: 'básico', mid: 'intermediário', high: 'avançado' }[d.tier];
+    return `Aparelho ${name} · GPU ${d.gpu.slice(0, 48)} · ${d.memoryGB} GB · máximo com todos os efeitos: ${QUALITY[d.maxLevel].label}`;
   }
 
   /** Troca o modo. Retorna true se o nível efetivo mudou (cena precisa ser reconfigurada). */
@@ -142,6 +207,16 @@ export class Quality {
       this.applyScaling();
     }
     // no modo automático, se nem a resolução mínima segura o FPS, desce um nível de qualidade
+    // qualquer modo: FPS muito baixo por muito tempo mesmo na resolução mínima (travando ou esquentando) → desce um nível
+    if (fps < target * 0.5 && this.renderDpr <= minDpr + 0.01) this.sustainedLow += 1.5;
+    else this.sustainedLow = Math.max(0, this.sustainedLow - 1.5);
+    if (this.mode !== 'auto' && this.sustainedLow >= 24 && this.level !== 'low') {
+      this.sustainedLow = 0;
+      this.level = ORDER[ORDER.indexOf(this.level) - 1];
+      this.applyLevel();
+      this.onAutoDowngrade?.(this.level);
+      return;
+    }
     if (this.mode === 'auto' && fps < target * 0.6 && this.renderDpr <= minDpr + 0.01) {
       if (++this.lowStreak >= 3 && this.level !== 'low') {
         this.lowStreak = 0;

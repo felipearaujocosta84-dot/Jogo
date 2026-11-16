@@ -1,6 +1,7 @@
 // Núcleo do jogo no navegador: motor 3D, cena, sessão (local ou online), mapa, personagens,
 // câmera, arma em primeira pessoa, efeitos, áudio, HUD, loja, placar e laço principal.
-import { Engine, Scene, Vector3, Matrix } from './babylon';
+import { QUALITY } from './Quality';
+import { Engine, Scene, Vector3, Matrix, Color3, CreateCylinder, Mesh, StandardMaterial } from './babylon';
 import { InputState } from './Input';
 import { KeyboardMouse } from './KeyboardMouse';
 import { Quality } from './Quality';
@@ -101,7 +102,11 @@ export class Game {
     this.quality = new Quality(this.engine, this.settings.get('quality'));
     this.quality.dynamic = this.settings.get('dynamicResolution');
     // modo automático: se o aparelho não aguentar, reduz o nível e reconstrói o cenário
-    this.quality.onAutoDowngrade = () => this.applyQualityLevel();
+    this.quality.onAutoDowngrade = level => {
+      this.applyQualityLevel();
+      // aviso: o jogo baixou a qualidade para não travar nem esquentar o aparelho
+      if (this.session) this.hud.message(`Qualidade ajustada para ${QUALITY[level].label} (desempenho)`, 3);
+    };
     this.scene = new Scene(this.engine);
     this.scene.skipPointerMovePicking = true;
     await nextFrame();
@@ -648,7 +653,17 @@ export class Game {
     }
     this.hud.setRound(st.round, st.bomb.state === 'planted');
     this.hud.setAlive(st.players);
-    this.hud.setZone(alive && local ? s.map.zoneAt(local.ctrl.position.x, local.ctrl.position.z) : '');
+    const z = st.round.zone;
+    this.updateZoneMesh(z ?? null);
+    if (z && local) {
+      // Battle Royale: vivos, zona e aviso quando está fora
+      const p = local.ctrl.position;
+      const out = Math.hypot(p.x - z.x, p.z - z.z) > z.r;
+      this.hud.setZone(`VIVOS ${st.round.aliveCount ?? '?'} · ${out && alive ? `FORA DA ZONA (−${z.dps}/s)` : z.shrinking ? 'ZONA FECHANDO' : 'zona segura'}`);
+    } else this.hud.setZone(alive && local ? s.map.zoneAt(local.ctrl.position.x, local.ctrl.position.z) : '');
+    const noMoney = st.round.mode === 'x1' || st.round.mode === 'br';
+    const moneyEl = document.getElementById('hudMoney');
+    if (moneyEl) moneyEl.style.display = noMoney ? 'none' : '';
     this.updatePrompt(st, me);
     this.scoreboard.update(st.players, st.round, s.localId, me?.team ?? 'T', s.online);
     this.hud.update(dt, camX, camZ, camYaw, this.radarDots(st, me));
@@ -688,10 +703,44 @@ export class Game {
     return false;
   }
 
+  private zoneMesh: Mesh | null = null;
+
+  /** Parede translúcida da zona segura do Battle Royale. */
+  private updateZoneMesh(z: { x: number; z: number; r: number } | null): void {
+    if (!z) {
+      this.zoneMesh?.setEnabled(false);
+      return;
+    }
+    if (!this.zoneMesh || this.zoneMesh.getScene() !== this.scene) {
+      const m = CreateCylinder('brZone', { diameter: 2, height: 60, tessellation: 96, cap: Mesh.NO_CAP, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
+      const mat = new StandardMaterial('brZoneMat', this.scene);
+      mat.emissiveColor = new Color3(0.25, 0.6, 1);
+      mat.disableLighting = true;
+      mat.alpha = 0.18;
+      mat.backFaceCulling = false;
+      m.material = mat;
+      m.isPickable = false;
+      this.zoneMesh = m;
+    }
+    this.zoneMesh.setEnabled(true);
+    this.zoneMesh.position.set(z.x, 20, z.z);
+    this.zoneMesh.scaling.set(Math.max(0.1, z.r), 1, Math.max(0.1, z.r));
+  }
+
   private onPhase(st: ViewState, me: PlayerView | null): void {
     const prev = this.lastPhase;
     this.lastPhase = st.round.phase;
     if (st.round.mode === 'training') return;
+    if (st.round.mode === 'br') {
+      if (st.round.phase === 'freeze') this.hud.banner('BATTLE ROYALE', 'Último vivo vence · fique dentro da zona', 'info', 3);
+      else if (st.round.phase === 'live' && prev === 'freeze') this.hud.banner('VALENDO!', `${st.round.aliveCount ?? ''} participantes`, 'info', 1.8);
+      return;
+    }
+    if (st.round.mode === 'x1') {
+      if (st.round.phase === 'freeze') this.hud.banner(`DUELO X1 · RODADA ${st.round.number}`, `Primeiro a ${st.round.winRounds} vence`, 'info', 2.5);
+      else if (st.round.phase === 'live' && prev === 'freeze') this.hud.banner('VALENDO!', 'Elimine o adversário', 'info', 1.5);
+      return;
+    }
     if (st.round.mode === 'tdm') {
       if (st.round.phase === 'live' && prev !== 'live')
         this.hud.banner('MATA-MATA EM EQUIPE', `Primeira equipe a ${st.round.winRounds} abates · renascimento automático`, 'info', 3);

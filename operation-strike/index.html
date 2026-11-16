@@ -115,9 +115,11 @@
         </button>
         <div class="sq-row"><span><b id="missionTag">CONTRA BOTS</b><small id="missionMode">Competitivo 5v5</small></span><button data-go="playMenu">TROCAR ⟳</button></div>
         <div class="sq-modes"><button data-action="mode-competitive">Competitivo</button><button data-action="mode-tdm">Mata-mata</button><b class="sq-avail" id="missionDiff">Normal</b></div>
-        <div class="sq-row"><span><b>PARTIDAS ONLINE</b><small>Salas com outros jogadores</small></span><button data-action="online-play">ENTRAR ⟳</button></div>
+        <div class="sq-row"><span><b>PARTIDAS ONLINE <em id="olBadgeMain" class="ol-badge hidden">0</em></b><small>Amigos, salas e X1</small></span><button data-action="online-play">ENTRAR ⟳</button></div>
         <nav class="sq-side">
           <button data-action="quick-competitive"><span>Encontrar partida</span><i>⌕</i></button>
+          <button data-action="online-x1"><span>Modo X1 (duelo)</span><i>⚔</i></button>
+          <button data-action="online-friends"><span>Amigos e convites</span><i>☺</i></button>
           <button data-action="lobby-team"><span id="sqTeam">Trocar equipe</span><i>⇄</i></button>
           <button data-go="profileScreen"><span>Perfil e histórico</span><i>☺</i></button>
         </nav>
@@ -165,15 +167,8 @@
         <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button><button class="btn primary" data-action="start-bots">INICIAR PARTIDA</button></div>
       </div>
       <div class="tab-body hidden" data-tab-body="online">
-        <div class="field"><span>Status do servidor: <b id="netStatus">desconectado</b> <small id="netPing"></small></span></div>
-        <div class="menu-buttons">
-          <button class="btn primary" data-action="quick-competitive">ENCONTRAR PARTIDA COMPETITIVA</button>
-          <button class="btn primary ct" data-action="quick-casual">ENCONTRAR PARTIDA CASUAL</button>
-        </div>
-        <div class="field row"><input id="joinCode" maxlength="5" placeholder="CÓDIGO" /><button class="btn" data-action="join-code">ENTRAR NA SALA</button></div>
-        <div class="field"><span>Criar sala (usa mapa, modo e dificuldade da aba "Contra bots")</span>
-          <div class="row"><label class="check"><input type="checkbox" id="roomPublic" checked /> Pública</label><button class="btn" data-action="create-room">CRIAR SALA</button></div></div>
-        <div class="field"><span>Salas públicas <button class="btn small" data-action="refresh-rooms">ATUALIZAR</button></span><div id="roomList" class="room-list"></div></div>
+        <p class="roadmap">Partidas online com outros jogadores: partida rápida, salas públicas e privadas, X1, amigos e convites.</p>
+        <button class="btn primary" data-action="online-play">ABRIR MULTIPLAYER</button>
         <div class="menu-buttons row"><button class="btn" data-go="mainMenu">VOLTAR</button></div>
       </div>
     </div>
@@ -241,7 +236,7 @@
       <p class="stage" id="endScore"></p>
       <div id="endStats" class="end-stats"></div>
       <div id="endProfile" class="end-profile"></div>
-      <div class="menu-buttons row"><button class="btn primary" data-action="end-menu">MENU PRINCIPAL</button></div>
+      <div class="menu-buttons row"><button class="btn hidden" id="btnRematch" data-action="end-rematch">REVANCHE</button><button class="btn hidden" id="btnEndRoom" data-action="end-room">VOLTAR À SALA</button><button class="btn primary" data-action="end-menu">MENU PRINCIPAL</button></div>
     </div>
 
     <div id="settingsMenu" class="screen st hidden">
@@ -253,6 +248,7 @@
           <div class="st-opt"><h3>Volume geral</h3><label class="st-range"><input type="range" data-setting="volume" min="0" max="1" step="0.05" /><output></output></label></div>
         </div>
         <div class="st-page" data-page="graphics">
+          <p class="st-device" id="stDevice"></p>
           <div class="st-opt"><h3>Qualidade gráfica</h3><select class="st-dots" data-setting="quality"><option value="auto">Auto</option><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option><option value="ultra">Ultra</option><option value="ultrareal">Ultra Realista</option></select></div>
           <div class="st-opt"><h3>Limite de FPS</h3><select class="st-dots" data-setting="fpsCap"><option value="30">30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option><option value="0">Sem limite</option></select></div>
           <div class="st-opt"><h3>Distância de renderização</h3><label class="st-range"><input type="range" data-setting="renderDistance" min="50" max="220" step="10" /><output></output></label></div>
@@ -282,6 +278,16 @@
           <button class="st-btn" data-action="settings-reset">RESTAURAR PADRÕES</button>
         </div>
       </section>
+    </div>
+
+    <div id="onlineScreen" class="screen ol hidden">
+      <div class="ol-top">
+        <div class="cz-title"><small>OPERATION STRIKE</small><h2>MULTIPLAYER</h2></div>
+        <nav id="olTabs" class="ol-tabs"></nav>
+        <button class="btn small" data-go="mainMenu">VOLTAR</button>
+      </div>
+      <div id="olStatus" class="ol-status"></div>
+      <div id="olBody" class="ol-body"></div>
     </div>
 
     <div id="rotateHint" class="rotate-hint"><div>⟳</div><p>Gire o celular para a horizontal</p></div>
