@@ -57,7 +57,7 @@ export class Game {
   private mapVisual: MapVisual | null = null;
   private mapRuntime: MapRuntime | null = null;
   private visualMapId = '';
-  private chars = new Map<string, { model: CharacterModel; team: Team; variant: number; step: number; reloadAt: number; reloadDur: number; lastX: number; lastZ: number }>();
+  private chars = new Map<string, { model: CharacterModel; team: Team; variant: number; step: number; reloadAt: number; reloadDur: number; lastX: number; lastZ: number; animAcc: number }>();
   private look = { yaw: 0, pitch: 0 };
   private wasAlive = false;
   private spectateIdx = 0;
@@ -545,14 +545,28 @@ export class Game {
       if (!c || c.team !== p.team || c.variant !== p.variant) {
         c?.model.dispose();
         const model = new CharacterModel(this.scene, p.team, p.variant, this.mapVisual?.shadow ?? null);
-        c = { model, team: p.team, variant: p.variant, step: 0, reloadAt: -10, reloadDur: 1, lastX: p.x, lastZ: p.z };
+        c = { model, team: p.team, variant: p.variant, step: 0, reloadAt: -10, reloadDur: 1, lastX: p.x, lastZ: p.z, animAcc: 0 };
         this.chars.set(p.id, c);
       }
       const isMe = p.id === s.localId;
       c.model.setVisible(!(isMe && alive));
       if (isMe && alive) continue;
       const reloadT = this.time - c.reloadAt < c.reloadDur ? (this.time - c.reloadAt) / c.reloadDur : 0;
-      c.model.update(dt, p, reloadT);
+      // LOD de animação: longe (ou atrás da câmera) o esqueleto é atualizado menos vezes por segundo
+      const cam = this.camera.camera.position;
+      const dx = p.x - cam.x, dz = p.z - cam.z;
+      const dist = Math.hypot(dx, dz);
+      const behind = dist > 6 && dx * Math.sin(this.look.yaw) + dz * Math.cos(this.look.yaw) < -0.3 * dist;
+      const lod = this.quality.preset.characterLod;
+      const rate = !p.alive || dist < lod * 0.5 ? 0 : behind ? 1 / 6 : dist < lod ? 1 / 30 : 1 / 12;
+      c.animAcc += dt;
+      if (c.animAcc >= rate) {
+        c.model.update(c.animAcc, p, reloadT);
+        c.animAcc = 0;
+      } else {
+        c.model.root.position.set(p.x, p.y, p.z);
+        c.model.root.rotation.y = p.yaw;
+      }
       c.model.setProtected(!!p.prot && p.alive, this.time);
       c.model.victory = (st.round.phase === 'end' || st.round.phase === 'over') && st.round.lastWinner === p.team && p.alive;
       // passos dos outros (som espacial)

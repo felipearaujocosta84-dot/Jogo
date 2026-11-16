@@ -42,7 +42,8 @@ export class BotBrain {
   private stuckT = 0;
   private stuckCount = 0;
   private lastPos: Vec3 = { x: 0, y: 0, z: 0 };
-  private perceiveT = 0;
+  /** Começa defasado para os bots não pensarem todos no mesmo passo (distribui a CPU). */
+  private perceiveT = Math.random() * 0.1;
   private target: Sighting | null = null;
   private targetId: string | null = null;
   private reactT = 0;

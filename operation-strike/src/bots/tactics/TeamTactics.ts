@@ -102,8 +102,7 @@ export class TeamTactics {
     const m = this.match, def = m.map.def;
     const out = def.sites.map(s => ({ x: (s.min[0] + s.max[0]) / 2, z: (s.min[1] + s.max[1]) / 2 }));
     for (const p of def.tactics.ctMid) out.push({ x: p[0], z: p[1] });
-    const enemy = m.map.spawnCenter(this.team === 'T' ? 'CT' : 'T');
-    out.push(enemy);
+    // a base inimiga fica de fora (evita ficar acampando o renascimento)
     return out;
   }
 

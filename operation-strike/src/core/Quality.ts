@@ -67,6 +67,7 @@ export class Quality {
   private samples: number[] = [];
   private timer = 0;
   private lowStreak = 0;
+  private mobile = isMobile();
 
   constructor(private engine: Engine, mode: QualityMode) {
     this.dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -93,7 +94,9 @@ export class Quality {
   private maxAllowed(): number {
     const p = this.preset;
     const css = Math.max(1, window.innerWidth * window.innerHeight);
-    const byPixels = Math.sqrt(p.maxPixels / css);
+    // no celular nunca força 4K: o Ultra fica limitado a 1440p (a resolução dinâmica ajusta o resto)
+    const maxPixels = this.mobile ? Math.min(p.maxPixels, 2560 * 1440) : p.maxPixels;
+    const byPixels = Math.sqrt(maxPixels / css);
     return Math.max(0.5, Math.min(this.dpr * (this.level === 'ultra' ? 1.5 : 1), p.maxDpr, byPixels));
   }
 
@@ -112,7 +115,8 @@ export class Quality {
     if (dt <= 0) return;
     this.samples.push(1 / dt);
     if (this.samples.length > 90) this.samples.shift();
-    if (!this.dynamic && this.mode !== 'auto') return;
+    // celular: resolução dinâmica sempre ativa
+    if (!this.dynamic && this.mode !== 'auto' && !this.mobile) return;
     this.timer += dt;
     if (this.timer < 1.5) return;
     this.timer = 0;
