@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1b2a1f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Vale da Lanterna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #14201a; --fg: #f4ecd6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #14201a; --fg: #f4ecd6; } }
+  :root[data-theme="dark"] { --bg: #14201a; --fg: #f4ecd6; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden;
+    touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+  canvas { display: block; position: fixed; inset: 0; }
+  #safe { position: fixed; inset: 0; pointer-events: none; visibility: hidden;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 600 18px "Pixelify Sans", sans-serif; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="safe"></div>
+<div id="loading">Carregando o vale…</div>
+<script src="game.js"></script>
+</body>
+</html>
