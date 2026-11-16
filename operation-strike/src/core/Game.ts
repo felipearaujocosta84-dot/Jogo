@@ -18,7 +18,9 @@ import { Hud } from '../interface/Hud';
 import { TouchControls } from '../interface/TouchControls';
 import { Scoreboard } from '../interface/Scoreboard';
 import { BuyMenu } from '../interface/BuyMenu';
-import { CharacterModel } from '../player/CharacterModel';
+import { CharacterModel } from '../player/Character';
+import { loadCharacters } from '../player/CharacterAssets';
+import { isMobile } from './Quality';
 import { WEAPONS } from '../weapons/WeaponData';
 import { skinById } from '../weapons/Skins';
 import { SkinPrefs } from '../save/SkinPrefs';
@@ -118,6 +120,9 @@ export class Game {
     this.postFx.apply(this.quality.preset);
     onProgress(18, 'Montando o lobby');
     this.lobby = new LobbyScene(this.engine, this.quality.preset);
+    // personagens (Soldado = CT, Terrorista = TR): carregados antes do menu, para o jogo e para o lobby
+    onProgress(20, 'Carregando personagens');
+    await Promise.all([loadCharacters(this.scene, this.characterLod), loadCharacters(this.lobby.scene, this.characterLod)]);
     onProgress(25, 'Construindo o cenário');
     this.loadMapVisual(DEFAULT_MAP);
     await nextFrame();
@@ -199,6 +204,11 @@ export class Game {
   }
 
   private postFx!: PostFx;
+  /** Versão leve dos personagens (menos polígonos, texturas 1024): Baixa/Média e celular (exceto Ultra). */
+  private get characterLod(): boolean {
+    const lv = this.quality.level;
+    return lv === 'low' || lv === 'medium' || (isMobile() && lv !== 'ultra');
+  }
   /** Cena 3D do menu principal (renderizada no lugar da partida enquanto não há sessão). */
   lobby: LobbyScene | null = null;
 
@@ -221,6 +231,7 @@ export class Game {
       const next = new LobbyScene(this.engine, p);
       next.active = old.active;
       next.setLoadout(old.team, old.variant, old.weapon, old.skin);
+      void loadCharacters(next.scene, this.characterLod).then(() => next.setLoadout(next.team, next.variant, next.weapon, next.skin));
       old.dispose();
       this.lobby = next;
     }

@@ -14,6 +14,7 @@ import { esc } from './interface/Hud';
 import { isNativeApp } from './core/Platform';
 import { SkinPrefs } from './save/SkinPrefs';
 import { ArsenalScreen } from './interface/ArsenalScreen';
+import { CHARACTER_FILES } from './player/CharacterAssets';
 import { BUY_CATEGORIES, WEAPONS } from './weapons/WeaponData';
 import { skinById, RARITY_COLOR, RARITY_LABEL } from './weapons/Skins';
 
@@ -75,7 +76,7 @@ function renderLobbyCard(): void {
   $('lpWeapon').textContent = WEAPONS[agent.weapon]?.name ?? agent.weapon;
   $('lpSkin').textContent = `${sk.name} · ${RARITY_LABEL[sk.rarity]}`;
   $('lpWeapon').parentElement!.style.setProperty('--rar', RARITY_COLOR[sk.rarity]);
-  $('lpAgent').textContent = `${agent.team === 'T' ? 'TR' : 'CT'} · Operador ${agent.variant + 1}`;
+  $('lpAgent').textContent = `${agent.team === 'T' ? 'TR' : 'CT'} · ${CHARACTER_FILES[agent.team].name}`;
   $('lpAgent').parentElement!.style.setProperty('--rar', agent.team === 'T' ? 'var(--t)' : 'var(--ct)');
 }
 
@@ -94,6 +95,10 @@ function lobbyAction(action: string): boolean {
       break;
     case 'lobby-team':
       agent.team = agent.team === 'T' ? 'CT' : 'T';
+      // o lado escolhido no lobby vira o lado inicial das partidas
+      picks.side = agent.team;
+      Storage.save('picks', picks);
+      syncPicks();
       break;
     case 'mode-competitive':
     case 'mode-tdm':
@@ -223,6 +228,13 @@ document.addEventListener('click', e => {
       toast(`Modo com bomba: mapa trocado para ${MAPS[picks.map].name}`);
     }
     Storage.save('picks', picks);
+    // escolher o lado mostra o personagem daquela equipe no lobby
+    if (key === 'side' && (picks.side === 'T' || picks.side === 'CT') && agent.team !== picks.side) {
+      agent.team = picks.side;
+      Storage.save('agent', agent);
+      renderLobbyCard();
+      syncLobby();
+    }
     syncPicks();
     game.audio.unlock();
     game.audio.play('click');

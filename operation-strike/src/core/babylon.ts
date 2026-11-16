@@ -35,6 +35,7 @@ export { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 export { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 export { AssetContainer } from '@babylonjs/core/assetContainer';
 export type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
+export { AnimationGroupMask, AnimationGroupMaskMode } from '@babylonjs/core/Animations/animationGroupMask';
 export type { Material } from '@babylonjs/core/Materials/material';
 export type { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture';
 export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline';

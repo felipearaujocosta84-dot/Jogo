@@ -1,3 +1,5 @@
+// MODELO PROVISÓRIO (bonecos montados por código). Só é usado como reserva de emergência se os arquivos GLB
+// dos personagens (public/assets/characters/) não carregarem. O personagem do jogo é o de Character.ts.
 // Personagem 3D com esqueleto (18 ossos) e malha com skinning, proporções humanas (1,80 m),
 // uniforme tático, colete, capacete/balaclava/boné, luvas e botas. 5 visuais por equipe.
 // Animação procedural: caminhada/corrida (ciclo de pernas), agachar, mira acompanhando o pitch,
@@ -74,7 +76,7 @@ function weaponPose(cls: string): { grip: Vector3; left: Vector3 | null } {
 let flashMat: StandardMaterial | null = null;
 let blobMat: StandardMaterial | null = null;
 
-export class CharacterModel {
+export class ProceduralCharacter {
   /** Material PBR (tecido fosco, reflexos do ambiente) nas qualidades Alta/Ultra. */
   static pbr = false;
   readonly root: TransformNode;
@@ -194,7 +196,7 @@ export class CharacterModel {
     }
 
     this.mesh = g.build('soldier', scene, true);
-    if (CharacterModel.pbr) {
+    if (ProceduralCharacter.pbr) {
       const pm = new PBRMaterial('soldierPbr', scene);
       pm.albedoColor = Color3.White();
       pm.metallic = 0.05;

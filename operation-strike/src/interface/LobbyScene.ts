@@ -23,7 +23,8 @@ import {
   type Engine,
   type Material
 } from '../core/babylon';
-import { CharacterModel } from '../player/CharacterModel';
+import { CharacterModel } from '../player/Character';
+import { characterAsset } from '../player/CharacterAssets';
 import { getTexture, getNormalTexture, paintedTexture, type TextureName } from '../maps/textures';
 import { applyStudioEnvironment } from '../core/Environment';
 import { PostFx } from '../core/Graphics';
@@ -379,7 +380,8 @@ export class LobbyScene {
     this.variant = variant;
     this.weapon = weapon;
     this.skin = skin;
-    const key = team + variant + (CharacterModel.pbr ? 'p' : 's');
+    // o modelo 3D da equipe pode terminar de carregar depois: a chave muda e o personagem é recriado
+    const key = team + (characterAsset(this.scene, team) ? 'm' : 'p' + variant) + (CharacterModel.pbr ? 'p' : 's');
     if (key !== this.charKey) {
       this.char?.dispose();
       this.char = new CharacterModel(this.scene, team, variant, this.shadow);
