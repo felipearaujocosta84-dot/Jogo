@@ -38,6 +38,7 @@ export type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 export { AnimationGroupMask, AnimationGroupMaskMode } from '@babylonjs/core/Animations/animationGroupMask';
 export type { Material } from '@babylonjs/core/Materials/material';
 export type { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture';
+export { SSRRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssrRenderingPipeline';
 export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline';
 export { SSAO2RenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssao2RenderingPipeline';
 export { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration';

@@ -26,7 +26,8 @@ import {
 } from '../core/babylon';
 import { CharacterModel } from '../player/Character';
 import { characterAsset } from '../player/CharacterAssets';
-import { getTexture, getNormalTexture, paintedTexture, type TextureName } from '../maps/textures';
+import { getTexture, paintedTexture, type TextureName } from '../maps/textures';
+import { applyPbr, pbrSet, resFor } from '../maps/PbrTextures';
 import { applyStudioEnvironment } from '../core/Environment';
 import { PostFx } from '../core/Graphics';
 import type { QualityPreset } from '../core/Quality';
@@ -131,16 +132,14 @@ export class LobbyScene {
     const found = this.scene.getMaterialByName(key);
     if (found) return found;
     if (this.preset.pbr) {
+      // texturas PBR reais (cópias próprias do lobby, com a repetição de cada peça)
       const m = new PBRMaterial(key, this.scene);
-      const tex = getTexture(this.scene, name, size);
-      tex.uScale = tex.vScale = scale;
-      m.albedoTexture = tex;
-      const n = getNormalTexture(this.scene, name, size);
-      n.uScale = n.vScale = scale;
-      m.bumpTexture = n;
+      const set = pbrSet(this.scene, name, resFor(name, this.preset.pbrRes === '4k' ? '2k' : this.preset.pbrRes), this.preset.aniso, 'lobby' + scale);
+      for (const t of [set.albedo, set.normal, set.orm]) t.uScale = t.vScale = scale;
+      applyPbr(m, set);
       m.albedoColor = Color3.FromHexString(tint);
-      m.metallic = metal;
-      m.roughness = rough;
+      void metal;
+      void rough;
       m.environmentIntensity = 0.55;
       m.directIntensity = 1.3;
       return m;

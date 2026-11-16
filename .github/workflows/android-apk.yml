@@ -43,6 +43,16 @@ jobs:
       - name: Build do jogo (TypeScript + Vite)
         run: npm run build
 
+      - name: Remove texturas só de PC (4K e 2K secundárias) para o APK ficar leve
+        run: |
+          rm -rf dist/assets/textures/pbr/4k
+          cd dist/assets/textures/pbr/2k
+          for f in *.webp; do
+            case "$f" in asphalt_*|concrete_*|plaster_*|brick_*|sandstone_*|sand_*|tile_*) ;;
+              *) rm -f "$f" ;;
+            esac
+          done
+
       - name: Copia o jogo para o projeto Android
         run: npx cap sync android
 

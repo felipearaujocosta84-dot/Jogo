@@ -5,7 +5,7 @@
 import type { Engine } from './babylon';
 import type { QualityMode } from './Settings';
 
-export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
+export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra' | 'ultrareal';
 
 export interface QualityPreset {
   label: string;
@@ -35,13 +35,23 @@ export interface QualityPreset {
   dynamicLights: boolean;
   /** Distância (m) a partir da qual personagens usam animação simplificada (LOD). */
   characterLod: number;
+  /** Resolução máxima das texturas PBR reais dos mapas. */
+  pbrRes: '1k' | '2k' | '4k';
+  /** Filtragem anisotrópica (nitidez das texturas em ângulo rasante). */
+  aniso: number;
+  /** Variação em grande escala que quebra a repetição das texturas. */
+  variation: boolean;
+  /** Reflexos em espaço de tela (SSR) e sombras de contato suaves (PCSS) — só nos níveis mais altos. */
+  ssr: boolean;
+  pcss: boolean;
 }
 
 export const QUALITY: Record<QualityLevel, QualityPreset> = {
-  low: { label: 'Baixa', maxDpr: 1, minDpr: 0.55, maxPixels: 1920 * 1080, shadows: false, shadowMapSize: 0, textureSize: 512, particles: 8, decals: 24, props: false, post: 'none', ssao: false, pbr: false, dynamicLights: false, characterLod: 30 },
-  medium: { label: 'Média', maxDpr: 1.35, minDpr: 0.7, maxPixels: 1920 * 1080, shadows: true, shadowMapSize: 1024, textureSize: 512, particles: 16, decals: 48, props: true, post: 'fxaa', ssao: false, pbr: false, dynamicLights: false, characterLod: 45 },
-  high: { label: 'Alta', maxDpr: 2, minDpr: 0.85, maxPixels: 2560 * 1440, shadows: true, shadowMapSize: 2048, textureSize: 1024, particles: 28, decals: 96, props: true, post: 'full', ssao: false, pbr: true, dynamicLights: true, characterLod: 70 },
-  ultra: { label: 'Ultra / 4K', maxDpr: 3, minDpr: 1, maxPixels: 3840 * 2160, shadows: true, shadowMapSize: 4096, textureSize: 1024, particles: 48, decals: 160, props: true, post: 'full', ssao: true, pbr: true, dynamicLights: true, characterLod: 110 }
+  low: { label: 'Baixa', maxDpr: 1, minDpr: 0.55, maxPixels: 1920 * 1080, shadows: false, shadowMapSize: 0, textureSize: 512, particles: 8, decals: 24, props: false, post: 'none', ssao: false, pbr: false, dynamicLights: false, characterLod: 30, pbrRes: '1k', aniso: 1, variation: false, ssr: false, pcss: false },
+  medium: { label: 'Média', maxDpr: 1.35, minDpr: 0.7, maxPixels: 1920 * 1080, shadows: true, shadowMapSize: 1024, textureSize: 512, particles: 16, decals: 48, props: true, post: 'fxaa', ssao: false, pbr: true, dynamicLights: false, characterLod: 45, pbrRes: '1k', aniso: 4, variation: false, ssr: false, pcss: false },
+  high: { label: 'Alta', maxDpr: 2, minDpr: 0.85, maxPixels: 2560 * 1440, shadows: true, shadowMapSize: 2048, textureSize: 1024, particles: 28, decals: 96, props: true, post: 'full', ssao: false, pbr: true, dynamicLights: true, characterLod: 70, pbrRes: '2k', aniso: 8, variation: true, ssr: false, pcss: false },
+  ultra: { label: 'Ultra', maxDpr: 3, minDpr: 1, maxPixels: 3840 * 2160, shadows: true, shadowMapSize: 4096, textureSize: 1024, particles: 48, decals: 160, props: true, post: 'full', ssao: true, pbr: true, dynamicLights: true, characterLod: 110, pbrRes: '2k', aniso: 16, variation: true, ssr: false, pcss: false },
+  ultrareal: { label: 'Ultra Realista', maxDpr: 3, minDpr: 1, maxPixels: 3840 * 2160, shadows: true, shadowMapSize: 4096, textureSize: 1024, particles: 64, decals: 200, props: true, post: 'full', ssao: true, pbr: true, dynamicLights: true, characterLod: 140, pbrRes: '4k', aniso: 16, variation: true, ssr: true, pcss: true }
 };
 
 export function isMobile(): boolean {
@@ -97,7 +107,7 @@ export class Quality {
     // no celular nunca força 4K: o Ultra fica limitado a 1440p (a resolução dinâmica ajusta o resto)
     const maxPixels = this.mobile ? Math.min(p.maxPixels, 2560 * 1440) : p.maxPixels;
     const byPixels = Math.sqrt(maxPixels / css);
-    return Math.max(0.5, Math.min(this.dpr * (this.level === 'ultra' ? 1.5 : 1), p.maxDpr, byPixels));
+    return Math.max(0.5, Math.min(this.dpr * (this.level === 'ultra' || this.level === 'ultrareal' ? 1.5 : 1), p.maxDpr, byPixels));
   }
 
   private applyLevel(): void {
@@ -135,7 +145,7 @@ export class Quality {
     if (this.mode === 'auto' && fps < target * 0.6 && this.renderDpr <= minDpr + 0.01) {
       if (++this.lowStreak >= 3 && this.level !== 'low') {
         this.lowStreak = 0;
-        this.level = this.level === 'ultra' ? 'high' : this.level === 'high' ? 'medium' : 'low';
+        this.level = this.level === 'ultrareal' ? 'ultra' : this.level === 'ultra' ? 'high' : this.level === 'high' ? 'medium' : 'low';
         this.applyLevel();
         this.onAutoDowngrade?.(this.level);
       }

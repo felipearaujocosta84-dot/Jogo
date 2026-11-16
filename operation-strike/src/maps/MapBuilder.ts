@@ -23,7 +23,8 @@ import {
 } from '../core/babylon';
 import type { QualityPreset } from '../core/Quality';
 import { applyStudioEnvironment } from '../core/Environment';
-import { getTexture, getNormalTexture, paintedTexture } from './textures';
+import { paintedTexture } from './textures';
+import { addVariation, applyBasic, progressivePbr, upgradeKitMaterial } from './PbrTextures';
 import { expandMap } from './MapLayout';
 import type { MapRuntime } from './MapRuntime';
 import { MATERIAL_SCALE, type BoxDef, type MapDefinition, type MaterialName } from './MapTypes';
@@ -108,9 +109,14 @@ export class MapBuilder {
     if (this.quality.shadows) {
       shadow = new ShadowGenerator(this.quality.shadowMapSize, sun);
       const webgl2 = (scene.getEngine() as unknown as { webGLVersion?: number }).webGLVersion === 2;
-      if (webgl2 && this.quality.shadowMapSize >= 2048) {
+      if (webgl2 && this.quality.pcss) {
+        // sombras de contato suaves (PCSS): nítidas perto do objeto, difusas longe — como a luz real do sol
+        shadow.useContactHardeningShadow = true;
+        shadow.contactHardeningLightSizeUVRatio = 0.035;
+        shadow.filteringQuality = ShadowGenerator.QUALITY_HIGH;
+      } else if (webgl2 && this.quality.shadowMapSize >= 2048) {
         shadow.usePercentageCloserFiltering = true;
-        shadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+        shadow.filteringQuality = this.quality.shadowMapSize >= 4096 ? ShadowGenerator.QUALITY_HIGH : ShadowGenerator.QUALITY_MEDIUM;
       } else {
         shadow.usePoissonSampling = true;
       }
@@ -167,6 +173,8 @@ export class MapBuilder {
             pm.directIntensity = 1.35;
             if (/glow|fire|screen|lamp|crystal/i.test(mat.name)) pm.emissiveColor = pm.albedoColor.scale(0.8);
             if (!quality.pbr) pm.specularIntensity = 0.3;
+            // texturas reais por cima da cor original do kit (relevo, desgaste, rugosidade)
+            else upgradeKitMaterial(pm, scene, quality.pbrRes, quality.aniso);
             mat.freeze();
           }
           // sombra estática: desenha de novo agora que o cenário chegou
@@ -279,35 +287,23 @@ export class MapBuilder {
     else b.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
-  /** Metalicidade e rugosidade realistas por material (PBR). */
-  private static PBR: Partial<Record<MaterialName, [number, number]>> = {
-    metal: [0.75, 0.45], container: [0.55, 0.5], door: [0.6, 0.45], steel: [0.85, 0.3], glass: [0.9, 0.08],
-    concrete: [0, 0.9], sand: [0, 0.97], sandstone: [0, 0.88], plaster: [0, 0.85], brick: [0, 0.85], tile: [0, 0.6],
-    asphalt: [0, 0.92], crate: [0, 0.75], roof: [0.2, 0.7], trim: [0, 0.8], carpet: [0, 1], grass: [0, 0.95], dark: [0.3, 0.3]
-  };
-
   private material(name: MaterialName): StandardMaterial | PBRMaterial {
     let m: StandardMaterial | PBRMaterial | undefined = this.materials.get(name);
     if (m) return m;
-    if (this.quality.pbr) {
-      // Alta/Ultra: PBR com mapa de relevo gerado da textura e reflexos do ambiente
+    const q = this.quality;
+    if (q.pbr) {
+      // Média em diante: texturas PBR reais (cor, relevo, oclusão, rugosidade, metal), 1K → 2K/4K progressivo
       const p = new PBRMaterial('pbr_' + name, this.scene);
-      p.albedoTexture = getTexture(this.scene, name, this.quality.textureSize);
-      if (name !== 'dark') {
-        p.bumpTexture = getNormalTexture(this.scene, name, this.quality.textureSize);
-        p.bumpTexture.level = 0.9;
-      }
-      const [met, rough] = MapBuilder.PBR[name] ?? [0, 0.8];
-      p.metallic = met;
-      p.roughness = rough;
-      p.environmentIntensity = 0.55;
-      p.directIntensity = 1.6;
+      progressivePbr(this.scene, p, name, q.pbrRes, q.aniso, name === 'glass' ? 0.4 : 1);
+      if (q.variation && name !== 'crate' && name !== 'glass') addVariation(p, this.scene);
+      p.environmentIntensity = name === 'glass' ? 1.0 : 0.6;
+      p.directIntensity = 1.5;
       if (name === 'dark') p.emissiveColor = new Color3(0.02, 0.025, 0.03);
       this.materials.set(name, p);
       return p;
     }
     m = new StandardMaterial('mat_' + name, this.scene);
-    m.diffuseTexture = getTexture(this.scene, name, this.quality.textureSize);
+    applyBasic(m, this.scene, name);
     m.specularColor = name === 'glass' ? new Color3(0.8, 0.8, 0.8) : name === 'metal' || name === 'container' || name === 'door' || name === 'steel' ? new Color3(0.25, 0.25, 0.25) : new Color3(0.04, 0.04, 0.04);
     if (name === 'glass') m.specularPower = 96;
     m.specularPower = 32;

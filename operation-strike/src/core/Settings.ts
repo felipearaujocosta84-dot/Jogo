@@ -1,7 +1,7 @@
 // Preferências do jogador (salvas no aparelho).
 import { Storage } from '../save/Storage';
 
-export type QualityMode = 'auto' | 'low' | 'medium' | 'high' | 'ultra';
+export type QualityMode = 'auto' | 'low' | 'medium' | 'high' | 'ultra' | 'ultrareal';
 
 export interface SettingsData {
   quality: QualityMode;

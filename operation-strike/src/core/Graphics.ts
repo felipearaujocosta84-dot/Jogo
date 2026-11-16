@@ -7,6 +7,7 @@ import {
   DefaultRenderingPipeline,
   ImageProcessingConfiguration,
   SSAO2RenderingPipeline,
+  SSRRenderingPipeline,
   type Camera,
   type Scene
 } from './babylon';
@@ -15,6 +16,7 @@ import type { QualityPreset } from './Quality';
 export class PostFx {
   private pipeline: DefaultRenderingPipeline | null = null;
   private ssao: SSAO2RenderingPipeline | null = null;
+  private ssr: SSRRenderingPipeline | null = null;
   ssaoActive = false;
 
   constructor(private scene: Scene, private camera: Camera) {}
@@ -52,7 +54,7 @@ export class PostFx {
         ssao.radius = 1.2;
         ssao.totalStrength = 1.1;
         ssao.base = 0.12;
-        ssao.samples = 12;
+        ssao.samples = p.ssr ? 16 : 12;
         ssao.maxZ = 120;
         ssao.expensiveBlur = false;
         this.ssao = ssao;
@@ -62,6 +64,22 @@ export class PostFx {
         this.ssaoActive = false;
       }
     }
+    // Ultra Realista: reflexos em espaço de tela (piso polido, vidro, metal, poças)
+    if (p.ssr && webgl2) {
+      try {
+        const ssr = new SSRRenderingPipeline('ssr', this.scene, [this.camera], false);
+        ssr.strength = 0.7;
+        ssr.reflectivityThreshold = 0.06;
+        ssr.thickness = 0.4;
+        ssr.maxDistance = 60;
+        ssr.step = 1;
+        ssr.blurDispersionStrength = 0.03;
+        ssr.roughnessFactor = 0.15;
+        this.ssr = ssr;
+      } catch (e) {
+        console.warn('[gráficos] reflexos (SSR) indisponíveis', e);
+      }
+    }
   }
 
   dispose(): void {
@@ -69,6 +87,8 @@ export class PostFx {
     this.pipeline = null;
     this.ssao?.dispose();
     this.ssao = null;
+    this.ssr?.dispose();
+    this.ssr = null;
     this.ssaoActive = false;
   }
 }

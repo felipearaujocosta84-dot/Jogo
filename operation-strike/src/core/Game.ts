@@ -175,8 +175,8 @@ export class Game {
     const level = this.quality.level;
     const lib = this.library;
     lib.enabled = level !== 'low';
-    lib.maxLoaded = level === 'ultra' ? 8 : level === 'high' ? 6 : 4;
-    lib.textureSize = level === 'high' || level === 'ultra' ? 2048 : 1024;
+    lib.maxLoaded = level === 'ultra' || level === 'ultrareal' ? 8 : level === 'high' ? 6 : 4;
+    lib.textureSize = level === 'high' || level === 'ultra' || level === 'ultrareal' ? 2048 : 1024;
     setWeaponMaterialQuality(level !== 'low');
   }
 
@@ -207,7 +207,7 @@ export class Game {
   /** Versão leve dos personagens (menos polígonos, texturas 1024): Baixa/Média e celular (exceto Ultra). */
   private get characterLod(): boolean {
     const lv = this.quality.level;
-    return lv === 'low' || lv === 'medium' || (isMobile() && lv !== 'ultra');
+    return lv === 'low' || lv === 'medium' || (isMobile() && lv !== 'ultra' && lv !== 'ultrareal');
   }
   /** Cena 3D do menu principal (renderizada no lugar da partida enquanto não há sessão). */
   lobby: LobbyScene | null = null;
