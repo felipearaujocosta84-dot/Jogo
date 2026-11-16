@@ -36,6 +36,7 @@ const BUTTONS: ButtonSpec[] = [
   { id: 'aim', action: 'aim', label: 'MIRAR', icon: '⊕', toggle: true },
   { id: 'reload', action: 'reload', label: 'RECARREGAR', icon: '↻' },
   { id: 'jump', action: 'jump', label: 'PULAR', icon: '⤒' },
+  { id: 'sprint', action: 'sprint', label: 'CORRER', icon: '»', toggle: true },
   { id: 'crouch', action: 'crouch', label: 'AGACHAR', icon: '⤓', toggle: true },
   { id: 'switch', action: 'switch', label: 'TROCAR', icon: '⇄' },
   { id: 'interact', action: 'interact', label: 'USAR', icon: '✋' },
@@ -53,6 +54,7 @@ const DEFAULT_LAYOUT: Layout = {
   aim: { x: 0.94, y: 0.4, size: 0.12 },
   reload: { x: 0.73, y: 0.86, size: 0.11 },
   jump: { x: 0.94, y: 0.74, size: 0.13 },
+  sprint: { x: 0.31, y: 0.5, size: 0.1 },
   crouch: { x: 0.94, y: 0.92, size: 0.11 },
   switch: { x: 0.61, y: 0.9, size: 0.1 },
   interact: { x: 0.72, y: 0.4, size: 0.1 },
@@ -334,6 +336,7 @@ export class TouchControls {
       }
     } else if (role.kind === 'joystick') {
       this.input.setMove('touch', 0, 0);
+      this.clearToggle('sprint'); // soltou o joystick: para de correr
       this.joyBase.classList.remove('active');
       this.setKnob(0, 0);
       this.applyLayout();

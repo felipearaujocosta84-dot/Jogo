@@ -16,6 +16,12 @@ export class FirstPersonCamera {
   private landVel = 0;
   private shake = 0;
   private specPos: Vector3 | null = null;
+  /** Inclinação lateral (strafe), aumento de FOV na corrida e coice visual dos disparos. */
+  private tilt = 0;
+  private sprintFov = 0;
+  private kickP = 0;
+  private kickVel = 0;
+  tiltEnabled = true;
 
   constructor(scene: Scene) {
     this.camera = new FreeCamera('fpCamera', new Vector3(0, 1.7, 0), scene);
@@ -39,6 +45,11 @@ export class FirstPersonCamera {
     this.landVel -= Math.min(2.5, impact * 0.12);
   }
 
+  /** Coice visual do disparo (a câmera sobe e volta como uma mola). */
+  kick(amount: number): void {
+    this.kickVel += amount;
+  }
+
   addShake(amount: number): void {
     this.shake = Math.min(1.5, this.shake + amount);
   }
@@ -48,7 +59,7 @@ export class FirstPersonCamera {
     const aspect = engine.getRenderWidth() / Math.max(1, engine.getRenderHeight());
     let fov = this.baseFov;
     if (aspect < 1) fov = Math.min(100, fov * 1.25);
-    this.camera.fov = fov * DEG * this.zoom;
+    this.camera.fov = (fov + this.sprintFov * 7) * DEG * this.zoom;
   }
 
   private common(dt: number): { sx: number; sy: number } {
@@ -61,18 +72,24 @@ export class FirstPersonCamera {
   }
 
   /** Primeira pessoa: eye = posição dos olhos; yaw/pitch já incluem o recuo. */
-  update(dt: number, eye: { x: number; y: number; z: number }, yaw: number, pitch: number, speed: number, onGround: boolean): void {
+  update(dt: number, eye: { x: number; y: number; z: number }, yaw: number, pitch: number, speed: number, onGround: boolean, lateral = 0, sprint = 0): void {
     this.specPos = null;
     const { sx, sy } = this.common(dt);
+    const tiltTarget = this.tiltEnabled && onGround ? Math.max(-1, Math.min(1, lateral / 5.6)) * -0.022 : 0;
+    this.tilt += (tiltTarget - this.tilt) * Math.min(1, dt * 7);
+    this.sprintFov += (sprint - this.sprintFov) * Math.min(1, dt * 5);
+    this.kickVel += (-this.kickP * 260 - this.kickVel * 22) * dt;
+    this.kickP += this.kickVel * dt;
     const sp = onGround ? speed : 0;
     const targetBob = Math.min(1, sp / 5.6) * (this.targetZoom < 0.95 ? 0.3 : 1);
     this.bobAmount += (targetBob - this.bobAmount) * Math.min(1, dt * 8);
     this.bobPhase += dt * (4 + sp * 1.15);
-    const bobY = Math.sin(this.bobPhase * 2) * 0.03 * this.bobAmount;
-    const bobX = Math.cos(this.bobPhase) * 0.02 * this.bobAmount;
+    const runBob = 1 + this.sprintFov * 0.6;
+    const bobY = Math.sin(this.bobPhase * 2) * 0.03 * this.bobAmount * runBob;
+    const bobX = Math.cos(this.bobPhase) * 0.02 * this.bobAmount * runBob;
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     this.camera.position.set(eye.x + cos * bobX, eye.y + bobY + this.landDip * 0.12, eye.z - sin * bobX);
-    this.camera.rotation.set(-pitch + sy, yaw + sx, Math.sin(this.bobPhase) * 0.004 * this.bobAmount);
+    this.camera.rotation.set(-pitch + sy - this.kickP, yaw + sx, Math.sin(this.bobPhase) * 0.004 * this.bobAmount * runBob + this.tilt);
   }
 
   /** Espectador: atrás e acima do jogador observado. */

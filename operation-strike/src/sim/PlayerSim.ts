@@ -220,6 +220,8 @@ export class SimPlayer {
       if (this.scope > 0) s = c.onGround ? Math.max(0.03, s * (speed > 1 ? 0.6 : 0.01)) : s;
     } else if (this.input.isDown('aim') && w.cls !== 'knife') s *= 0.6;
     if (c.crouched) s *= 0.75;
+    // correndo: penalidade forte de precisão
+    if (c.sprintT > 0.05 && c.onGround) s += (w.spreadMove - w.spreadStand) * 0.8 * c.sprintT + 1.5 * c.sprintT;
     s += Math.min(this.spray, 10) * (w.cls === 'pistol' ? 0.25 : 0.14);
     return s;
   }
@@ -244,6 +246,8 @@ export class SimPlayer {
     inp.set('jump', !!(b & BTN.JUMP), 'cmd');
     inp.set('crouch', !!(b & BTN.CROUCH), 'cmd');
     inp.set('walk', !!(b & BTN.WALK), 'cmd');
+    // correr: só sem mirar/atirar/luneta (atirar cancela a corrida)
+    inp.set('sprint', !!(b & BTN.SPRINT) && !(b & (BTN.AIM | BTN.FIRE)) && this.scope === 0 && this.reloadT <= 0, 'cmd');
     inp.set('interact', !!(b & BTN.USE), 'cmd');
     inp.set('zoom', !!(b & BTN.ZOOM), 'cmd');
     inp.set('switch', !!(b & BTN.NEXT), 'cmd');
@@ -317,6 +321,8 @@ export class SimPlayer {
     // disparo
     if (this.active !== 'c4' && !this.frozen) {
       const wants = w.automatic ? inp.isDown('fire') : inp.consume('fire');
+      // vindo de uma corrida, a arma leva um instante para subir até a posição de tiro
+      if (wants && this.ctrl.sprintT > 0.15 && w.cls !== 'knife') this.cooldown = Math.max(this.cooldown, 0.14 * this.ctrl.sprintT);
       if (wants) this.tryFire(w, hooks, cmd.rt, tick);
     }
     if (this.act === 1 && this.reloadT <= 0) this.act = 0;

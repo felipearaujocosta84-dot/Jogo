@@ -14,7 +14,8 @@ export const BTN = {
   USE: 64,
   ZOOM: 128,
   NEXT: 256,
-  DROP: 512
+  DROP: 512,
+  SPRINT: 1024
 } as const;
 
 /** Comando do jogador para um passo de simulação (1/60 s). */

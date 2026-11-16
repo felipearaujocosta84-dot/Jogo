@@ -8,6 +8,7 @@ export type ActionName =
   | 'jump'
   | 'crouch'
   | 'walk'
+  | 'sprint'
   | 'switch'
   | 'interact'
   | 'inspect'

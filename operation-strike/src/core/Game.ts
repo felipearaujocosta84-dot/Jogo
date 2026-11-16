@@ -382,6 +382,7 @@ export class Game {
     if (i.isDown('jump') || i.consume('jump')) b |= BTN.JUMP;
     if (i.isDown('crouch')) b |= BTN.CROUCH;
     if (i.isDown('walk')) b |= BTN.WALK;
+    if (i.isDown('sprint')) b |= BTN.SPRINT;
     if (i.isDown('interact') || i.consume('interact')) b |= BTN.USE;
     if (i.consume('zoom')) b |= BTN.ZOOM;
     if (i.consume('switch')) b |= BTN.NEXT;
@@ -486,7 +487,9 @@ export class Game {
         this.audio.land(-this.landWatch.vy, c.groundSurface);
       }
       this.landWatch = { ground: c.onGround, vy: c.velocity.y };
-      this.camera.update(dt, eye, this.look.yaw + punchY, this.look.pitch + punchP, c.horizontalSpeed, c.onGround);
+      const lateral = c.velocity.x * Math.cos(this.look.yaw) - c.velocity.z * Math.sin(this.look.yaw);
+      this.camera.tiltEnabled = this.settings.get('cameraTilt');
+      this.camera.update(dt, eye, this.look.yaw + punchY, this.look.pitch + punchP, c.horizontalSpeed, c.onGround, lateral, c.sprintT);
       camX = eye.x;
       camZ = eye.z;
       // zoom: luneta ou mira
@@ -508,7 +511,7 @@ export class Game {
       this.view.plant(local.act === 2 || local.act === 3);
       this.view.setVisible(!scoped);
       const bob = this.camera.bob;
-      this.view.update(dt, { aiming: local.input.isDown('aim') && !w.scope, crouched: c.crouched, speed: c.horizontalSpeed, onGround: c.onGround, bobPhase: bob.phase, bobAmount: bob.amount, landDip: bob.dip });
+      this.view.update(dt, { aiming: local.input.isDown('aim') && !w.scope, crouched: c.crouched, speed: c.horizontalSpeed + c.sprintT * 2, onGround: c.onGround, bobPhase: bob.phase, bobAmount: bob.amount, landDip: bob.dip });
       // passos do próprio jogador
       const ch = this.footstepTracker('local', c.horizontalSpeed, c.onGround, dt);
       if (ch) this.audio.footstep(c.groundSurface);
@@ -685,6 +688,7 @@ export class Game {
         if (!serverEcho) {
           if (isLocal) {
             this.view.fire();
+            if (def && def.cls !== 'knife' && def.cls !== 'grenade') this.camera.kick(Math.min(0.5, def.recoil * 0.05) * (def.cls === 'sniper' ? 1.6 : 1));
             this.audio.shot(def?.sound ?? 'rifle', null, e.w as string);
             if (def?.cls !== 'knife') this.fx.lightFlash(this.view.muzzleWorld, def?.cls === 'sniper' ? 2.6 : 1.6, 0.06, 7);
             if (def?.cls !== 'knife') this.fx.tracer(this.view.muzzleWorld, to);

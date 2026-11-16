@@ -14,6 +14,12 @@ export const PLAYER = {
   stepHeight: 0.5,
   runSpeed: 5.6,
   walkSpeed: 2.9,
+  /** Velocidade máxima correndo (botão CORRER / Shift), alcançada aos poucos. */
+  sprintSpeed: 7.1,
+  /** Segundos para atingir a corrida máxima. */
+  sprintRamp: 0.7,
+  /** Aterrissagem forte reduz a velocidade por um instante. */
+  landSlow: 0.55,
   crouchSpeed: 2.0,
   gravity: 19,
   jumpSpeed: 6.4,
@@ -36,6 +42,7 @@ export interface ControllerState {
   vz: number;
   onGround: boolean;
   crouched: boolean;
+  sprintT?: number;
 }
 
 export interface PlayerEvents {
@@ -64,6 +71,8 @@ export class PlayerController {
   /** Desligado = personagem parado (menus, morte). */
   enabled = true;
 
+  /** 0..1: quanto da corrida já foi alcançada (aceleração progressiva). */
+  sprintT = 0;
   private eyeHeight = PLAYER.eyeStand;
   private stepOffset = 0;
   private stepAccum = 0;
@@ -77,7 +86,7 @@ export class PlayerController {
     return {
       x: this.position.x, y: this.position.y, z: this.position.z,
       vx: this.velocity.x, vy: this.velocity.y, vz: this.velocity.z,
-      onGround: this.onGround, crouched: this.crouched
+      onGround: this.onGround, crouched: this.crouched, sprintT: this.sprintT
     };
   }
 
@@ -90,6 +99,7 @@ export class PlayerController {
     this.velocity.y = s.vy;
     this.velocity.z = s.vz;
     this.onGround = s.onGround;
+    this.sprintT = s.sprintT ?? 0;
     if (s.crouched !== this.crouched) {
       this.crouched = s.crouched;
       this.height = s.crouched ? PLAYER.crouchHeight : PLAYER.standHeight;
@@ -125,6 +135,7 @@ export class PlayerController {
     this.yaw = yaw;
     this.pitch = 0;
     this.crouched = false;
+    this.sprintT = 0;
     this.height = PLAYER.standHeight;
     this.eyeHeight = PLAYER.eyeStand;
     this.stepOffset = 0;
@@ -162,7 +173,12 @@ export class PlayerController {
     const wishX = mx * cos + my * sin;
     const wishZ = -mx * sin + my * cos;
 
-    let maxSpeed = this.crouched ? PLAYER.crouchSpeed : this.walking ? PLAYER.walkSpeed : PLAYER.runSpeed;
+    // corrida: só para a frente, no chão e em pé; acelera progressivamente e desacelera suave
+    const wantSprint = input.isDown('sprint') && !this.crouched && !this.walking && my > 0.5 && mag > 0.5;
+    if (wantSprint && this.onGround) this.sprintT = Math.min(1, this.sprintT + dt / PLAYER.sprintRamp);
+    else if (!wantSprint) this.sprintT = Math.max(0, this.sprintT - dt * 3);
+    const sprintEase = this.sprintT * this.sprintT * (3 - 2 * this.sprintT);
+    let maxSpeed = this.crouched ? PLAYER.crouchSpeed : this.walking ? PLAYER.walkSpeed : PLAYER.runSpeed + (PLAYER.sprintSpeed - PLAYER.runSpeed) * sprintEase;
     maxSpeed *= this.speedMultiplier;
     const wishSpeed = maxSpeed * mag;
 
@@ -388,6 +404,15 @@ export class PlayerController {
 
   private land(surface: SurfaceKind): void {
     if (this.fallSpeed > 2) this.events.onLand?.(this.fallSpeed, surface);
+    // aterrissagem: queda alta trava o movimento por um instante (sem "bunny hop" infinito)
+    if (this.fallSpeed > 7.5) {
+      this.velocity.x *= PLAYER.landSlow;
+      this.velocity.z *= PLAYER.landSlow;
+      this.sprintT *= 0.4;
+    } else if (this.fallSpeed > 4) {
+      this.velocity.x *= 0.88;
+      this.velocity.z *= 0.88;
+    }
   }
 
   private updateCrouch(want: boolean): void {
