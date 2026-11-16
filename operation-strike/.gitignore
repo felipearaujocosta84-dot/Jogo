@@ -3,3 +3,6 @@ dist
 *.log
 data/
 public/assets/manifest.json
+
+.env
+.data/

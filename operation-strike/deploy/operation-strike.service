@@ -1,0 +1,23 @@
+# Serviço systemd: inicia com o sistema e reinicia sozinho se o processo cair.
+# Instalar: sudo cp deploy/operation-strike.service /etc/systemd/system/ && sudo systemctl enable --now operation-strike
+[Unit]
+Description=OPERATION STRIKE - servidor multiplayer
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opstrike
+WorkingDirectory=/opt/operation-strike
+EnvironmentFile=/opt/operation-strike/.env
+ExecStart=/usr/bin/npx tsx server/index.ts
+Restart=always
+RestartSec=3
+# limites e isolamento
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

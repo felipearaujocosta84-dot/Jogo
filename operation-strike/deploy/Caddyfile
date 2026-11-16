@@ -1,0 +1,6 @@
+# Caddy: HTTPS automático (Let's Encrypt) e WSS para o servidor do jogo.
+# Troque o domínio. O DNS (registro A) do domínio precisa apontar para o IP da VPS.
+jogo.seudominio.com.br {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080
+}

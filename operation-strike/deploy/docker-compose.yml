@@ -1,0 +1,23 @@
+# Alternativa com Docker: PostgreSQL + servidor do jogo (reinício automático). Use um proxy HTTPS na frente.
+# docker compose -f deploy/docker-compose.yml up -d --build
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: opstrike
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no ambiente}
+      POSTGRES_DB: opstrike
+    volumes: [pgdata:/var/lib/postgresql/data]
+  game:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    restart: always
+    depends_on: [db]
+    environment:
+      PORT: 8080
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://opstrike:${DB_PASSWORD}@db:5432/opstrike
+      TRUST_PROXY: "1"
+    ports: ["127.0.0.1:8080:8080"]
+volumes:
+  pgdata:

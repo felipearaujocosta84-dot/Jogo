@@ -142,6 +142,7 @@ export class Quality {
       pcss: cap.pcss,
       shadowMapSize: Math.min(base.shadowMapSize, cap.shadowMapSize),
       maxDpr: Math.min(base.maxDpr, cap.maxDpr),
+      minDpr: Math.min(base.minDpr, cap.minDpr),
       maxPixels: Math.min(base.maxPixels, cap.maxPixels),
       pbrRes: cap.pbrRes,
       particles: Math.min(base.particles, cap.particles),
