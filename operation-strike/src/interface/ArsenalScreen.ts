@@ -42,6 +42,18 @@ export class ArsenalScreen {
   private loadToken = 0;
   private report: AssetReport | null = null;
   onEquip: () => void = () => {};
+  /** Arma escolhida na tela (o lobby mostra o agente com ela). */
+  onWeapon: (id: string) => void = () => {};
+
+  get weaponId(): string {
+    return this.weapon;
+  }
+
+  /** Abre já na aba indicada (ex.: inventário) e/ou com a arma indicada. */
+  prepare(tab: 'weapons' | 'inventory' | 'assets', weapon?: string): void {
+    this.tab = tab;
+    if (weapon) this.weapon = weapon;
+  }
   onToast: (msg: string) => void = () => {};
 
   constructor() {
@@ -172,6 +184,7 @@ export class ArsenalScreen {
     const w = t.closest<HTMLElement>('[data-arsw]');
     if (w) {
       this.weapon = w.dataset.arsw!;
+      this.onWeapon(this.weapon);
       this.preview = SkinPrefs.get(this.weapon);
       this.tab = 'weapons';
       this.render();

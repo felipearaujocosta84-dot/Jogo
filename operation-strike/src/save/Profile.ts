@@ -16,6 +16,7 @@ export interface MatchRecord {
   mvps: number;
   mmrDelta: number;
   xp: number;
+  coins?: number;
 }
 
 export interface ProfileData {
@@ -33,6 +34,8 @@ export interface ProfileData {
   mvps: number;
   matches: number;
   roundsWon: number;
+  /** Moedas de campanha ganhas nas partidas. */
+  coins?: number;
   history: MatchRecord[];
 }
 
@@ -95,6 +98,8 @@ export function applyMatch(
   const xp = Math.max(50, s.kills * 10 + s.assists * 5 + s.mvps * 20 + info.scoreOwn * 15 + (result === 'win' ? 200 : result === 'draw' ? 100 : 50)) * (info.mode === 'competitive' ? 1 : 0.6);
   p.mmr = Math.max(100, p.mmr + mmrDelta);
   p.xp += Math.round(xp);
+  const coins = Math.round(xp / 6) + (result === 'win' ? 25 : 0);
+  p.coins = (p.coins ?? 0) + coins;
   p.matches++;
   if (result === 'win') p.wins++;
   else if (result === 'loss') p.losses++;
@@ -108,7 +113,7 @@ export function applyMatch(
   const rec: MatchRecord = {
     date: Date.now(), mode: info.mode, mapId: info.mapId, online: info.online, result,
     score: `${info.scoreOwn}-${info.scoreEnemy}`, team: s.team, kills: s.kills, deaths: s.deaths, assists: s.assists,
-    mvps: s.mvps, mmrDelta, xp: Math.round(xp)
+    mvps: s.mvps, mmrDelta, xp: Math.round(xp), coins
   };
   p.history.unshift(rec);
   if (p.history.length > 30) p.history.length = 30;

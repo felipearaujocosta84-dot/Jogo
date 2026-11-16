@@ -26,6 +26,7 @@ import { WeaponLibrary } from '../weapons/WeaponLibrary';
 import { setWeaponMaterialQuality } from '../weapons/WeaponModels';
 import { applyStudioEnvironment } from './Environment';
 import { PostFx } from './Graphics';
+import { LobbyScene } from '../interface/LobbyScene';
 import { weaponConfigs, assetExists, ASSET_BASE } from '../assets/AssetRegistry';
 import { PLAYER } from '../player/PlayerController';
 import { BTN, type PlayerView, type SimEvent, type Team, type UserCmd } from '../sim/types';
@@ -115,6 +116,8 @@ export class Game {
     CharacterModel.pbr = this.quality.preset.pbr;
     this.postFx = new PostFx(this.scene, this.camera.camera);
     this.postFx.apply(this.quality.preset);
+    onProgress(18, 'Montando o lobby');
+    this.lobby = new LobbyScene(this.engine, this.quality.preset);
     onProgress(25, 'Construindo o cenário');
     this.loadMapVisual(DEFAULT_MAP);
     await nextFrame();
@@ -196,6 +199,8 @@ export class Game {
   }
 
   private postFx!: PostFx;
+  /** Cena 3D do menu principal (renderizada no lugar da partida enquanto não há sessão). */
+  lobby: LobbyScene | null = null;
 
   /** Reconfigura tudo que depende do nível de qualidade (cenário, pós-processamento, luzes, materiais). */
   private applyQualityLevel(): void {
@@ -210,6 +215,15 @@ export class Game {
       this.chars.clear(); // recriados no próximo quadro com o material novo
     }
     if (this.library) this.configureLibrary();
+    if (this.lobby) {
+      // recria o lobby com os materiais/sombras do novo nível, mantendo o agente e a arma
+      const old = this.lobby;
+      const next = new LobbyScene(this.engine, p);
+      next.active = old.active;
+      next.setLoadout(old.team, old.variant, old.weapon, old.skin);
+      old.dispose();
+      this.lobby = next;
+    }
     if (this.visualMapId) {
       const id = this.visualMapId;
       this.visualMapId = '';
@@ -322,6 +336,17 @@ export class Game {
     this.lastTime = now;
     if (dt > 0.1) dt = 0.1;
     const s = this.session;
+    if (this.paused && !s && this.lobby?.active) {
+      // menu principal: cena do lobby (até 60 qps, respeitando o limite escolhido)
+      const cap = Math.min(60, this.settings.get('fpsCap') || 60);
+      this.sinceRender += dt;
+      if (this.sinceRender < 1 / cap - 0.002) return;
+      const ldt = Math.min(0.1, this.sinceRender);
+      this.sinceRender = 0;
+      this.lobby.render(ldt);
+      this.quality.update(ldt, cap);
+      return;
+    }
     if (this.paused) {
       // menus: offline a cena fica parada; online a simulação segue (sem comandos)
       if (s?.online) s.update(dt, () => this.idleCmd());

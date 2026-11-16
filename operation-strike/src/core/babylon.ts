@@ -28,6 +28,7 @@ export { Skeleton } from '@babylonjs/core/Bones/skeleton';
 export { Bone } from '@babylonjs/core/Bones/bone';
 export { Space } from '@babylonjs/core/Maths/math.axis';
 export { PointLight } from '@babylonjs/core/Lights/pointLight';
+export { SpotLight } from '@babylonjs/core/Lights/spotLight';
 export { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 export { RawCubeTexture } from '@babylonjs/core/Materials/Textures/rawCubeTexture';
 export { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';

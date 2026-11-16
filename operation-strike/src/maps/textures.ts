@@ -328,7 +328,7 @@ export type TextureName = keyof typeof PAINTERS;
 const cache = new Map<string, DynamicTexture>();
 
 export function getTexture(scene: Scene, name: TextureName, size: number): DynamicTexture {
-  const key = name + size;
+  const key = name + size + '@' + scene.uniqueId;
   const found = cache.get(key);
   if (found && found.getInternalTexture()) return found;
   const tex = new DynamicTexture('tex_' + name, { width: size, height: size }, scene, true);
@@ -355,7 +355,7 @@ const BUMP: Partial<Record<TextureName, number>> = {
  * Dá volume aos tijolos, frestas e rachaduras sem nenhum arquivo extra.
  */
 export function getNormalTexture(scene: Scene, name: TextureName, size: number): DynamicTexture {
-  const key = name + size;
+  const key = name + size + '@' + scene.uniqueId;
   const found = normalCache.get(key);
   if (found && found.getInternalTexture()) return found;
   const src = document.createElement('canvas');

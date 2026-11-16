@@ -13,6 +13,8 @@ import { esc } from './interface/Hud';
 import { isNativeApp } from './core/Platform';
 import { SkinPrefs } from './save/SkinPrefs';
 import { ArsenalScreen } from './interface/ArsenalScreen';
+import { BUY_CATEGORIES, WEAPONS } from './weapons/WeaponData';
+import { skinById, RARITY_COLOR, RARITY_LABEL } from './weapons/Skins';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -21,6 +23,10 @@ const arsenal = new ArsenalScreen();
 arsenal.onToast = msg => toast(msg);
 arsenal.onEquip = () => {
   if (net?.connected) net.send({ t: 'skins', skins: SkinPrefs.all });
+};
+arsenal.onWeapon = id => {
+  agent.weapon = id;
+  Storage.save('agent', agent);
 };
 const canvas = $<HTMLCanvasElement>('renderCanvas');
 const game = new Game(canvas, settings);
@@ -34,11 +40,104 @@ let settingsReturn: ScreenId = 'mainMenu';
 let net: NetClient | null = null;
 let profile = loadLocalProfile(settings.get('playerName'));
 
+// ------------------------------------------------------------ lobby 3D
+
+/** Telas em que o lobby 3D aparece ao fundo (fora de partida). */
+const LOBBY_SCREENS = new Set<string>(['mainMenu', 'playMenu', 'lobbyScreen', 'trainingMenu', 'profileScreen', 'rankingScreen', 'settingsMenu']);
+const LOBBY_WEAPONS = BUY_CATEGORIES.filter(c => c.id !== 'grenade' && c.id !== 'gear').flatMap(c => c.items);
+const agent = Object.assign({ team: 'CT' as Team, variant: 0, weapon: 'ak47' }, Storage.load<Partial<{ team: Team; variant: number; weapon: string }>>('agent', {}));
+if (!WEAPONS[agent.weapon]) agent.weapon = 'ak47';
+
+function syncLobby(): void {
+  const l = game.lobby;
+  if (!l) return;
+  l.active = current !== null && LOBBY_SCREENS.has(current) && !game.session;
+  l.setLoadout(agent.team, agent.variant, agent.weapon, SkinPrefs.get(agent.weapon));
+  l.focus(current === 'profileScreen');
+}
+
+function renderLobbyCard(): void {
+  const p = profile;
+  const lv = levelFor(p.xp);
+  $('lpLevel').textContent = String(lv.level);
+  $('lpName').textContent = p.name;
+  $('lpRank').textContent = `${rankName(p.mmr)} · ${p.mmr} MMR`;
+  $('lpXp').style.width = Math.round((lv.into / lv.need) * 100) + '%';
+  $('lpXpText').textContent = `${lv.into} / ${lv.need} XP para o nível ${lv.level + 1}`;
+  $('lpCoins').textContent = (p.coins ?? 0).toLocaleString('pt-BR');
+  const kd = p.deaths ? p.kills / p.deaths : p.kills;
+  const wr = p.matches ? Math.round((p.wins / p.matches) * 100) : 0;
+  const hs = p.kills ? Math.round((p.headshots / p.kills) * 100) : 0;
+  const cell = (v: string | number, l: string) => `<div><b>${v}</b><small>${l}</small></div>`;
+  $('lpStats').innerHTML = cell(p.matches, 'PARTIDAS') + cell(wr + '%', 'VITÓRIAS') + cell(kd.toFixed(2), 'K/D') + cell(p.kills, 'ABATES') + cell(hs + '%', 'NA CABEÇA') + cell(p.mvps, 'MVPS');
+  const sk = skinById(SkinPrefs.get(agent.weapon));
+  $('lpWeapon').textContent = WEAPONS[agent.weapon]?.name ?? agent.weapon;
+  $('lpSkin').textContent = `${sk.name} · ${RARITY_LABEL[sk.rarity]}`;
+  $('lpWeapon').parentElement!.style.setProperty('--rar', RARITY_COLOR[sk.rarity]);
+  $('lpAgent').textContent = `${agent.team === 'T' ? 'TR' : 'CT'} · Operador ${agent.variant + 1}`;
+  $('lpAgent').parentElement!.style.setProperty('--rar', agent.team === 'T' ? 'var(--t)' : 'var(--ct)');
+}
+
+function lobbyAction(action: string): boolean {
+  switch (action) {
+    case 'lobby-weapon-prev':
+    case 'lobby-weapon-next': {
+      const i = LOBBY_WEAPONS.indexOf(agent.weapon);
+      const d = action.endsWith('next') ? 1 : -1;
+      agent.weapon = LOBBY_WEAPONS[(i + d + LOBBY_WEAPONS.length) % LOBBY_WEAPONS.length];
+      break;
+    }
+    case 'lobby-agent-prev':
+    case 'lobby-agent-next':
+      agent.variant = (agent.variant + (action.endsWith('next') ? 1 : 4)) % 5;
+      break;
+    case 'lobby-team':
+      agent.team = agent.team === 'T' ? 'CT' : 'T';
+      break;
+    case 'mode-competitive':
+    case 'mode-tdm':
+      picks.mode = action === 'mode-tdm' ? 'tdm' : 'competitive';
+      Storage.save('picks', picks);
+      syncPicks();
+      show('playMenu');
+      return true;
+    case 'inventory':
+      arsenal.prepare('inventory', agent.weapon);
+      show('arsenalScreen');
+      return true;
+    default:
+      return false;
+  }
+  Storage.save('agent', agent);
+  renderLobbyCard();
+  syncLobby();
+  return true;
+}
+
+// arrastar na área livre gira o agente
+{
+  const drag = $('lobbyDrag');
+  let lastX: number | null = null;
+  drag.addEventListener('pointerdown', e => {
+    lastX = e.clientX;
+    drag.setPointerCapture(e.pointerId);
+  });
+  drag.addEventListener('pointermove', e => {
+    if (lastX === null) return;
+    game.lobby?.drag(e.clientX - lastX);
+    lastX = e.clientX;
+  });
+  const end = () => (lastX = null);
+  drag.addEventListener('pointerup', end);
+  drag.addEventListener('pointercancel', end);
+}
+
 function show(id: ScreenId): void {
   current = id;
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== id);
   document.body.classList.toggle('in-menu', id !== null);
   if (id === 'mainMenu') refreshMenuRank();
+  syncLobby();
   if (id === 'profileScreen') renderProfile(profileTab);
   if (id === 'rankingScreen') void loadRanking();
   if (id === 'arsenalScreen') {
@@ -73,8 +172,7 @@ function updateSkinLevel(): void {
 
 function refreshMenuRank(): void {
   updateSkinLevel();
-  const lv = levelFor(profile.xp);
-  $('menuRank').textContent = `${profile.name} · Nível ${lv.level} · ${rankName(profile.mmr)} (${profile.mmr} MMR)`;
+  renderLobbyCard();
 }
 
 // ------------------------------------------------------------ escolhas (botões segmentados)
@@ -392,6 +490,7 @@ document.addEventListener('click', e => {
   if (!btn) return;
   game.audio.unlock();
   game.audio.play('click');
+  if (lobbyAction(btn.dataset.action!)) return;
   switch (btn.dataset.action) {
     case 'start-bots':
       return startLocal(picks.mode as GameMode, picks.map, picks.difficulty as Difficulty, picks.side);

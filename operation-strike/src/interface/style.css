@@ -412,3 +412,54 @@ body.touch .slots { display: none; }
   .ars-layout { grid-template-columns: 1fr; grid-template-rows: auto 240px auto; }
   .ars-list { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* ------------------------------------------------------------ lobby 3D (menu principal) */
+.screen:not(.hidden) { animation: screenIn 0.32s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@keyframes screenIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+.hq { display: block; padding: 0; background: linear-gradient(90deg, rgba(6, 7, 9, 0.88) 0%, rgba(6, 7, 9, 0.35) 34%, rgba(0, 0, 0, 0) 55%, rgba(6, 7, 9, 0.45) 100%); overflow: hidden; touch-action: none; }
+.lobby-drag { position: absolute; inset: 0; cursor: grab; }
+.lobby-left { position: absolute; top: max(18px, var(--safe-t)); left: max(4vw, var(--safe-l)); bottom: max(14px, var(--safe-b)); display: flex; flex-direction: column; gap: 12px; width: min(340px, 34vw); pointer-events: none; }
+.lobby-left > * { pointer-events: auto; }
+.lobby-left .logo b { font-size: clamp(30px, 5.6vw, 64px); }
+.lobby-nav { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.lobby-nav .btn { text-align: left; display: flex; align-items: center; gap: 10px; padding: 9px 14px; font-size: 14px; letter-spacing: 0.06em; border-left: 3px solid transparent; transition: transform 0.15s, background 0.15s, border-color 0.15s; }
+.lobby-nav .btn i { font-style: normal; width: 18px; text-align: center; color: var(--accent); opacity: 0.85; }
+.lobby-nav .btn:hover, .lobby-nav .btn:focus-visible { transform: translateX(6px); border-left-color: var(--accent); }
+.lobby-nav .btn.big { font-size: 22px; padding: 14px 18px; font-weight: 900; font-style: italic; justify-content: center; }
+.lobby-top { position: absolute; top: max(14px, var(--safe-t)); right: max(16px, var(--safe-r)); }
+.lp-card { display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--line); padding: 10px 14px; border-radius: 6px; backdrop-filter: blur(6px); min-width: 300px; }
+.lp-level { width: 46px; height: 46px; display: grid; place-items: center; font-weight: 900; font-size: 20px; color: #111; background: var(--accent); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.lp-info { display: flex; flex-direction: column; flex: 1; gap: 2px; min-width: 0; }
+.lp-info b { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-info span, .lp-info small { color: var(--muted); font-size: 12px; }
+.lp-info .xpbar { margin: 3px 0 0; }
+.lp-coins { display: flex; align-items: center; gap: 6px; font-size: 18px; padding-left: 10px; border-left: 1px solid var(--line); }
+.lp-coins i { font-style: normal; color: #5fd4a0; }
+.lobby-right { position: absolute; right: max(16px, var(--safe-r)); bottom: max(14px, var(--safe-b)); display: flex; flex-direction: column; gap: 8px; width: 270px; }
+.lp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lp-stats div { background: var(--panel); border: 1px solid var(--line); padding: 6px 8px; border-radius: 4px; display: flex; flex-direction: column; }
+.lp-stats b { font-size: 17px; }
+.lp-stats small { color: var(--muted); font-size: 10px; letter-spacing: 0.08em; }
+.lp-equip, .lp-agent { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--rar, var(--accent)); padding: 8px 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 3px; }
+.lp-equip small, .lp-agent small { color: var(--muted); font-size: 10px; letter-spacing: 0.14em; }
+.lp-equip b, .lp-agent b { font-size: 17px; }
+.lp-equip span { font-size: 12px; color: var(--rar, var(--muted)); }
+.lp-equip .row, .lp-agent .row { display: flex; gap: 6px; margin-top: 4px; }
+.lp-equip .row .btn, .lp-agent .row .btn { flex: 1; }
+.btn.ghost { background: transparent; border: 1px solid var(--line); }
+.hq .howto { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(6px, var(--safe-b)); margin: 0; font-size: 11px; opacity: 0.55; max-width: 44vw; text-align: center; pointer-events: none; }
+@media (max-height: 520px), (max-width: 760px) {
+  .lobby-left { width: min(250px, 36vw); gap: 6px; }
+  .lobby-left .logo b { font-size: 28px; }
+  .lobby-left .logo span { font-size: 10px; }
+  .lobby-nav .btn { padding: 6px 10px; font-size: 12px; }
+  .lobby-nav .btn.big { font-size: 17px; padding: 9px 12px; }
+  .lp-card { min-width: 0; padding: 6px 10px; gap: 8px; }
+  .lp-level { width: 34px; height: 34px; font-size: 15px; }
+  .lobby-right { width: 210px; gap: 5px; }
+  .lp-stats { display: none; }
+  .lp-coins { font-size: 15px; }
+  .lp-stats b { font-size: 14px; }
+  .lp-equip b, .lp-agent b { font-size: 14px; }
+  .hq .howto { display: none; }
+}
