@@ -87,58 +87,51 @@
       <p id="loadingText">Carregando…</p>
     </div>
 
-    <div id="mainMenu" class="screen hq hidden">
-      <div id="lobbyDrag" class="lobby-drag" aria-hidden="true"></div>
-      <div class="lobby-left">
-        <div class="logo"><span>OPERATION</span><b>STRIKE</b></div>
-        <nav class="lobby-nav">
-          <button class="btn primary big" data-go="playMenu">JOGAR</button>
-          <button class="btn" data-action="mode-competitive"><i>⚔</i>COMPETITIVO</button>
-          <button class="btn" data-action="mode-tdm"><i>✚</i>MATA-MATA EM EQUIPE</button>
-          <button class="btn" data-go="trainingMenu"><i>◎</i>TREINAMENTO</button>
-          <button class="btn" data-go="arsenalScreen"><i>▤</i>ARSENAL</button>
-          <button class="btn" data-action="inventory"><i>▦</i>INVENTÁRIO</button>
-          <button class="btn" data-go="profileScreen"><i>☰</i>PERFIL</button>
-          <button class="btn" data-go="settingsMenu"><i>⚙</i>CONFIGURAÇÕES</button>
-        </nav>
-      </div>
-      <div class="lobby-top">
-        <div class="lp-card">
+    <div id="mainMenu" class="screen sq hidden">
+      <div class="sq-top">
+        <div class="sq-logo logo"><span>OPERATION</span><b>STRIKE</b></div>
+        <div class="sq-tabs">
+          <button class="on" data-go="playMenu">MISSÃO</button>
+          <button data-go="playMenu">MAPA</button>
+          <button data-go="trainingMenu">TREINO</button>
+        </div>
+        <div class="sq-wallet">
           <div class="lp-level" id="lpLevel">1</div>
-          <div class="lp-info">
-            <b id="lpName">Jogador</b>
-            <span id="lpRank">Recruta I</span>
-            <div class="xpbar"><i id="lpXp"></i></div>
-            <small id="lpXpText"></small>
-          </div>
+          <div class="lp-info"><b id="lpName">Jogador</b><span id="lpRank">Recruta I</span><div class="xpbar"><i id="lpXp"></i></div><small id="lpXpText"></small></div>
           <div class="lp-coins" title="Moedas de campanha"><i>◆</i><b id="lpCoins">0</b></div>
         </div>
       </div>
-      <div class="lobby-right">
-        <div class="lp-stats" id="lpStats"></div>
-        <div class="lp-equip">
-          <small>EQUIPADO</small>
-          <b id="lpWeapon">AK-47</b>
-          <span id="lpSkin">Padrão de fábrica</span>
-          <div class="row">
-            <button class="btn small" data-action="lobby-weapon-prev">◀</button>
-            <button class="btn small" data-go="arsenalScreen">SKINS</button>
-            <button class="btn small" data-action="lobby-weapon-next">▶</button>
-          </div>
+      <nav class="sq-side">
+        <button data-action="online-play"><i>⊕</i><span>Jogar online</span></button>
+        <button data-action="quick-competitive"><i>⌕</i><span>Encontrar partida</span></button>
+        <button data-action="lobby-team"><i>⇄</i><span id="sqTeam">Trocar equipe</span></button>
+        <button data-go="settingsMenu"><i>⚙</i><span>Configurações</span></button>
+        <div class="sq-sep"></div>
+        <label class="sq-toggle"><span>Nomes dos aliados</span><input type="checkbox" data-setting="nameTags" /><i></i></label>
+        <label class="sq-toggle"><span>Resolução dinâmica</span><input type="checkbox" data-setting="dynamicResolution" /><i></i></label>
+      </nav>
+      <div id="squadPlates" class="sq-plates"></div>
+      <div class="sq-mission">
+        <div class="sq-mhead"><span id="missionTag">Contra bots</span><b class="sq-avail" id="missionDiff">Normal</b><button class="sq-gear" data-go="playMenu" aria-label="Escolher modo e mapa">⚙</button></div>
+        <div class="sq-mcard" id="missionCard">
+          <b id="missionMap">Dust Zone</b>
+          <small id="missionMode">Competitivo 5v5</small>
+          <small id="missionInfo">Lado: CT</small>
         </div>
-        <div class="lp-agent">
-          <small>PERSONAGEM</small>
-          <b id="lpAgent">CT · Soldado</b>
-          <div class="row">
-            <button class="btn small" data-action="lobby-team">TROCAR EQUIPE</button>
-          </div>
-        </div>
-        <button class="btn small ghost" data-go="rankingScreen">RANKING ONLINE</button>
+        <button class="sq-start" data-action="start-bots">INICIAR</button>
       </div>
-      <ul class="howto">
-        <li class="pc"><b>PC:</b> WASD · Mouse · Espaço pular · Ctrl agachar · Shift correr · Alt andar · Clique atirar · Botão direito mirar · R recarregar · 1-5 armas · Q trocar · E usar · B loja · Tab placar · F inspecionar</li>
-        <li class="mobile"><b>Celular:</b> polegar esquerdo move · arraste à direita para olhar · CORRER acelera · USAR (segurar) planta e desarma</li>
-      </ul>
+      <div class="sq-bar">
+        <button class="sq-ico" data-action="mode-competitive" aria-label="Competitivo">⚔</button>
+        <button class="sq-ico" data-action="mode-tdm" aria-label="Mata-mata">✚</button>
+        <span class="sq-gap"></span>
+        <button data-action="inventory">INVENTÁRIO</button>
+        <button data-go="arsenalScreen">ARSENAL</button>
+        <button data-go="profileScreen">PERFIL</button>
+        <button data-go="rankingScreen">RANKING</button>
+        <span class="sq-gap"></span>
+        <button class="sq-ico" data-go="profileScreen" aria-label="Perfil">☺</button>
+        <button class="sq-ico" data-go="settingsMenu" aria-label="Configurações">⚙</button>
+      </div>
     </div>
 
     <div id="playMenu" class="screen menu hidden">

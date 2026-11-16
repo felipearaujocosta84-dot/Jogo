@@ -15,8 +15,8 @@ import { isNativeApp } from './core/Platform';
 import { SkinPrefs } from './save/SkinPrefs';
 import { ArsenalScreen } from './interface/ArsenalScreen';
 import { CHARACTER_FILES } from './player/CharacterAssets';
+import type { SquadMember } from './interface/LobbyScene';
 import { BUY_CATEGORIES, WEAPONS } from './weapons/WeaponData';
-import { skinById, RARITY_COLOR, RARITY_LABEL } from './weapons/Skins';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -54,9 +54,13 @@ function syncLobby(): void {
   const l = game.lobby;
   if (!l) return;
   l.active = current !== null && LOBBY_SCREENS.has(current) && !game.session;
+  l.setSquad(squadMembers());
   l.setLoadout(agent.team, agent.variant, agent.weapon, SkinPrefs.get(agent.weapon));
   l.focus(current === 'profileScreen');
 }
+
+const MODE_LABEL: Record<string, string> = { competitive: 'Competitivo 5v5', casual: 'Casual', tdm: 'Mata-mata em equipe', training: 'Treinamento' };
+const DIFF_LABEL: Record<string, string> = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
 
 function renderLobbyCard(): void {
   const p = profile;
@@ -67,18 +71,57 @@ function renderLobbyCard(): void {
   $('lpXp').style.width = Math.round((lv.into / lv.need) * 100) + '%';
   $('lpXpText').textContent = `${lv.into} / ${lv.need} XP para o nível ${lv.level + 1}`;
   $('lpCoins').textContent = (p.coins ?? 0).toLocaleString('pt-BR');
-  const kd = p.deaths ? p.kills / p.deaths : p.kills;
-  const wr = p.matches ? Math.round((p.wins / p.matches) * 100) : 0;
-  const hs = p.kills ? Math.round((p.headshots / p.kills) * 100) : 0;
-  const cell = (v: string | number, l: string) => `<div><b>${v}</b><small>${l}</small></div>`;
-  $('lpStats').innerHTML = cell(p.matches, 'PARTIDAS') + cell(wr + '%', 'VITÓRIAS') + cell(kd.toFixed(2), 'K/D') + cell(p.kills, 'ABATES') + cell(hs + '%', 'NA CABEÇA') + cell(p.mvps, 'MVPS');
-  const sk = skinById(SkinPrefs.get(agent.weapon));
-  $('lpWeapon').textContent = WEAPONS[agent.weapon]?.name ?? agent.weapon;
-  $('lpSkin').textContent = `${sk.name} · ${RARITY_LABEL[sk.rarity]}`;
-  $('lpWeapon').parentElement!.style.setProperty('--rar', RARITY_COLOR[sk.rarity]);
-  $('lpAgent').textContent = `${agent.team === 'T' ? 'TR' : 'CT'} · ${CHARACTER_FILES[agent.team].name}`;
-  $('lpAgent').parentElement!.style.setProperty('--rar', agent.team === 'T' ? 'var(--t)' : 'var(--ct)');
+  $('sqTeam').textContent = `Equipe: ${agent.team === 'T' ? 'TR' : 'CT'} · ${CHARACTER_FILES[agent.team].name}`;
+  // cartão da missão: modo, mapa e regras escolhidos (o botão INICIAR começa com eles)
+  const map = MAPS[picks.map] ?? MAPS.dust_zone;
+  $('missionMap').textContent = map.name;
+  $('missionMode').textContent = MODE_LABEL[picks.mode] ?? picks.mode;
+  $('missionInfo').textContent = picks.mode === 'tdm'
+    ? `${picks.tdmTime} min · ${picks.tdmKills} abates · ${WEAPONS[picks.tdmPrimary]?.name ?? ''}`
+    : `Lado inicial: ${picks.side === 'T' ? 'TR' : picks.side === 'CT' ? 'CT' : 'aleatório'}`;
+  $('missionDiff').textContent = 'Bots ' + (DIFF_LABEL[picks.difficulty] ?? picks.difficulty);
+  $('missionCard').style.background = `linear-gradient(0deg, rgba(5,9,13,0.85), rgba(5,9,13,0.1) 70%), linear-gradient(160deg, ${map.ambience.sky[0]}, ${map.ambience.sky[1]} 45%, ${map.ambience.fog} 70%, #2a2622)`;
+  renderSquad();
 }
+
+// ------------------------------------------------------------ esquadrão do lobby (jogador + 3 companheiros)
+
+const SQUAD_NAMES = ['Viper', 'Falcão', 'Raven', 'Ghost', 'Cobra', 'Titan', 'Lince', 'Spectre', 'Nômade', 'Atlas', 'Jaguar', 'Orion'];
+const squadPick = Storage.load<number[] | null>('squad', null) ?? (() => {
+  const idx = [...SQUAD_NAMES.keys()].sort(() => Math.random() - 0.5).slice(0, 3);
+  Storage.save('squad', idx);
+  return idx;
+})();
+
+function squadMembers(): SquadMember[] {
+  const rifles = agent.team === 'T' ? ['ak47', 'mac10', 'awp'] : ['m4a4', 'aug', 'mp5'];
+  const lv = levelFor(profile.xp).level;
+  const bots = squadPick.map((k, i) => ({ name: 'BOT ' + SQUAD_NAMES[k % SQUAD_NAMES.length], level: 8 + ((k * 7 + i * 5) % 33), weapon: rifles[i % rifles.length], skin: 'default' }));
+  const me: SquadMember = { name: profile.name, level: lv, weapon: agent.weapon, skin: SkinPrefs.get(agent.weapon), me: true };
+  return [bots[0], me, bots[1], bots[2]];
+}
+
+function renderSquad(): void {
+  const box = $('squadPlates');
+  const list = squadMembers();
+  const color = agent.team === 'T' ? 'var(--t)' : 'var(--ct)';
+  box.innerHTML = list.map(m => `<div class="sq-plate${m.me ? ' me' : ''}" style="--pc:${color}"><span class="av">${esc(m.name.replace('BOT ', '')[0] ?? '?')}</span><div><b>${m.me ? '<span class="lead">★</span>' : ''}${esc(m.name)}</b><small>Nv ${m.level} · ${WEAPONS[m.weapon]?.name ?? ''}</small></div></div>`).join('');
+}
+
+// plaquinhas acompanham os personagens na tela
+function updatePlates(): void {
+  requestAnimationFrame(updatePlates);
+  const l = game.lobby;
+  if (!l || current !== 'mainMenu') return;
+  const els = $('squadPlates').children;
+  for (let i = 0; i < els.length; i++) {
+    const p = l.plates[i];
+    const el = els[i] as HTMLElement;
+    el.style.display = p?.visible ? '' : 'none';
+    if (p?.visible) el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translateX(-50%)`;
+  }
+}
+requestAnimationFrame(updatePlates);
 
 function lobbyAction(action: string): boolean {
   switch (action) {
@@ -107,6 +150,10 @@ function lobbyAction(action: string): boolean {
       syncPicks();
       show('playMenu');
       return true;
+    case 'online-play':
+      show('playMenu');
+      (document.querySelector('.tab[data-tab="online"]') as HTMLElement | null)?.click();
+      return true;
     case 'inventory':
       arsenal.prepare('inventory', agent.weapon);
       show('arsenalScreen');
@@ -120,29 +167,14 @@ function lobbyAction(action: string): boolean {
   return true;
 }
 
-// arrastar na área livre gira o agente
-{
-  const drag = $('lobbyDrag');
-  let lastX: number | null = null;
-  drag.addEventListener('pointerdown', e => {
-    lastX = e.clientX;
-    drag.setPointerCapture(e.pointerId);
-  });
-  drag.addEventListener('pointermove', e => {
-    if (lastX === null) return;
-    game.lobby?.drag(e.clientX - lastX);
-    lastX = e.clientX;
-  });
-  const end = () => (lastX = null);
-  drag.addEventListener('pointerup', end);
-  drag.addEventListener('pointercancel', end);
-}
-
 function show(id: ScreenId): void {
   current = id;
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== id);
   document.body.classList.toggle('in-menu', id !== null);
-  if (id === 'mainMenu') refreshMenuRank();
+  if (id === 'mainMenu') {
+    refreshMenuRank();
+    syncSettingsForm();
+  }
   syncLobby();
   if (id === 'profileScreen') renderProfile(profileTab);
   if (id === 'rankingScreen') void loadRanking();
