@@ -44,3 +44,12 @@ const c = await LoadAssetContainerAsync('assets/characters/soldado.glb', scene);
 c.addAllToScene();
 c.animationGroups.find(g => g.name === 'Walk')!.start(true);
 ```
+
+## Animações de locomoção (FBX)
+
+`scripts/blender/retarget_mixamo.py -- <rig.blend> <pasta_fbx> <saida.glb> <saida.blend> <saida.json>` converte os FBX
+(esqueleto de 67 ossos, centímetros) para o rig de 21 ossos: rotação relativa à T-pose em espaço de mundo, altura do
+quadril escalada pela razão das pernas, deslocamento linear removido (o jogo move o personagem), giro progressivo removido
+em Turning/Strafing e versões espelhadas para o outro lado. Rodar de novo substitui os clipes.
+`scripts/blender/lod.py -- <rig.blend> <saida_lod.glb> 0.32 1024` gera a versão leve.
+Este `.blend` de cada personagem já contém as 18 ações.

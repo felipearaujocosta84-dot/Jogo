@@ -1,6 +1,9 @@
 // Personagem do jogo: modelo 3D da equipe (Soldado = CT, Terrorista = TR) com esqueleto e animações do arquivo GLB.
 // Cada jogador/bot recebe uma cópia com esqueleto próprio. As animações são misturadas por região do corpo:
-//  - pernas e quadril: Idle / Walk / Run / Crouch (velocidade das passadas acompanha a velocidade real);
+//  - pernas e quadril: Idle / Crouch / locomoção direcional — frente (Walk → Run_Forward), trás (Stepping_Backward →
+//    Sprint_Backward), lados (Walk_Left/Right; agachado Strafe_Left/Right) e giro no lugar (Turning/Turning_Mirror).
+//    Pesos pela direção da velocidade em relação ao olhar; a cadência de cada ciclo = velocidade real ÷ velocidade
+//    do ciclo (medida na conversão), para os pés não deslizarem;
 //  - tronco e braços: Aim (arma pronta) / Idle (arma baixa, parado e calmo) / Run (correndo) / Shoot / Reload;
 //  - corpo inteiro: Jump (no ar) e Death.
 // Por cima das animações: o tronco acompanha a mira (olhar para cima/baixo) e dá um tranco ao levar dano.
@@ -32,9 +35,23 @@ import { ProceduralCharacter } from './ProceduralCharacter';
 const LOWER = ['Hips', 'UpLeg.L', 'Leg.L', 'Foot.L', 'Toe.L', 'UpLeg.R', 'Leg.R', 'Foot.R', 'Toe.R'];
 const UPPER = ['Spine', 'Chest', 'Neck', 'Head', 'Shoulder.L', 'UpperArm.L', 'ForeArm.L', 'Hand.L', 'Shoulder.R', 'UpperArm.R', 'ForeArm.R', 'Hand.R'];
 
-/** Velocidade (m/s) em que cada ciclo foi animado, para casar passadas e deslocamento. */
-const WALK_SPEED = 0.95;
-const RUN_SPEED = 3.6;
+/**
+ * Ciclos de locomoção: velocidade (m/s) em que cada um foi animado (medida pelo retarget, ver
+ * art/characters/LEIAME.md) e limites da cadência — fora deles o ciclo fica feio demais e aceita-se um pouco de deslize.
+ */
+const LOCO: Record<string, { clip: string; speed: number; min: number; max: number }> = {
+  walk: { clip: 'Walk', speed: 0.95, min: 0.7, max: 2.4 },
+  runF: { clip: 'Run_Forward', speed: 3.709, min: 0.65, max: 1.7 },
+  stepB: { clip: 'Stepping_Backward', speed: 0.221, min: 1, max: 4.5 },
+  sprintB: { clip: 'Sprint_Backward', speed: 5.563, min: 0.42, max: 1.25 },
+  walkL: { clip: 'Walk_Left', speed: 1.483, min: 0.7, max: 2.8 },
+  walkR: { clip: 'Walk_Right', speed: 1.483, min: 0.7, max: 2.8 },
+  strafeL: { clip: 'Strafe_Left', speed: 0.833, min: 0.8, max: 2.8 },
+  strafeR: { clip: 'Strafe_Right', speed: 0.833, min: 0.8, max: 2.8 }
+};
+/** Giro no lugar: o ciclo gira ~37° em 1,2 s (Turning = para a direita, Turning_Mirror = para a esquerda). */
+const TURN_RATE = (37 * Math.PI) / 180 / 1.2;
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 interface Layer {
   group: AnimationGroup;
@@ -76,6 +93,8 @@ class SkinnedCharacter {
   private hitSide = 1;
   private pitch = 0;
   private speed = 0;
+  private lastYaw: number | null = null;
+  private turnRate = 0;
   private obs: ReturnType<Scene['onAfterAnimationsObservable']['add']>;
   victory = false;
 
@@ -111,8 +130,9 @@ class SkinnedCharacter {
     add('idleUp', 'Idle', 'upper', false, true);
     add('runUp', 'Run', 'upper', false, true);
     add('idle', 'Idle', 'lower');
-    add('walk', 'Walk', 'lower');
-    add('run', 'Run', 'lower');
+    for (const [key, c] of Object.entries(LOCO)) add(key, c.clip, 'lower');
+    add('turnR', 'Turning', 'lower');
+    add('turnL', 'Turning_Mirror', 'lower');
     add('crouch', 'Crouch', 'lower');
     add('aim', 'Aim', 'upper');
     add('shoot', 'Shoot', 'upper');
@@ -329,18 +349,22 @@ class SkinnedCharacter {
 
     // pernas
     const crouch = p.crouch || p.act === 2 || p.act === 3;
-    const fwd = p.vx * Math.sin(p.yaw) + p.vz * Math.cos(p.yaw);
-    const dir = fwd < -0.3 ? -1 : 1;
-    if (crouch) this.want('crouch', rest);
-    else if (this.speed < 0.3) this.want('idle', rest);
-    else {
-      const run = Math.max(0, Math.min(1, (this.speed - 2.2) / 1.2));
-      this.want('walk', rest * (1 - run));
-      this.want('run', rest * run);
-      this.ratio('walk', (dir * Math.max(0.7, Math.min(2.2, this.speed / WALK_SPEED))));
-      this.ratio('run', (dir * Math.max(0.7, Math.min(2.1, this.speed / RUN_SPEED))));
+    // velocidade de giro (rad/s), suavizada — rede e bots mudam o yaw em degraus
+    if (this.lastYaw !== null && dt > 0) {
+      const dy = Math.atan2(Math.sin(p.yaw - this.lastYaw), Math.cos(p.yaw - this.lastYaw));
+      this.turnRate += (dy / dt - this.turnRate) * Math.min(1, dt * 6);
     }
-
+    this.lastYaw = p.yaw;
+    if (this.speed < 0.3) {
+      const turn = crouch ? 0 : clamp01((Math.abs(this.turnRate) - 0.6) / 0.6);
+      this.want(crouch ? 'crouch' : 'idle', rest * (1 - turn));
+      if (turn > 0) {
+        // Turning = giro à direita (yaw crescente no Babylon); cadência pela velocidade do giro
+        const key = this.turnRate > 0 ? 'turnR' : 'turnL';
+        this.want(key, rest * turn);
+        this.ratio(key, Math.max(0.8, Math.min(2.5, Math.abs(this.turnRate) / TURN_RATE)));
+      }
+    } else this.locomotion(p, rest, crouch);
     // tronco e braços
     if (reloadT > 0) {
       this.want('reload', rest);
@@ -355,6 +379,42 @@ class SkinnedCharacter {
       this.flash.setEnabled(this.flashT > 0);
     }
     this.blend(dt, 10);
+  }
+
+  /**
+   * Andando/correndo: pesos por direção (frente/trás/lados, diagonais misturam dois) e, em cada direção,
+   * ciclo lento → rápido pela velocidade. Agachado: frente/trás usam o Crouch, lados o Strafing (postura baixa).
+   */
+  private locomotion(p: PlayerView, rest: number, crouch: boolean): void {
+    const s = Math.sin(p.yaw), c = Math.cos(p.yaw);
+    const fwd = p.vx * s + p.vz * c;
+    const side = p.vx * c - p.vz * s; // > 0 = direita do personagem
+    const len = Math.hypot(fwd, side) || 1;
+    const f = fwd / len, r = side / len;
+    const norm = Math.abs(f) + Math.abs(r) || 1;
+    const wF = Math.max(0, f) / norm, wB = Math.max(0, -f) / norm;
+    const wR = Math.max(0, r) / norm, wL = Math.max(0, -r) / norm;
+    const sp = this.speed;
+    const cycle = (key: string, w: number) => {
+      if (w <= 0.001) return;
+      const d = LOCO[key];
+      this.want(key, rest * w);
+      this.ratio(key, Math.max(d.min, Math.min(d.max, sp / d.speed)));
+    };
+    if (crouch) {
+      this.want('crouch', rest * (wF + wB));
+      cycle('strafeL', wL);
+      cycle('strafeR', wR);
+      return;
+    }
+    const run = clamp01((sp - 1.8) / 1.2); // frente: andar → correr
+    cycle('walk', wF * (1 - run));
+    cycle('runF', wF * run);
+    const back = clamp01((sp - 0.6) / 0.8); // trás: passos curtos → corrida de costas
+    cycle('stepB', wB * (1 - back));
+    cycle('sprintB', wB * back);
+    cycle('walkL', wL);
+    cycle('walkR', wR);
   }
 
   private ratio(key: string, r: number): void {

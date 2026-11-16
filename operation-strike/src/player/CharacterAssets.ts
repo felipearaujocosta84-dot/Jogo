@@ -13,7 +13,12 @@ export const CHARACTER_FILES: Record<Team, { name: string; file: string }> = {
 };
 
 /** Animações esperadas no arquivo (nomes das ações do Blender). */
-export const CHARACTER_CLIPS = ['Idle', 'Walk', 'Run', 'Jump', 'Crouch', 'Aim', 'Shoot', 'Reload', 'Death'] as const;
+export const CHARACTER_CLIPS = [
+  'Idle', 'Walk', 'Run', 'Jump', 'Crouch', 'Aim', 'Shoot', 'Reload', 'Death',
+  // locomoção (FBX enviados, convertidos por scripts/blender/retarget_mixamo.py)
+  'Run_Forward', 'Sprint_Backward', 'Stepping_Backward', 'Strafe_Left', 'Strafe_Right',
+  'Walk_Left', 'Walk_Right', 'Turning', 'Turning_Mirror'
+] as const;
 
 let gltfLoader: Promise<unknown> | null = null;
 function ensureGltf(): Promise<unknown> {
