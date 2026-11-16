@@ -5,16 +5,16 @@ Kai, o garoto de cabelo branco e mochila azul, e o cachorrinho Floco precisam re
 Lanterna da Torre reunindo três relíquias pelo vale.
 
 ## O mundo
-Um mapa contínuo de 7600 × 4500 px. As 5 ilustrações viraram regiões, ligadas por campos,
-florestas, trilhas, uma praia, um lago e clareiras geradas em pixel art.
+Um mapa contínuo de 7600 × 4500 px, todo desenhado em código (pixel art gerada, sem imagens):
+campos, florestas, trilhas, rio com ponte, mar, praia, lago, clareiras, casas, torre e fazenda.
 
-| Região | Imagem | O que tem |
-|---|---|---|
-| Praça das Telhas | `praca.jpg` | Vó Aurora, Oficina do Bruno, Casa do Téo, Casa da Vó |
-| Vila do Rio | `vila.jpg` | Mel, flores-lume, Padaria da Rosa, Casa da Mel |
-| Horta do Seu Tomé | `horta.jpg` | Musgos comendo as couves |
-| Penhasco do Vento | `penhasco.jpg` | Rui e Lina na fogueira |
-| Torre da Lanterna | `torre.jpg` | Baú secreto, chefe Musgo Ancião, final |
+| Região | O que tem |
+|---|---|
+| Praça das Telhas | Praça de pedra com chafariz, Vó Aurora, Oficina do Bruno, Casa do Téo, Casa da Vó |
+| Vila do Rio | Casas à beira do rio, Mel, flores-lume, Padaria da Rosa, Casa da Mel |
+| Horta do Seu Tomé | Celeiro, poço, plantações cercadas e Musgos comendo as couves |
+| Penhasco do Vento | Barraca, trailer e fogueira de Rui e Lina à beira do mar |
+| Torre da Lanterna | Torre de pedra, ruínas, baú secreto, chefe Musgo Ancião e o final |
 
 ## Casas (interiores)
 Oficina do Bruno (bancada de criação), Casa do Téo, Casa da Vó Aurora (cama: descansar e salvar),

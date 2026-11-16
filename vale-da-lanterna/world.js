@@ -1,128 +1,96 @@
-/* Vale da Lanterna — mundo aberto: regiões (as ilustrações), terreno, trilhas, água, props e interiores. */
+/* Vale da Lanterna — mundo aberto todo desenhado em código: terreno, rio, mar, trilhas, praças,
+   casas, torre, fazenda, acampamento, árvores e interiores. */
 'use strict';
 
-const IS = 1.5;                    // escala das ilustrações no mundo
-const WW = 7600, WH = 4500;        // tamanho do mundo (px)
+const IS = 1;
+const WW = 7600, WH = 4500;
 const CELL = 8, GC = Math.ceil(WW / CELL), GR = Math.ceil(WH / CELL);
 
-// Coordenadas locais = pixels da ilustração original. ox/oy = canto no mundo.
+// Regiões (coordenadas de mundo). ox/oy/iw/ih = retângulo da região.
 const REGIONS = {
-  praca: {
-    name: 'Praça das Telhas', img: 'assets/praca.jpg', amb: 'petals', ox: 3000, oy: 1100, safe: true,
-    walk: [[[290, 470], [470, 455], [490, 530], [540, 610], [575, 680], [555, 770], [520, 830], [470, 880], [440, 940],
-      [470, 1060], [540, 1120], [600, 1180], [585, 1308], [220, 1308], [200, 1200], [210, 1120], [240, 1050], [230, 950],
-      [245, 850], [240, 760], [245, 690], [200, 650], [140, 610], [140, 550], [230, 545], [280, 520]],
-      [[0, 520], [160, 540], [160, 618], [0, 618]]],
-    corridors: [[[0, 528], [150, 545], [150, 612], [0, 612]]],
-    holes: [{ e: [400, 728, 95, 58] }, { e: [405, 1005, 58, 82] }, { e: [436, 872, 26, 22] }],
-    npcs: [{ id: 'aurora', x: 318, y: 835, name: 'Vó Aurora' }],
-    items: [{ id: 'c_p1', k: 'moeda', x: 520, y: 640 }, { id: 'c_p2', k: 'moeda', x: 260, y: 1180 }],
-    doors: [{ x: 212, y: 498, to: 'oficina' }, { x: 560, y: 598, to: 'casaTeo' }, { x: 522, y: 1078, to: 'casaAurora' }],
-    start: [380, 1150]
-  },
-  vila: {
-    name: 'Vila do Rio', img: 'assets/vila.jpg', amb: 'butterflies', ox: 1500, oy: 300, safe: true,
-    walk: [
-      [[430, 188], [495, 188], [490, 260], [472, 340], [420, 340], [440, 260]],
-      [[300, 330], [520, 330], [530, 420], [400, 445], [300, 450]],
-      [[300, 440], [400, 440], [400, 610], [300, 610]],
-      [[270, 600], [405, 595], [430, 680], [520, 700], [525, 785], [440, 790], [400, 805], [340, 820], [278, 760], [270, 680]],
-      [[340, 800], [440, 780], [525, 800], [600, 880], [600, 950], [450, 955], [415, 1068], [345, 1068], [310, 950], [300, 880]],
-      [[440, 940], [640, 955], [680, 1020], [480, 1040], [440, 1000]],
-      [[340, 1040], [420, 1040], [425, 1313], [335, 1313]],
-      [[600, 945], [736, 960], [736, 1035], [640, 1035]]],
-    corridors: [[[345, 1045], [415, 1045], [420, 1313], [340, 1313]], [[610, 955], [736, 968], [736, 1028], [650, 1028]]],
-    holes: [],
-    npcs: [{ id: 'mel', x: 430, y: 885, name: 'Mel' }],
+  praca: { name: 'Praça das Telhas', amb: 'petals', ox: 3000, oy: 1100, iw: 1104, ih: 1965, safe: true,
+    npcs: [{ id: 'aurora', x: 3420, y: 2170, name: 'Vó Aurora' }],
+    items: [{ id: 'c_p1', k: 'moeda', x: 3700, y: 1780 }, { id: 'c_p2', k: 'moeda', x: 3330, y: 2420 }],
+    doors: [], start: [3550, 2420] },
+  vila: { name: 'Vila do Rio', amb: 'butterflies', ox: 1500, oy: 300, iw: 1104, ih: 1965, safe: true,
+    npcs: [{ id: 'mel', x: 2010, y: 1440, name: 'Mel' }],
     items: [
-      { id: 'flor1', k: 'florlume', x: 340, y: 395 }, { id: 'flor2', k: 'florlume', x: 462, y: 300 }, { id: 'flor3', k: 'florlume', x: 305, y: 700 },
-      { id: 'flor4', k: 'florlume', x: 480, y: 745 }, { id: 'flor5', k: 'florlume', x: 600, y: 1000 }, { id: 'c_v1', k: 'moeda', x: 350, y: 520 }],
-    doors: [{ x: 440, y: 672, to: 'padaria' }, { x: 585, y: 880, to: 'casaMel' }],
-    start: [462, 250]
-  },
-  horta: {
-    name: 'Horta do Seu Tomé', img: 'assets/horta.jpg', amb: 'butterflies', ox: 4600, oy: 300,
-    walk: [[[40, 170], [330, 120], [345, 215], [215, 250], [205, 340], [240, 420], [300, 450], [440, 500], [560, 560],
-      [640, 615], [736, 635], [736, 720], [640, 722], [560, 780], [460, 860], [360, 920], [280, 960], [300, 1060], [420, 1100],
-      [440, 1160], [400, 1200], [360, 1314], [100, 1314], [60, 1150], [40, 1000], [30, 760], [140, 665], [150, 420], [60, 330]],
-      [[0, 165], [70, 165], [70, 335], [0, 335]]],
-    corridors: [[[0, 172], [60, 172], [60, 328], [0, 328]]],
-    holes: [
-      { p: [[195, 650], [230, 600], [260, 570], [300, 560], [420, 600], [520, 690], [510, 760], [390, 830], [290, 820], [200, 760]] },
-      { e: [245, 872, 88, 36] }],
-    npcs: [{ id: 'tome', x: 610, y: 690, name: 'Seu Tomé' }],
-    items: [{ id: 'c_h1', k: 'moeda', x: 90, y: 760 }, { id: 'c_h2', k: 'moeda', x: 330, y: 1240 }],
-    foes: [{ id: 'hm1', x: 180, y: 520 }, { id: 'hm2', x: 470, y: 580 }, { id: 'hm3', x: 110, y: 900 },
-      { id: 'hm4', x: 230, y: 1060 }, { id: 'hm5', x: 300, y: 1200 }],
-    doors: [], start: [250, 205]
-  },
-  torre: {
-    name: 'Torre da Lanterna', img: 'assets/torre.jpg', amb: 'fireflies', ox: 6200, oy: 1500,
-    walk: [[[440, 300], [600, 300], [650, 340], [640, 400], [560, 470], [600, 560], [560, 620], [600, 700], [560, 760],
-      [580, 880], [560, 960], [540, 1000], [420, 1030], [300, 1000], [200, 965], [120, 960], [0, 945], [0, 875], [120, 875],
-      [180, 895], [250, 860], [300, 780], [340, 700], [330, 620], [300, 580], [290, 500], [330, 450], [420, 420], [470, 360]]],
-    corridors: [], holes: [], npcs: [], items: [], doors: [],
-    door: { x: 520, y: 312 }, chest: { x: 258, y: 448 },
-    start: [80, 915]
-  },
-  penhasco: {
-    name: 'Penhasco do Vento', img: 'assets/penhasco.jpg', amb: 'embers', ox: 300, oy: 2300, frame: 'tl',
-    walk: [[[60, 700], [260, 700], [300, 655], [420, 605], [440, 520], [430, 430], [470, 350], [520, 360], [560, 480],
-      [660, 560], [680, 620], [640, 720], [600, 800], [520, 880], [440, 930], [320, 960], [230, 968], [60, 962], [20, 900], [20, 760]],
-      [[55, 0], [205, 0], [205, 730], [55, 730]]],
-    corridors: [[[62, 0], [198, 0], [198, 715], [62, 715]]],
-    holes: [{ e: [395, 690, 55, 32] }, { e: [488, 648, 34, 30] }],
-    npcs: [{ id: 'camp', x: 485, y: 655, name: 'Rui e Lina', hidden: true }],
-    items: [{ id: 'c_c1', k: 'moeda', x: 470, y: 900 }, { id: 'c_c2', k: 'moeda', x: 560, y: 520 }],
-    doors: [], fire: { x: 395, y: 680 },
-    start: [150, 900]
-  }
+      { id: 'flor1', k: 'florlume', x: 1610, y: 1290 }, { id: 'flor2', k: 'florlume', x: 2290, y: 1060 }, { id: 'flor3', k: 'florlume', x: 1580, y: 1820 },
+      { id: 'flor4', k: 'florlume', x: 2230, y: 1720 }, { id: 'flor5', k: 'florlume', x: 2010, y: 560 }, { id: 'c_v1', k: 'moeda', x: 1790, y: 1420 }],
+    doors: [], start: [1900, 1700] },
+  horta: { name: 'Horta do Seu Tomé', amb: 'butterflies', ox: 4600, oy: 300, iw: 1104, ih: 1965,
+    npcs: [{ id: 'tome', x: 4990, y: 1400, name: 'Seu Tomé' }],
+    items: [{ id: 'c_h1', k: 'moeda', x: 4700, y: 1380 }, { id: 'c_h2', k: 'moeda', x: 5480, y: 2000 }],
+    foes: [{ id: 'hm1', x: 4880, y: 1100 }, { id: 'hm2', x: 5380, y: 1080 }, { id: 'hm3', x: 4870, y: 1650 },
+      { id: 'hm4', x: 5370, y: 1660 }, { id: 'hm5', x: 5250, y: 1400 }],
+    doors: [], start: [5100, 1000] },
+  torre: { name: 'Torre da Lanterna', amb: 'fireflies', ox: 6200, oy: 1500, iw: 1104, ih: 1965,
+    npcs: [], items: [], doors: [],
+    door: { x: 6750, y: 2262 }, chest: { x: 6470, y: 2170 }, start: [6500, 2620] },
+  penhasco: { name: 'Penhasco do Vento', amb: 'embers', ox: 300, oy: 2300, iw: 1104, ih: 1500,
+    npcs: [{ id: 'camp', x: 800, y: 3222, name: 'Rui e Lina', hidden: true },
+      { id: 'rui', x: 712, y: 3196, name: 'Rui', deco: true }, { id: 'lina', x: 890, y: 3196, name: 'Lina', deco: true }],
+    items: [{ id: 'c_c1', k: 'moeda', x: 560, y: 3350 }, { id: 'c_c2', k: 'moeda', x: 1100, y: 3100 }],
+    doors: [], fire: { x: 800, y: 3140 }, start: [800, 2900] }
 };
 const REGION_LIST = Object.keys(REGIONS).map(k => Object.assign(REGIONS[k], { id: k }));
-const toWorld = (r, x, y) => [r.ox + x * IS, r.oy + y * IS];
+const toWorld = (r, x, y) => [x, y];
 
 const TRAILS = [
-  [[495, 2300], [495, 2150], [1420, 2150], [1420, 2450], [2070, 2450], [2070, 2262]],
-  [[2604, 1800], [2800, 1800], [2800, 1955], [3000, 1955]],
-  [[4600, 675], [2800, 675], [2800, 1800]],
-  [[3600, 3055], [3600, 3350], [5800, 3350], [5800, 2865], [6200, 2865]],
-  [[4945, 2262], [4945, 3350]],
-  [[5800, 2865], [5800, 1300], [6050, 1000], [6750, 900]],
-  [[3600, 3350], [3600, 4000], [2750, 4000]],
-  [[1420, 2150], [1150, 1600], [800, 950]]
+  [[3150, 1950], [2800, 1950], [2800, 1600], [1900, 1600]],                       // praça → vila (ponte)
+  [[1900, 1760], [1900, 2150], [800, 2150], [800, 3060]],                          // vila → penhasco
+  [[1900, 1760], [1900, 600], [2250, 430]],                                         // rua da vila
+  [[3550, 1480], [3550, 700], [5100, 700], [5100, 2000], [5100, 3350]],            // praça → horta → sul
+  [[3550, 2700], [3550, 3350], [5800, 3350], [5800, 2620], [6560, 2620], [6750, 2420]], // praça → torre
+  [[5800, 2620], [5800, 1300], [6050, 1000], [6750, 900]],                         // bosque norte
+  [[3550, 3350], [3550, 4000], [2750, 4000]],                                      // praia
+  [[800, 2150], [800, 950]],                                                       // clareira
+  [[4600, 700], [4600, 1400], [5650, 1400]]                                        // corredor da horta
 ];
+const RIVER = [[2500, 120], [2480, 700], [2400, 1100], [2450, 1500], [2350, 1900], [2250, 2300], [2200, 2700]];
 const WATER = [
-  [[1240, 2650], [1800, 2560], [2350, 2700], [2550, 3300], [2500, 4000], [2650, 4500], [0, 4500], [0, 4250], [1240, 4250]],
+  [[1240, 2650], [1800, 2560], [2350, 2700], [2550, 3300], [2500, 4000], [2650, 4500], [0, 4500], [0, 3700],
+    [300, 3650], [600, 3760], [950, 3640], [1240, 3450]],
   [[7000, 2700], [7600, 2600], [7600, 4500], [6300, 4500], [6400, 3950], [6900, 3650], [6950, 3200]],
   Array.from({ length: 20 }, (_, i) => [4300 + Math.cos(i / 20 * 6.283) * 240, 3880 + Math.sin(i / 20 * 6.283) * 150])
 ];
-// lugares notáveis no mapa grande
+const PLAZAS = [[3550, 2080, 430, 640], [6750, 2380, 280, 210], [1900, 1660, 170, 110], [800, 3170, 230, 150]];
+const FIELDS = [[4740, 900, 260, 380], [5200, 900, 360, 380], [4740, 1460, 260, 380], [5200, 1460, 360, 380]];
 const LANDMARKS = [
-  { name: 'Clareira dos Cogumelos', x: 800, y: 900 },
-  { name: 'Praia', x: 2700, y: 3950 },
-  { name: 'Lago', x: 7050, y: 3900 },
-  { name: 'Bosque Norte', x: 6750, y: 900 },
-  { name: 'Campos do Sul', x: 4700, y: 3950 }
+  { name: 'Clareira dos Cogumelos', x: 800, y: 900 }, { name: 'Praia', x: 2700, y: 3950 }, { name: 'Lago', x: 7050, y: 3900 },
+  { name: 'Bosque Norte', x: 6750, y: 900 }, { name: 'Campos do Sul', x: 4700, y: 3950 }
 ];
 const CAT_SPOT = [6800, 860];
-const SPAWN_CLEAR = [];
 
-// ---------------------------------------------------------------- terreno (0 grama, 1 trilha, 2 água, 3 areia)
+// ---------------------------------------------------------------- terreno
+// 0 grama, 1 trilha, 2 água, 3 areia, 4 calçamento, 5 terra arada, 6 rocha do penhasco, 7 ponte
 let terrain = null;
 function buildTerrain() {
   const c = document.createElement('canvas'); c.width = GC; c.height = GR;
   const g = c.getContext('2d');
-  g.fillStyle = '#000'; g.fillRect(0, 0, GC, GR);
   const path = p => { g.beginPath(); p.forEach(([x, y], i) => i ? g.lineTo(x / CELL, y / CELL) : g.moveTo(x / CELL, y / CELL)); };
   g.lineJoin = 'round'; g.lineCap = 'round';
-  for (const w of WATER) { path(w); g.closePath(); g.strokeStyle = '#0000ff'; g.lineWidth = 70 / CELL; g.stroke(); }
-  for (const w of WATER) { path(w); g.closePath(); g.fillStyle = '#ff0000'; g.fill(); }
-  for (const t of TRAILS) { path(t); g.strokeStyle = '#00ff00'; g.lineWidth = 76 / CELL; g.stroke(); }
-  const d = g.getImageData(0, 0, GC, GR).data;
+  const layer = draw => {
+    g.clearRect(0, 0, GC, GR); g.fillStyle = '#fff'; g.strokeStyle = '#fff'; draw();
+    const d = g.getImageData(0, 0, GC, GR).data, m = new Uint8Array(GC * GR);
+    for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 120 ? 1 : 0;
+    return m;
+  };
+  const sand = layer(() => { for (const w of WATER) { path(w); g.closePath(); g.lineWidth = 80 / CELL; g.stroke(); } });
+  const water = layer(() => {
+    for (const w of WATER) { path(w); g.closePath(); g.fill(); }
+    path(RIVER); g.lineWidth = 84 / CELL; g.stroke();
+  });
+  const cliff = layer(() => {
+    g.save(); g.beginPath(); g.rect(0, 2400 / CELL, 1700 / CELL, GR); g.clip();
+    path(WATER[0]); g.closePath(); g.lineWidth = 120 / CELL; g.stroke(); g.restore();
+  });
+  const trail = layer(() => { for (const t of TRAILS) { path(t); g.lineWidth = 76 / CELL; g.stroke(); } });
+  const plaza = layer(() => { for (const [x, y, rx, ry] of PLAZAS) { g.beginPath(); g.ellipse(x / CELL, y / CELL, rx / CELL, ry / CELL, 0, 0, 7); g.fill(); } });
+  const field = layer(() => { for (const [x, y, w, h] of FIELDS) g.fillRect(x / CELL, y / CELL, w / CELL, h / CELL); });
   terrain = new Uint8Array(GC * GR);
   for (let i = 0; i < terrain.length; i++) {
-    const r = d[i * 4], gg = d[i * 4 + 1], b = d[i * 4 + 2];
-    terrain[i] = r > 127 ? 2 : gg > 127 ? 1 : b > 127 ? 3 : 0;
+    terrain[i] = trail[i] && water[i] ? 7 : field[i] ? 5 : plaza[i] ? 4 : trail[i] ? 1 : cliff[i] ? 6 : water[i] ? 2 : sand[i] ? 3 : 0;
   }
 }
 function terrainAt(x, y) {
@@ -131,67 +99,17 @@ function terrainAt(x, y) {
   return terrain[cy * GC + cx];
 }
 function regionAt(x, y, pad = 0) {
-  for (const r of REGION_LIST) {
-    if (x >= r.ox - pad && y >= r.oy - pad && x < r.ox + r.iw * IS + pad && y < r.oy + r.ih * IS + pad) return r;
-  }
+  for (const r of REGION_LIST) if (x >= r.ox - pad && y >= r.oy - pad && x < r.ox + r.iw + pad && y < r.oy + r.ih + pad) return r;
   return null;
 }
 
-// máscara local de cada ilustração (1/4 da resolução original)
-function buildRegionMask(r, im) {
-  const iw = im.naturalWidth, ih = im.naturalHeight, mw = Math.ceil(iw / 4), mh = Math.ceil(ih / 4);
-  const c = document.createElement('canvas'); c.width = mw; c.height = mh;
-  const g = c.getContext('2d');
-  g.fillStyle = '#000'; g.fillRect(0, 0, mw, mh);
-  const poly = (p, col) => { g.fillStyle = col; g.beginPath(); p.forEach(([x, y], i) => i ? g.lineTo(x / 4, y / 4) : g.moveTo(x / 4, y / 4)); g.closePath(); g.fill(); };
-  r.walk.forEach(p => poly(p, '#fff'));
-  r.holes.forEach(h => {
-    if (h.p) poly(h.p, '#000');
-    else { g.fillStyle = '#000'; g.beginPath(); g.ellipse(h.e[0] / 4, h.e[1] / 4, h.e[2] / 4, h.e[3] / 4, 0, 0, Math.PI * 2); g.fill(); }
-  });
-  const d = g.getImageData(0, 0, mw, mh).data, m = new Uint8Array(mw * mh);
-  for (let i = 0; i < m.length; i++) m[i] = d[i * 4] > 127 ? 1 : 0;
-  r.iw = iw; r.ih = ih; r.mask = { w: mw, h: mh, m };
-  const pc = document.createElement('canvas'); pc.width = mw; pc.height = mh;
-  const pg = pc.getContext('2d'); pg.drawImage(im, 0, 0, mw, mh);
-  try { r.pix = pg.getImageData(0, 0, mw, mh).data; } catch (e) { r.pix = null; }
-}
-// borda esfumada para a ilustração se misturar ao campo
-function featherImage(im) {
-  const w = im.naturalWidth, h = im.naturalHeight, F = 64;
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
-  try {
-    const id = g.getImageData(0, 0, w, h), d = id.data;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const e = Math.min(x, y, w - 1 - x, h - 1 - y);
-      if (e >= F) continue;
-      const wob = (hash2(x >> 3, y >> 3) - 0.5) * 18;
-      let a = clamp((e + wob) / F, 0, 1); a = a * a * (3 - 2 * a);
-      d[(y * w + x) * 4 + 3] = Math.round(a * 255);
-    }
-    g.putImageData(id, 0, 0);
-  } catch (err) { /* sem acesso aos pixels: usa a imagem sem esfumar */ }
-  return c;
-}
-
-// ---------------------------------------------------------------- grade andável do mundo
+// ---------------------------------------------------------------- grade andável
 let worldGrid = null;
 function buildWorldGrid() {
   const m = new Uint8Array(GC * GR);
   for (let cy = 0; cy < GR; cy++) for (let cx = 0; cx < GC; cx++) {
-    const x = (cx + 0.5) * CELL, y = (cy + 0.5) * CELL;
-    let v = 1;
-    if (x < 150 || y < 150 || x > WW - 150 || y > WH - 150) v = 0;
-    else {
-      const r = regionAt(x, y);
-      if (r) {
-        const lx = (x - r.ox) / IS, ly = (y - r.oy) / IS, mk = r.mask;
-        const mx = Math.floor(lx / 4), my = Math.floor(ly / 4);
-        v = (mx >= 0 && my >= 0 && mx < mk.w && my < mk.h) ? mk.m[my * mk.w + mx] : 0;
-      } else if (terrain[cy * GC + cx] === 2) v = 0;
-    }
-    m[cy * GC + cx] = v;
+    const x = (cx + 0.5) * CELL, y = (cy + 0.5) * CELL, t = terrain[cy * GC + cx];
+    m[cy * GC + cx] = (x < 150 || y < 150 || x > WW - 150 || y > WH - 150 || t === 2 || t === 6) ? 0 : 1;
   }
   worldGrid = { cols: GC, rows: GR, cell: CELL, m };
 }
@@ -204,119 +122,360 @@ function stampGrid(grid, x, y, rad, v) {
     if ((i * c) ** 2 + (j * c * 1.6) ** 2 <= rad * rad) grid.m[cy * grid.cols + cx] = v;
   }
 }
+function stampRect(grid, x0, y0, x1, y1, v) {
+  for (let y = y0; y < y1; y += grid.cell) for (let x = x0; x < x1; x += grid.cell) {
+    const cx = Math.floor(x / grid.cell), cy = Math.floor(y / grid.cell);
+    if (cx >= 0 && cy >= 0 && cx < grid.cols && cy < grid.rows) grid.m[cy * grid.cols + cx] = v;
+  }
+}
 
-// ---------------------------------------------------------------- props: árvores, rochas, capim, flores, cogumelos
+// ---------------------------------------------------------------- construções em pixel art
+const SC = 4;   // 1 pixel de arte = 4 px de mundo
+const ROOFS = {
+  red: ['#4a1812', '#8e3a2a', '#b5523a', '#d8784e'], slate: ['#161b28', '#2c3448', '#424c66', '#647090'],
+  blue: ['#15233f', '#2b4a7a', '#3b62a0', '#6a92cc'], teal: ['#0f3533', '#1f6a66', '#2f8a84', '#5cc0b4'],
+  brown: ['#2e1c10', '#5e3a20', '#7e5230', '#a87446'], purple: ['#24163a', '#4a2f66', '#6a4a8e', '#9a7ac0'],
+  orange: ['#4a2410', '#a0522a', '#c86a34', '#e8944e']
+};
+const FLOWER_COLS = ['#ff9ec7', '#ffe066', '#ffffff', '#ff7a5a', '#b59cff'];
+function makeHouse(o, seed) {
+  const W = o.w, roofH = o.roofH || 30, wallH = o.wallH || 25, top = 10, H = top + roofH + wallH + 3;
+  const P = ROOFS[o.roof];
+  const cv2 = pixelCanvas(W, H, g => {
+    const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    const wy0 = top + roofH, wx0 = 3, wx1 = W - 3;
+    // parede
+    for (let y = wy0; y < wy0 + wallH; y++) for (let x = wx0; x < wx1; x++) {
+      let c;
+      if (o.wall === 'stone') {
+        const row = Math.floor((y - wy0) / 4), off = (row % 2) * 3;
+        c = ((x + off) % 6 === 0 || (y - wy0) % 4 === 0) ? '#5f5c57' : ['#a29e96', '#8f8b83', '#b4b0a8'][Math.floor(hash2(Math.floor((x + off) / 6), row + seed) * 3)];
+      } else if (o.wall === 'wood') c = x % 4 === 0 ? '#5e3a20' : (hash2(x >> 2, seed) < 0.5 ? '#9a6a3e' : '#a87646');
+      else c = hash2(x + seed, y) < 0.07 ? '#ddd0b0' : '#efe4c8';
+      rect(x, y, 1, 1, c);
+    }
+    if (o.wall === 'plaster') {
+      rect(wx0, wy0, 2, wallH, '#5a3a22'); rect(wx1 - 2, wy0, 2, wallH, '#5a3a22');
+      rect(wx0, wy0 + 1, wx1 - wx0, 2, '#5a3a22'); rect(wx0, wy0 + Math.floor(wallH * 0.55), wx1 - wx0, 1, '#6b4426');
+      for (let x = wx0 + 10; x < wx1 - 8; x += 14) { for (let k = 0; k < 6; k++) rect(x + k, wy0 + 3 + k, 1, 1, '#6b4426'); }
+    }
+    for (let y = wy0 + wallH - 4; y < wy0 + wallH; y++) for (let x = wx0; x < wx1; x++)
+      rect(x, y, 1, 1, ((x + (y % 2) * 2) % 5 === 0 || y === wy0 + wallH - 4) ? '#4f4c48' : '#8a867e');
+    rect(wx0 - 1, wy0, 1, wallH, '#2a1d16'); rect(wx1, wy0, 1, wallH, '#2a1d16'); rect(wx0 - 1, wy0 + wallH, wx1 - wx0 + 2, 1, '#2a1d16');
+    // janelas
+    const dw = 10, dh = 15, dx = Math.floor(W / 2 - dw / 2), dy = wy0 + wallH - dh;
+    const nWin = W >= 62 ? 2 : 1;
+    for (const s of [-1, 1]) for (let k = 0; k < nWin; k++) {
+      const x = Math.round(W / 2 + s * (dw / 2 + 7 + k * 13) - 4), y = wy0 + 6;
+      rect(x - 1, y - 1, 10, 9, '#2a1d16'); rect(x, y, 8, 7, '#8fcfe8'); rect(x, y, 3, 3, '#d8f2ff');
+      rect(x + 3, y, 1, 7, '#5a3a22'); rect(x, y + 3, 8, 1, '#5a3a22');
+      if (o.flowers !== false) {
+        rect(x - 1, y + 8, 10, 3, '#6b4426');
+        for (let i = 0; i < 5; i++) rect(x + i * 2, y + 7 - (i % 2), 2, 2, FLOWER_COLS[(i + seed) % 5]);
+      }
+    }
+    // porta
+    rect(dx - 1, dy - 1, dw + 2, dh + 1, '#2a1d16'); rect(dx, dy, dw, dh, '#7a4a2a');
+    for (let x = dx + 2; x < dx + dw; x += 3) rect(x, dy, 1, dh, '#5a3418');
+    rect(dx, dy, dw, 2, '#5a3418'); rect(dx + dw - 3, dy + 7, 1, 2, '#e0b040');
+    rect(dx, dy - 1, 1, 1, 'rgba(0,0,0,0)');
+    rect(dx - 3, wy0 + wallH, dw + 6, 3, '#9a968e'); rect(dx - 3, wy0 + wallH + 2, dw + 6, 1, '#5f5c57');
+    // placa
+    if (o.sign) {
+      const sx = dx + dw + 3, sy = dy - 2;
+      rect(sx, sy, 8, 1, '#2a1d16'); rect(sx + 1, sy + 1, 1, 2, '#2a1d16'); rect(sx + 6, sy + 1, 1, 2, '#2a1d16');
+      rect(sx - 1, sy + 3, 10, 8, '#2a1d16'); rect(sx, sy + 4, 8, 6, '#c99a6a');
+      if (o.sign === 'anvil') { rect(sx + 1, sy + 5, 6, 2, '#4f4c48'); rect(sx + 3, sy + 7, 2, 2, '#4f4c48'); }
+      if (o.sign === 'bread') { rect(sx + 1, sy + 6, 6, 3, '#a0602a'); rect(sx + 2, sy + 5, 4, 1, '#d9a05a'); }
+    }
+    // telhado
+    for (let t = 0; t < roofH; t++) {
+      const y = top + t, inset = Math.round((1 - t / roofH) * 7);
+      for (let x = inset; x < W - inset; x++) {
+        const row = Math.floor(t / 4), off = (row % 2) * 3;
+        let c = P[2];
+        if ((x + off) % 6 === 0 || t % 4 === 3) c = P[1];
+        else if (t % 4 === 0 && hash2(x + seed, row) < 0.35) c = P[3];
+        if (x === inset || x === W - inset - 1) c = P[0];
+        rect(x, y, 1, 1, c);
+      }
+    }
+    rect(7, top, W - 14, 2, P[0]); rect(8, top + 1, W - 16, 1, P[3]);
+    rect(0, top + roofH - 1, W, 1, P[0]);
+    rect(wx0, top + roofH, wx1 - wx0, 2, 'rgba(0,0,0,0.28)');
+    if (W >= 62) {   // água-furtada
+      const cx = Math.floor(W / 2) - 6, cy = top + 7;
+      rect(cx - 1, cy + 3, 14, 11, '#2a1d16'); rect(cx, cy + 4, 12, 9, '#efe4c8');
+      rect(cx + 3, cy + 6, 6, 5, '#8fcfe8'); rect(cx + 5, cy + 6, 1, 5, '#5a3a22');
+      for (let k = 0; k < 7; k++) { rect(cx - 1 + k, cy + 3 - Math.floor(k / 2), 1, 1, P[0]); rect(cx + 12 - k, cy + 3 - Math.floor(k / 2), 1, 1, P[0]); }
+      rect(cx + 1, cy + 1, 10, 3, P[2]);
+    }
+    if (o.chimney) {
+      const cx = Math.floor(W * 0.72);
+      rect(cx - 1, 1, 8, top + 9, '#2a1d16'); rect(cx, 2, 6, top + 7, '#8a867e');
+      for (let y = 4; y < top + 8; y += 3) rect(cx, y, 6, 1, '#6a665f');
+      rect(cx - 1, 1, 8, 2, '#4f4c48');
+      o.chimneyPos = [cx + 3, 1];
+    }
+  });
+  return { img: cv2, w: W, h: H, foot: (wallH + roofH * 0.55) };
+}
+function makeTower() {
+  const W = 64, H = 150;
+  const img = pixelCanvas(W, H, g => {
+    const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    // corpo cilíndrico
+    for (let y = 40; y < 140; y++) for (let x = 12; x < 52; x++) {
+      const row = Math.floor(y / 5), off = (row % 2) * 4;
+      const sh = (x - 12) / 40;
+      const base = sh < 0.25 ? ['#c4beb2', '#b6b0a4'] : sh < 0.7 ? ['#a8a296', '#9a9488'] : ['#857f74', '#767066'];
+      let c = base[Math.floor(hash2(Math.floor((x + off) / 8), row) * 2)];
+      if ((x + off) % 8 === 0 || y % 5 === 0) c = '#5f5a52';
+      if (hash2(x, y) < 0.02) c = '#5f8a3a';
+      rect(x, y, 1, 1, c);
+    }
+    rect(11, 40, 1, 100, '#2a2622'); rect(52, 40, 1, 100, '#2a2622');
+    for (let x = 7; x < 57; x++) for (let y = 132; y < 146; y++) rect(x, y, 1, 1, (y === 132 || (x + (y % 2) * 3) % 7 === 0) ? '#4f4a44' : '#8f897d');
+    rect(6, 132, 1, 14, '#2a2622'); rect(57, 132, 1, 14, '#2a2622'); rect(6, 146, 52, 1, '#2a2622');
+    // porta em arco
+    rect(23, 113, 18, 33, '#2a2622'); rect(25, 116, 14, 30, '#7a4a2a');
+    for (let x = 27; x < 39; x += 3) rect(x, 116, 1, 30, '#5a3418');
+    rect(25, 116, 2, 2, '#2a2622'); rect(37, 116, 2, 2, '#2a2622'); rect(26, 125, 12, 1, '#3b3530'); rect(26, 136, 12, 1, '#3b3530');
+    rect(35, 130, 2, 2, '#e0b040');
+    rect(22, 112, 20, 2, '#d6d0c4');
+    // janelas
+    for (const y of [62, 88]) { rect(29, y - 1, 6, 12, '#2a2622'); rect(30, y, 4, 10, '#3a4a5a'); rect(30, y, 1, 4, '#8fcfe8'); }
+    // varanda
+    rect(5, 34, 54, 7, '#2a2622'); rect(6, 35, 52, 4, '#b6b0a4'); rect(6, 39, 52, 2, '#6a645a');
+    for (let x = 8; x < 56; x += 5) rect(x, 30, 2, 5, '#4f4a44');
+    rect(6, 29, 52, 2, '#4f4a44');
+    // sala da lanterna
+    rect(17, 13, 30, 17, '#2a2622');
+    for (let i = 0; i < 4; i++) { rect(19 + i * 7, 15, 5, 13, '#34404c'); rect(19 + i * 7, 15, 1, 6, '#5a6a7a'); }
+    // telhado cônico
+    for (let y = 0; y < 14; y++) {
+      const hw = Math.round(2 + y * 1.3);
+      for (let x = 32 - hw; x < 32 + hw; x++) rect(x, y, 1, 1, x === 32 - hw || x === 32 + hw - 1 ? '#161b28' : x < 32 ? '#46516e' : '#2c3448');
+    }
+    rect(15, 12, 34, 2, '#161b28'); rect(31, 0, 2, 2, '#e0b040');
+  });
+  return { img, w: W, h: H, lantern: [32, 21] };
+}
+function makeBarn() {
+  const W = 78, H = 70;
+  const img = pixelCanvas(W, H, g => {
+    const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    for (let y = 30; y < 66; y++) for (let x = 6; x < 72; x++) rect(x, y, 1, 1, x % 4 === 0 ? '#7a2a1e' : '#a8402e');
+    rect(5, 30, 1, 36, '#2a1410'); rect(72, 30, 1, 36, '#2a1410'); rect(5, 66, 68, 1, '#2a1410');
+    rect(6, 30, 66, 2, '#f0e6d0'); rect(6, 30, 2, 36, '#f0e6d0'); rect(70, 30, 2, 36, '#f0e6d0');
+    // portão
+    rect(27, 40, 24, 26, '#f0e6d0'); rect(29, 42, 20, 24, '#8e3424');
+    for (let k = 0; k < 20; k++) { rect(29 + k, 42 + Math.floor(k * 1.2), 1, 1, '#f0e6d0'); rect(48 - k, 42 + Math.floor(k * 1.2), 1, 1, '#f0e6d0'); }
+    rect(38, 42, 1, 24, '#f0e6d0');
+    // telhado de duas águas
+    for (let y = 0; y < 31; y++) {
+      const hw = Math.round(6 + y * 1.06);
+      for (let x = 39 - hw; x < 39 + hw; x++) {
+        let c = (x + (Math.floor(y / 3) % 2) * 2) % 5 === 0 || y % 3 === 2 ? '#4a2a18' : '#6e4426';
+        if (x === 39 - hw || x === 39 + hw - 1) c = '#24140a';
+        rect(x, y, 1, 1, c);
+      }
+    }
+    rect(33, 12, 12, 10, '#24140a'); rect(34, 13, 10, 8, '#f0e6d0'); rect(35, 14, 8, 6, '#e8c060'); rect(38, 14, 2, 6, '#c99a3a');
+  });
+  return { img, w: W, h: H };
+}
+function makeSmall(kind) {
+  const defs = {
+    well: [32, 40, g => {
+      const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+      rect(5, 8, 3, 20, '#5a3a22'); rect(24, 8, 3, 20, '#5a3a22');
+      for (let y = 0; y < 9; y++) { const hw = 6 + y * 1.4; rect(16 - hw, y, hw * 2, 1, y === 8 ? '#4a1812' : y % 3 === 0 ? '#8e3a2a' : '#b5523a'); }
+      rect(8, 13, 16, 2, '#7a4a2a'); rect(15, 15, 2, 6, '#3b2618'); rect(13, 20, 6, 5, '#7a4a2a');
+      g.fillStyle = '#4f4c48'; g.beginPath(); g.ellipse(16, 31, 15, 8, 0, 0, 7); g.fill();
+      g.fillStyle = '#9a968e'; g.beginPath(); g.ellipse(16, 30, 14, 7, 0, 0, 7); g.fill();
+      g.fillStyle = '#2a5a8a'; g.beginPath(); g.ellipse(16, 29, 10, 4, 0, 0, 7); g.fill();
+      for (let x = 3; x < 30; x += 4) rect(x, 32 + (x % 8 ? 1 : 0), 3, 2, '#7d7a74');
+    }],
+    fountain: [64, 36, g => {
+      const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+      g.fillStyle = '#4f4c48'; g.beginPath(); g.ellipse(32, 25, 31, 11, 0, 0, 7); g.fill();
+      g.fillStyle = '#b4b0a8'; g.beginPath(); g.ellipse(32, 24, 30, 10, 0, 0, 7); g.fill();
+      g.fillStyle = '#3a7ab0'; g.beginPath(); g.ellipse(32, 23, 25, 7, 0, 0, 7); g.fill();
+      g.fillStyle = '#5fa8d8'; g.beginPath(); g.ellipse(28, 22, 14, 3, 0, 0, 7); g.fill();
+      rect(28, 6, 8, 18, '#4f4c48'); rect(29, 6, 6, 17, '#a29e96'); rect(29, 6, 2, 17, '#c4beb2');
+      g.fillStyle = '#4f4c48'; g.beginPath(); g.ellipse(32, 6, 9, 3, 0, 0, 7); g.fill();
+      g.fillStyle = '#5fa8d8'; g.beginPath(); g.ellipse(32, 5, 7, 2, 0, 0, 7); g.fill();
+    }],
+    van: [62, 36, g => {
+      const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+      rect(2, 5, 58, 25, '#2a2622'); rect(3, 6, 56, 23, '#e8e0c8'); rect(3, 6, 56, 4, '#f6f0dc');
+      rect(14, 1, 18, 5, '#2a2622'); rect(15, 2, 16, 4, '#d8d0b8');
+      rect(6, 11, 10, 7, '#2a3a4a'); rect(19, 11, 10, 7, '#2a3a4a'); rect(32, 11, 8, 7, '#2a3a4a'); rect(46, 10, 11, 9, '#2a3a4a');
+      rect(7, 12, 3, 3, '#8fcfe8'); rect(47, 11, 4, 3, '#8fcfe8');
+      rect(3, 21, 56, 2, '#b5523a'); rect(3, 24, 56, 1, '#7a6a5a');
+      rect(41, 10, 1, 19, '#7a6a5a'); rect(56, 22, 3, 3, '#ffe27a');
+      for (const wx of [14, 47]) { g.fillStyle = '#1a1a1a'; g.beginPath(); g.arc(wx, 30, 5.5, 0, 7); g.fill(); g.fillStyle = '#8a8a8a'; g.beginPath(); g.arc(wx, 30, 2, 0, 7); g.fill(); }
+    }],
+    tent: [44, 32, g => {
+      for (let y = 0; y < 30; y++) {
+        const hw = y * 0.72 + 1;
+        for (let x = Math.round(22 - hw); x < Math.round(22 + hw); x++) {
+          g.fillStyle = x === Math.round(22 - hw) || x === Math.round(22 + hw) - 1 ? '#5a2a10' : x < 22 ? '#e8883a' : '#c06a28';
+          g.fillRect(x, y + 1, 1, 1);
+        }
+      }
+      g.fillStyle = '#3a1a08';
+      for (let y = 12; y < 30; y++) { const hw = (y - 12) * 0.35; g.fillRect(Math.round(22 - hw), y + 1, Math.max(1, Math.round(hw * 2)), 1); }
+      g.fillStyle = '#5a3a22'; g.fillRect(21, 0, 2, 3);
+    }]
+  };
+  const [w, h, fn] = defs[kind];
+  return { img: pixelCanvas(w, h, fn), w, h };
+}
+
+// lista de construções (x = centro, y = base no mundo)
+const BUILDINGS = [
+  { kind: 'house', x: 3250, y: 1560, w: 66, roof: 'slate', wall: 'stone', sign: 'anvil', chimney: true, to: 'oficina' },
+  { kind: 'house', x: 3850, y: 1560, w: 62, roof: 'red', wall: 'plaster', to: 'casaTeo' },
+  { kind: 'house', x: 3850, y: 2640, w: 62, roof: 'purple', wall: 'plaster', chimney: true, to: 'casaAurora' },
+  { kind: 'house', x: 3250, y: 2640, w: 58, roof: 'blue', wall: 'wood', chimney: true },
+  { kind: 'house', x: 1700, y: 1160, w: 66, roof: 'orange', wall: 'plaster', sign: 'bread', chimney: true, to: 'padaria' },
+  { kind: 'house', x: 2130, y: 1340, w: 58, roof: 'teal', wall: 'wood', to: 'casaMel' },
+  { kind: 'house', x: 1700, y: 1640, w: 54, roof: 'blue', wall: 'plaster' },
+  { kind: 'house', x: 2140, y: 880, w: 58, roof: 'brown', wall: 'plaster', chimney: true },
+  { kind: 'house', x: 1700, y: 720, w: 54, roof: 'red', wall: 'stone', chimney: true },
+  { kind: 'barn', x: 5380, y: 820 },
+  { kind: 'tower', x: 6750, y: 2262 },
+  { kind: 'well', x: 5640, y: 1420 },
+  { kind: 'fountain', x: 3550, y: 2030 },
+  { kind: 'van', x: 990, y: 3040 },
+  { kind: 'tent', x: 620, y: 3070 }
+];
+let TOWER = null;
+function buildBuildings() {
+  BUILDINGS.forEach((b, i) => {
+    let s;
+    if (b.kind === 'house') s = makeHouse(b, i * 13 + 7);
+    else if (b.kind === 'tower') { s = makeTower(); TOWER = b; }
+    else if (b.kind === 'barn') s = makeBarn();
+    else s = makeSmall(b.kind);
+    b.sc = (b.kind === 'house' || b.kind === 'barn' || b.kind === 'tower') ? 5 : SC;
+    b.img = s.img; b.pw = s.w * b.sc; b.ph = s.h * b.sc; b.lantern = s.lantern;
+    if (b.chimneyPos) b.smoke = [b.x - b.pw / 2 + b.chimneyPos[0] * b.sc, b.y - b.ph + 4];
+    // colisão
+    const hw = b.pw / 2;
+    if (b.kind === 'house' || b.kind === 'barn') stampRect(worldGrid, b.x - hw + 16, b.y - (s.foot ? s.foot * b.sc : b.ph * 0.6), b.x + hw - 16, b.y - 10, 0);
+    else if (b.kind === 'tower') stampRect(worldGrid, b.x - b.pw * 0.36, b.y - b.ph * 0.3, b.x + b.pw * 0.36, b.y - 8, 0);
+    else if (b.kind === 'fountain') { for (let a = 0; a < 6.28; a += 0.2) stampGrid(worldGrid, b.x + Math.cos(a) * 80, b.y - 44 + Math.sin(a) * 26, 34, 0); stampGrid(worldGrid, b.x, b.y - 44, 60, 0); }
+    else if (b.kind === 'well') stampRect(worldGrid, b.x - 56, b.y - 70, b.x + 56, b.y - 6, 0);
+    else if (b.kind === 'van') stampRect(worldGrid, b.x - 118, b.y - 100, b.x + 118, b.y - 8, 0);
+    else if (b.kind === 'tent') stampRect(worldGrid, b.x - 76, b.y - 90, b.x + 76, b.y - 8, 0);
+    if (b.to) { const r = regionAt(b.x, b.y); r.doors.push({ x: b.x, y: b.y + 14, to: b.to }); }
+    addProp({ t: 'bld', x: b.x, y: b.y, b });
+  });
+}
+
+// ---------------------------------------------------------------- props
 const BUCKET = 512, BC = Math.ceil(WW / BUCKET), BR = Math.ceil(WH / BUCKET);
 let buckets = [];
 const props = [];
 function addProp(p) { props.push(p); }
-function entrancePoints() {
-  const pts = [];
-  for (const t of TRAILS) { pts.push(t[0]); pts.push(t[t.length - 1]); }
-  return pts;
-}
+function deco(d, x, y, extra) { addProp(Object.assign({ t: 'deco', d, x, y, seed: Math.floor(x * 7 + y * 13) }, extra || {})); }
 function clearOf(x, y, rad, types) {
-  for (let a = 0; a < 8; a++) {
-    const t = terrainAt(x + Math.cos(a * 0.785) * rad, y + Math.sin(a * 0.785) * rad);
-    if (types.includes(t)) return false;
-  }
+  for (let a = 0; a < 8; a++) if (types.includes(terrainAt(x + Math.cos(a * 0.785) * rad, y + Math.sin(a * 0.785) * rad))) return false;
   return !types.includes(terrainAt(x, y));
+}
+function nearBuilding(x, y, pad) {
+  return BUILDINGS.some(b => x > b.x - b.pw / 2 - pad && x < b.x + b.pw / 2 + pad && y > b.y - b.ph - pad && y < b.y + pad + 40);
+}
+function placeTownDecor() {
+  // praça: postes, bancos, canteiros, barris
+  for (const [x, y] of [[3330, 1760], [3770, 1760], [3330, 2400], [3770, 2400], [3200, 2050], [3900, 2050]]) deco('lamp', x, y, { block: 12 });
+  for (const [x, y] of [[3420, 2290], [3680, 2290]]) deco('bench', x, y);
+  for (const [x, y] of [[3550, 2200], [3380, 1990], [3720, 1990], [3550, 1850]]) deco('flowerbed', x, y);
+  for (const [x, y] of [[3100, 1600], [3110, 1640], [4000, 2680], [3420, 1620]]) deco('barrel', x, y, { block: 18 });
+  deco('crate', 3060, 1620, { block: 18 }); deco('anvilout', 3400, 1610, { block: 16 });
+  // vila
+  for (const [x, y] of [[1820, 1250], [1980, 1250], [1820, 800], [1980, 1520]]) deco('lamp', x, y, { block: 12 });
+  for (const [x, y] of [[1600, 1300], [2260, 1080], [1580, 1830], [2230, 1740], [2000, 580], [1640, 900], [2250, 1440]]) deco('flowerbed', x, y);
+  deco('bench', 1780, 1700); deco('crate', 1590, 1190, { block: 18 }); deco('barrel', 1850, 1180, { block: 18 });
+  // horta: cercas, plantações, feno
+  for (const [fx, fy, fw, fh] of FIELDS) {
+    for (let x = fx + 12; x < fx + fw; x += 48) {
+      if (Math.abs(x + 24 - (fx + fw / 2)) > 40) { deco('fenceH', x + 24, fy - 6); }
+      deco('fenceH', x + 24, fy + fh + 18);
+    }
+    for (let y = fy + 30; y < fy + fh; y += 46) { deco('fenceV', fx - 10, y + 20); deco('fenceV', fx + fw + 10, y + 20); }
+    const kinds = ['cabbage', 'carrot', 'beans', 'pumpkin'], kd = kinds[(fx + fy) % 4 === 0 ? 0 : Math.floor(hash2(fx, fy) * 4)];
+    for (let y = fy + 50; y < fy + fh - 10; y += 64) for (let x = fx + 34; x < fx + fw - 20; x += 56) deco(kd, x, y);
+  }
+  for (const [x, y] of [[5640, 900], [5680, 960], [4700, 820]]) deco('hay', x, y, { block: 30 });
+  deco('crate', 5560, 1460, { block: 18 }); deco('barrel', 5720, 1460, { block: 18 });
+  // torre: ruínas e baú
+  for (const [x, y] of [[6520, 2420], [6980, 2420], [6600, 2160], [6920, 2170], [6450, 2620], [7050, 2620]]) deco('pillar', x, y, { block: 22 });
+  for (const [x, y] of [[6560, 2540], [6930, 2300], [7000, 2500], [6480, 2280]]) deco('rubble', x, y);
+  deco('chest', REGIONS.torre.chest.x, REGIONS.torre.chest.y, { block: 26 });
+  // acampamento
+  deco('campfire', REGIONS.penhasco.fire.x, REGIONS.penhasco.fire.y, { block: 46 });
+  for (const [x, y] of [[700, 3200], [900, 3200]]) deco('log', x, y + 6);
+  deco('crate', 1080, 3140, { block: 18 }); deco('chair', 1000, 3240);
+  // placas nas entradas
+  for (const [x, y, t] of [[3110, 1890, 'Praça das Telhas'], [2700, 1540, 'Vila do Rio'], [5040, 640, 'Horta'], [6480, 2700, 'Torre'], [860, 2960, 'Penhasco'], [5740, 1260, 'Bosque Norte']]) deco('sign', x, y, { text: t, block: 8 });
+  for (const p of props) if (p.t === 'deco' && p.block) stampGrid(worldGrid, p.x, p.y - 6, p.block, 0);
+  for (const p of props) if (p.t === 'deco' && (p.d === 'fenceH')) stampRect(worldGrid, p.x - 24, p.y - 12, p.x + 24, p.y, 0);
+  for (const p of props) if (p.t === 'deco' && (p.d === 'fenceV')) stampRect(worldGrid, p.x - 6, p.y - 46, p.x + 6, p.y, 0);
 }
 function placeProps() {
   const R = mulberry(20261116);
-  const ents = entrancePoints();
-  const nearEnt = (x, y, d) => ents.some(([ex, ey]) => Math.hypot(ex - x, ey - y) < d);
-  const okTree = (x, y) => x > 60 && y > 120 && x < WW - 60 && y < WH - 40 && !regionAt(x, y, 24) &&
-    clearOf(x, y, 64, [1, 2, 3]) && !nearEnt(x, y, 180) && Math.hypot(x - CAT_SPOT[0], y - CAT_SPOT[1]) > 230;
+  const town = (x, y) => REGION_LIST.some(r => x > r.ox + 60 && x < r.ox + r.iw - 60 && y > r.oy + 60 && y < r.oy + r.ih - 60);
+  const okTree = (x, y) => x > 60 && y > 120 && x < WW - 60 && y < WH - 40 && clearOf(x, y, 66, [1, 2, 3, 4, 5, 6, 7]) &&
+    !nearBuilding(x, y, 90) && Math.hypot(x - CAT_SPOT[0], y - CAT_SPOT[1]) > 230 && !PLAZAS.some(([px, py, rx, ry]) => ((x - px) / (rx + 90)) ** 2 + ((y - py) / (ry + 90)) ** 2 < 1);
   const tree = (x, y) => {
-    let kind = R();
-    let idx = y < 1300 && R() < 0.6 ? 5 + Math.floor(R() * 2) : Math.floor(kind * 5);
+    let idx = y < 1300 && R() < 0.6 ? 5 + Math.floor(R() * 2) : Math.floor(R() * 5);
     if (x > 5600 && R() < 0.4) idx = 3;
     addProp({ t: 'tree', x, y, img: TREE_IMGS[idx].img, stock: 3, regrow: 0, shake: 0, s: 4 + (R() < 0.2 ? 0.6 : 0) });
   };
-  // floresta: manchas de ruído + borda densa
   for (let y = 60; y < WH; y += 104) for (let x = 40; x < WW; x += 96) {
     const jx = x + (R() - 0.5) * 70, jy = y + (R() - 0.5) * 60;
     const edge = Math.min(jx, jy, WW - jx, WH - jy);
     let n = vnoise(jx * 0.0014, jy * 0.0014) + (edge < 380 ? 0.55 : 0) + (vnoise(jx * 0.006, jy * 0.006) - 0.5) * 0.25;
-    if ((n > 0.62 || R() < 0.06) && okTree(jx, jy)) tree(jx, jy);
+    const inTown = town(jx, jy);
+    if (inTown) n -= 0.35;
+    if ((n > 0.62 || (!inTown && R() < 0.06) || (inTown && R() < 0.035)) && okTree(jx, jy)) tree(jx, jy);
   }
-  // árvores coladas às ilustrações (escondem as emendas)
-  for (const r of REGION_LIST) {
-    const x0 = r.ox, y0 = r.oy, x1 = r.ox + r.iw * IS, y1 = r.oy + r.ih * IS;
-    const per = [];
-    for (let x = x0; x <= x1; x += 110) { per.push([x, y0 - 4]); per.push([x, y1 + 70]); }
-    for (let y = y0 + 80; y <= y1; y += 120) { per.push([x0 - 40, y]); per.push([x1 + 40, y]); }
-    for (const [px, py] of per) {
-      const x = px + (R() - 0.5) * 30, y = py + R() * 30;
-      if (R() < 0.95 && !regionAt(x, y, 0) && clearOf(x, y, 60, [1, 2, 3]) && !nearEnt(x, y, 200)) tree(x, y);
-    }
-  }
-  // moldura de mata sobre as bordas das ilustrações: esconde as casas cortadas na borda
-  const localWalk = (r, lx, ly) => {
-    const mk = r.mask, mx = Math.floor(lx / 4), my = Math.floor(ly / 4);
-    return mx >= 0 && my >= 0 && mx < mk.w && my < mk.h && mk.m[my * mk.w + mx] === 1;
-  };
-  const watery = (r, lx, ly) => {
-    if (!r.pix) return false;
-    const mx = clamp(Math.floor(lx / 4), 0, r.mask.w - 1), my = clamp(Math.floor(ly / 4), 0, r.mask.h - 1), i = (my * r.mask.w + mx) * 4;
-    const R0 = r.pix[i], G0 = r.pix[i + 1], B0 = r.pix[i + 2];
-    return B0 > G0 + 8 && B0 > R0 + 30;
-  };
-  for (const r of REGION_LIST) {
-    const sides = r.frame || 'tlrb';
-    const cand = [];
-    for (const depth of [4, 20]) {
-      const step = depth === 4 ? 58 : 66, off = depth === 4 ? 30 : 0;
-      for (let lx = off; lx <= r.iw; lx += step) {
-        if (sides.includes('t')) cand.push([lx, depth + 18, depth]);
-        if (sides.includes('b')) cand.push([lx, r.ih - depth + 30, depth]);
-      }
-      for (let ly = off + 40; ly <= r.ih; ly += step) {
-        if (sides.includes('l')) cand.push([depth, ly, depth]);
-        if (sides.includes('r')) cand.push([r.iw - depth, ly, depth]);
-      }
-    }
-    for (const [lx0, ly0, depth] of cand) {
-      const lx = lx0 + (R() - 0.5) * 18, ly = ly0 + (R() - 0.5) * 14;
-      let clear = true;
-      for (let a = 0; a < 12 && clear; a++) for (const rad of [0, 35, 60]) {
-        if (localWalk(r, lx + Math.cos(a * 0.524) * rad, ly - 20 + Math.sin(a * 0.524) * rad * 0.8)) { clear = false; break; }
-      }
-      if (!clear || watery(r, lx, ly) || watery(r, lx, ly - 40)) continue;
-      const [x, y] = toWorld(r, lx, ly);
-      if (nearEnt(x, y, 230)) continue;
-      if (depth === 4 || R() < 0.25) addProp({ t: 'bush', x, y, img: BUSH_IMGS[Math.floor(R() * BUSH_IMGS.length)], s: 4 + R() * 1.5 });
-      else addProp({ t: 'tree', x, y, img: TREE_IMGS[Math.floor(R() * 5)].img, stock: 3, regrow: 0, shake: 0, s: 4 + R() * 0.8, frame: true });
-    }
-  }
-  const meadow = (x, y, pad) => x > 200 && y > 200 && x < WW - 200 && y < WH - 200 && !regionAt(x, y, pad) && clearOf(x, y, 30, [1, 2, 3]);
-  const farFromTrees = (x, y, d) => !props.some(p => p.t === 'tree' && Math.abs(p.x - x) < d && Math.abs(p.y - y) < d * 0.7);
-  for (let i = 0; i < 170; i++) {
+  // arbustos espalhados (decoração)
+  for (let i = 0; i < 260; i++) {
     const x = R() * WW, y = R() * WH;
-    if (!meadow(x, y, 40) || !farFromTrees(x, y, 70)) continue;
+    if (x < 200 || y < 200 || x > WW - 200 || y > WH - 200 || !clearOf(x, y, 40, [1, 2, 3, 4, 5, 6, 7]) || nearBuilding(x, y, 60)) continue;
+    addProp({ t: 'bush', x, y, img: BUSH_IMGS[Math.floor(R() * BUSH_IMGS.length)], s: 3.5 + R() * 1.5 });
+  }
+  const meadow = (x, y) => x > 200 && y > 200 && x < WW - 200 && y < WH - 200 && clearOf(x, y, 34, [1, 2, 3, 4, 5, 6, 7]) && !nearBuilding(x, y, 70);
+  const notSafe = (x, y) => { const r = regionAt(x, y); return !(r && r.safe); };
+  const farFromTrees = (x, y, d) => !props.some(p => (p.t === 'tree' || p.t === 'bld') && Math.abs(p.x - x) < d && Math.abs(p.y - y) < d * 0.7);
+  for (let i = 0; i < 190; i++) {
+    const x = R() * WW, y = R() * WH;
+    if (!meadow(x, y) || !notSafe(x, y) || !farFromTrees(x, y, 70)) continue;
     const crystal = (x > 5400 && R() < 0.5) || (Math.hypot(x - CAT_SPOT[0], y - CAT_SPOT[1]) < 900 && R() < 0.6);
     addProp({ t: 'rock', x, y, img: crystal ? ROCK_IMGS[2] : ROCK_IMGS[Math.floor(R() * 2)], crystal, stock: crystal ? 2 : 3, regrow: 0, shake: 0 });
   }
-  for (let i = 0; i < 520; i++) {
+  for (let i = 0; i < 560; i++) {
     const x = R() * WW, y = R() * WH;
-    if (meadow(x, y, 10) && farFromTrees(x, y, 40)) addProp({ t: 'tuft', x, y, gone: 0, ph: R() * 6 });
+    if (meadow(x, y) && farFromTrees(x, y, 40)) addProp({ t: 'tuft', x, y, gone: 0, ph: R() * 6 });
   }
-  const FC = ['#ff9ec7', '#ffe066', '#ffffff', '#b59cff', '#ff7a5a'];
   for (let i = 0; i < 300; i++) {
     const x = R() * WW, y = R() * WH;
-    if (meadow(x, y, 10) && farFromTrees(x, y, 40)) addProp({ t: 'flower', x, y, gone: 0, col: FC[Math.floor(R() * FC.length)] });
+    if (meadow(x, y) && notSafe(x, y) && farFromTrees(x, y, 40)) addProp({ t: 'flower', x, y, gone: 0, col: FLOWER_COLS[Math.floor(R() * FLOWER_COLS.length)] });
   }
   for (let i = 0; i < 900; i++) {
     const x = i % 3 === 0 ? 800 + (R() - 0.5) * 1300 : R() * WW, y = i % 3 === 0 ? 950 + (R() - 0.5) * 1000 : R() * WH;
-    if (!meadow(x, y, 20)) continue;
+    if (!meadow(x, y) || !notSafe(x, y)) continue;
     if (!props.some(p => p.t === 'tree' && Math.hypot(p.x - x, p.y - y) < 150)) continue;
     if (props.filter(p => p.t === 'mush').length > 120) break;
     addProp({ t: 'mush', x, y, gone: 0 });
   }
-  // colisão de troncos e rochas
   for (const p of props) {
-    if (p.t === 'tree' && !p.frame) stampGrid(worldGrid, p.x, p.y - 6, 20, 0);
+    if (p.t === 'tree') stampGrid(worldGrid, p.x, p.y - 6, 20, 0);
     if (p.t === 'rock') stampGrid(worldGrid, p.x, p.y - 8, 30, 0);
   }
   buckets = Array.from({ length: BC * BR }, () => []);
@@ -336,22 +495,39 @@ function propsNear(x0, y0, x1, y1) {
 }
 
 // ---------------------------------------------------------------- chão em pedaços (cache)
-const CH = 512, CHR = 2;   // pedaço de 512px de mundo desenhado em meia resolução
+const CH = 512, CHR = 2;
 const chunkCache = new Map();
 function groundRGB(wx, wy) {
-  const jx = (vnoise(wx * 0.02, wy * 0.02) - 0.5) * 30, jy = (vnoise(wx * 0.02 + 50, wy * 0.02) - 0.5) * 30;
+  const jx = (vnoise(wx * 0.02, wy * 0.02) - 0.5) * 26, jy = (vnoise(wx * 0.02 + 50, wy * 0.02) - 0.5) * 26;
   const t = terrainAt(wx + jx, wy + jy);
   const n = vnoise(wx * 0.005, wy * 0.005) * 0.65 + vnoise(wx * 0.03, wy * 0.03) * 0.35;
   const h = hash2(wx >> 2, wy >> 2);
   const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-  if (t === 2) {
-    if (h < 0.015) return [170, 222, 245];
-    return mix([40, 118, 176], [64, 158, 210], n);
+  if (t === 7) {
+    const tx = terrainAt(wx, wy);
+    if (tx !== 7) return [90, 58, 32];
+    return (wx % 16 < 3 || wy % 16 < 2) ? [90, 58, 32] : h < 0.5 ? [160, 112, 62] : [176, 124, 70];
+  }
+  if (t === 2) { if (h < 0.015) return [170, 222, 245]; return mix([40, 118, 176], [64, 158, 210], n); }
+  if (t === 6) {
+    if (h < 0.06) return [62, 60, 58];
+    const k = vnoise(wx * 0.04, wy * 0.04);
+    return k < 0.35 ? [95, 92, 87] : k < 0.65 ? [125, 122, 116] : [154, 151, 143];
   }
   if (t === 3) return h < 0.05 ? [200, 180, 120] : mix([214, 192, 132], [232, 214, 158], n);
+  if (t === 4) {
+    const row = Math.floor(wy / 14), off = (row % 2) * 10, bx = Math.floor((wx + off) / 20);
+    if ((wx + off) % 20 < 3 || wy % 14 < 3) return [128, 118, 100];
+    const k = hash2(bx, row);
+    return k < 0.33 ? [200, 190, 166] : k < 0.66 ? [184, 173, 148] : [214, 204, 180];
+  }
+  if (t === 5) {
+    if (wy % 32 < 7) return [86, 56, 32];
+    return h < 0.06 ? [140, 98, 60] : mix([112, 74, 44], [128, 86, 52], n);
+  }
   if (t === 1) {
     if (h < 0.05) return [150, 118, 78];
-    const e = terrainAt(wx + jx + 14, wy + jy) !== 1 || terrainAt(wx + jx - 14, wy + jy) !== 1 || terrainAt(wx + jx, wy + jy + 14) !== 1 || terrainAt(wx + jx, wy + jy - 14) !== 1;
+    const e = [[14, 0], [-14, 0], [0, 14], [0, -14]].some(([a, b]) => { const q = terrainAt(wx + jx + a, wy + jy + b); return q === 0 || q === 3; });
     return e ? [160, 126, 80] : mix([178, 140, 88], [204, 168, 112], n);
   }
   if (h < 0.045) return [150, 212, 92];
@@ -368,8 +544,7 @@ function getChunk(cx, cy, allowBuild) {
   c = document.createElement('canvas'); c.width = S2; c.height = S2;
   const g = c.getContext('2d'), id = g.createImageData(S2, S2), d = id.data;
   for (let y = 0; y < S2; y += 2) for (let x = 0; x < S2; x += 2) {
-    const wx = cx * CH + x * CHR, wy = cy * CH + y * CHR;
-    const [r, gg, b] = groundRGB(wx, wy);
+    const [r, gg, b] = groundRGB(cx * CH + x * CHR, cy * CH + y * CHR);
     for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
       const k = ((y + j) * S2 + x + i) * 4; d[k] = r; d[k + 1] = gg; d[k + 2] = b; d[k + 3] = 255;
     }
@@ -379,14 +554,6 @@ function getChunk(cx, cy, allowBuild) {
   while (chunkCache.size > 70) chunkCache.delete(chunkCache.keys().next().value);
   return c;
 }
-// textura de terra para as trilhas que entram nas ilustrações
-const DIRT = pixelCanvas(32, 32, g => {
-  for (let y = 0; y < 32; y += 2) for (let x = 0; x < 32; x += 2) {
-    const h = hash2(x + 900, y + 300), n = vnoise(x * 0.15, y * 0.15);
-    g.fillStyle = h < 0.08 ? '#97764e' : n > 0.55 ? '#cca870' : '#b99459';
-    g.fillRect(x, y, 2, 2);
-  }
-});
 
 // ---------------------------------------------------------------- interiores
 const TILE = 48;
