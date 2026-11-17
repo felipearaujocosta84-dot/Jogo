@@ -10,9 +10,9 @@ function newSave() {
     stage: 0, relics: { petala: false, orvalho: false, brasa: false }, got: {}, kills: {},
     coins: 0, maxHp: 5, chest: false, bossDead: false, done: false,
     inv: { madeira: 0, pedra: 0, fibra: 0, flor: 0, cogumelo: 0, seiva: 0, cristal: 0 },
-    bag: { pocao: 0, torta: 0, feixe: 0 },
+    bag: { pocao: 0, torta: 0, feixe: 0, sopa: 0, buque: 0, anel: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
-    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, npcs: {}, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
+    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
 }
 let S = newSave();
@@ -62,10 +62,13 @@ const hortaKills = () => REGIONS.horta.foes.filter(f => S.kills[f.id]).length;
 
 // ---------------------------------------------------------------- receitas e itens
 const NAMES = { madeira: 'Madeira', pedra: 'Pedra', fibra: 'Fibra', flor: 'Flor', cogumelo: 'Cogumelo', seiva: 'Seiva', cristal: 'Cristal',
-  pocao: 'Poção de Cura', torta: 'Torta', feixe: 'Feixe de Lenha', moeda: 'Moeda' };
+  pocao: 'Poção de Cura', torta: 'Torta', feixe: 'Feixe de Lenha', moeda: 'Moeda', sopa: 'Sopa de Cogumelo', buque: 'Buquê de Flores', anel: 'Anel de Cristal' };
 const RECIPES = [
   { id: 'pocao', name: 'Poção de Cura', desc: 'Recupera 3 corações', need: { flor: 2, cogumelo: 1 }, icon: 'pocao' },
   { id: 'feixe', name: 'Feixe de Lenha', desc: 'Lenha boa para fogueira', need: { madeira: 4, fibra: 1 }, icon: 'feixe' },
+  { id: 'sopa', name: 'Sopa de Cogumelo', desc: 'Alimenta a família · +2 corações', need: { cogumelo: 2 }, icon: 'sopa' },
+  { id: 'buque', name: 'Buquê de Flores', desc: 'Para pedir alguém em namoro', need: { flor: 5, fibra: 1 }, icon: 'buque' },
+  { id: 'anel', name: 'Anel de Cristal', desc: 'Para o pedido de casamento', need: { cristal: 2, pedra: 3 }, station: true, icon: 'anel' },
   { id: 'espada2', name: 'Espada de Pedra', desc: 'Dano 2', need: { madeira: 3, pedra: 4 }, station: true, icon: 'espada2', has: () => S.eq.espada >= 2 },
   { id: 'espada3', name: 'Espada de Cristal', desc: 'Dano 3', need: { madeira: 2, cristal: 3, seiva: 2 }, station: true, icon: 'espada3', has: () => S.eq.espada >= 3 },
   { id: 'armadura', name: 'Armadura de Folhas', desc: '+2 corações', need: { fibra: 6, madeira: 3 }, station: true, icon: 'armadura', has: () => S.eq.armadura },
@@ -78,6 +81,7 @@ function craft(r) {
   for (const [k, n] of Object.entries(r.need)) S.inv[k] -= n;
   if (r.id === 'pocao') S.bag.pocao++;
   else if (r.id === 'feixe') S.bag.feixe++;
+  else if (r.id === 'sopa' || r.id === 'buque' || r.id === 'anel') S.bag[r.id]++;
   else if (r.id === 'espada2') S.eq.espada = Math.max(S.eq.espada, 2);
   else if (r.id === 'espada3') S.eq.espada = 3;
   else if (r.id === 'armadura') { S.eq.armadura = true; S.maxHp += 2; player.hp = S.maxHp; }
@@ -91,7 +95,7 @@ function craft(r) {
 function useItem(k) {
   if (!S.bag[k] || player.hp >= S.maxHp) { if (player.hp >= S.maxHp) toast('Vida já está cheia'); return; }
   S.bag[k]--;
-  player.hp = k === 'torta' ? S.maxHp : Math.min(S.maxHp, player.hp + 3);
+  player.hp = k === 'torta' ? S.maxHp : Math.min(S.maxHp, player.hp + (k === 'sopa' ? 2 : 3));
   Audio.sfx('heal'); burst(player.x, player.y - 40, '#ff8aa0', 12);
   save();
 }
@@ -322,10 +326,13 @@ const QUEST_NPCS = ['aurora', 'mel', 'tome', 'bruno', 'rosa', 'teo'];
 function talkTo(n) {
   talkPid = n.id; talkFace = n;
   if (n.resident) {
+    if (n.kid) return kidOpen(n);
     if (n.sleeping) { say([n.name + ' está dormindo. Zzz...']); return; }
-    if (!QUEST_NPCS.includes(n.id)) return lifeTalk(n);
-    noteTalk(n.id);
+    return socialOpen(n, QUEST_NPCS.includes(n.id) ? () => { noteTalk(n.id); talkPid = n.id; talkFace = n; questTalk(n); } : null);
   }
+  return questTalk(n);
+}
+function questTalk(n) {
   if (n.role) return talkRole(n);
   if (n.v) {
     const c = n.city, lines = ['Bem-vindo a ' + c.name + '!', cityRumor(c), 'Dizem que a Lanterna do Vale voltou a brilhar' + (S.done ? '... foi você? Obrigado!' : '? Ainda não, né...'), 'O mercado fica pertinho da praça.', 'A estalagem tem cama quentinha.'];
@@ -342,6 +349,7 @@ function talkTo(n) {
         'Vó Aurora: A Mel, na Vila do Rio (a oeste), o Seu Tomé, na Horta (a nordeste), e os viajantes Rui e Lina, no Penhasco (sudoeste), podem ajudar.',
         'Vó Aurora: O vale é grande! Abra a Mochila para ver o mapa, criar itens e acompanhar suas missões.',
         'Vó Aurora: E entre nas casas: tem muita gente aqui precisando de uma mãozinha.',
+        'Vó Aurora: Ah! A casinha a oeste da praça agora é sua. Bem-vindo de volta ao vale!',
         'Kai: Pode deixar, vó! Vamos, Floco!'], () => { S.stage = 1; save(); Audio.sfx('pick'); });
     } else if (S.q.caca === 1 && S.mkills >= 20) {
       say(['Vó Aurora: Vinte Musgos! O vale está bem mais tranquilo.', 'Vó Aurora: Tome: 30 moedas e 3 cristais que guardei.'],
@@ -434,7 +442,10 @@ function interact(t) {
   else if (t.kind === 'cat') { S.cat = 'follow'; Audio.sfx('meow'); say(['Miau!', 'A Bolinha pulou pertinho de você. Leve-a de volta para o Téo, na Praça.']); save(); }
   else if (t.kind === 'furn') {
     const f = t.ref;
-    if (f.use === 'bancada2') { menu = { tab: 'craft', station: true }; Audio.sfx('ui'); }
+    if (f.use === 'cook') {
+      say(['Fogão de casa. O que vai cozinhar?'], null, [{ t: 'Sopa (2 cogumelos)', fn: () => { const r = RECIPES.find(r => r.id === 'sopa'); if (canCraft(r)) craft(r); else say(['Você precisa de 2 cogumelos.']); } }, { t: 'Nada' }]);
+    }
+    else if (f.use === 'bancada2') { menu = { tab: 'craft', station: true }; Audio.sfx('ui'); }
     else if (f.use === 'bancada') {
       if (S.q.ferro < 2) say(['Bruno: Ei! Essa bancada é minha. Me ajuda primeiro e eu deixo você usar.']);
       else { menu = { tab: 'craft', station: true }; Audio.sfx('ui'); }
@@ -848,7 +859,7 @@ function findInteract(busy) {
   } else {
     for (const f of interiorDef.furn) if (f.use) {
       const x = (f.x + f.w / 2) * TILE, y = (f.y + f.h) * TILE;
-      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'bancada' || f.use === 'bancada2' ? 'Criar' : f.use === 'bed' ? ((gameHour() >= 20 || gameHour() < 5) ? 'Dormir' : 'Deitar') : 'Abrir' });
+      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'cook' ? 'Cozinhar' : f.use === 'bancada' || f.use === 'bancada2' ? 'Criar' : f.use === 'bed' ? ((gameHour() >= 20 || gameHour() < 5) ? 'Dormir' : 'Deitar') : 'Abrir' });
     }
   }
 }
@@ -1421,15 +1432,17 @@ function drawNpc(n) {
     if (talking) { anim = n.id === 'rui' || n.id === 'lina' ? 'rest' : 'talk'; const dx = player.x - n.x, dy = player.y - n.y, d = Math.hypot(dx, dy) || 1; fx = dx / d; fy = dy / d; }
     else if (anim === 'rest' && !n.resident) { fx = 0; fy = 1; }
     if (n.sleeping) { anim = 'sleep'; fx = 0; fy = 1; }
-    drawn = Char3D.drawPerson(ctx, n.id, app, anim, time + (n.x % 7), fx, fy, n.x, n.y + 3, KAI3D_SIZE);
+    drawn = Char3D.drawPerson(ctx, n.atlasKey || n.id, app, anim, time + (n.x % 7), fx, fy, n.x, n.y + 3, KAI3D_SIZE);
   }
   if (!drawn) {
-    const sc = n.id === 'teo' ? 5 : 6;
+    const sc = n.kid ? 6 * (KID_SCALE[n.stage] || 0.6) : n.id === 'teo' ? 5 : 6;
     if (n.sleeping) { spr(NPC[n.id], n.x, n.y - 10, sc * 0.9, false, false); ctx.fillStyle = '#5a4a6a'; ctx.fillRect(n.x - 26, n.y - 50, 52, 44); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(n.x - 26, n.y - 50, 52, 5); }
     else spr(NPC[n.id], n.x, n.y + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
   }
   label(n.name, n.x, n.y + 22, 15, '#fff6d8', 0.9);
   if (n.sleeping) label('z z Z', n.x + 30, n.y - 70 - Math.sin(time * 2) * 5, 15, '#cfe6ff', 0.85);
+  if (n.resident && !n.kid && isBirthday(n.id)) label('♪ aniversário ♪', n.x, n.y + 40, 12, '#ffd65a', 0.9);
+  if (n.resident && partnerOf(n.id)) label('♥', n.x - ctx.measureText(n.name).width / 2 - 14, n.y + 22, 15, '#ff7aa6', 0.95);
 }
 function drawEnemy(e) {
   const SP = e.boss ? MUSGO_BOSS : e.azul ? MUSGO_AZUL : e.variant ? MUSGO_VAR[e.variant] : MUSGO;
@@ -1506,6 +1519,9 @@ function drawIcon(k, x, y, s) {
     case 'espada2': case 'espada3': case 'espada1': ctx.rotate(-0.8); r(-1, -8, 3, 11, k === 'espada3' ? '#8fd8ff' : k === 'espada2' ? '#a9a6a0' : '#e8eef5'); r(-4, 3, 9, 2, '#c99a3a'); r(-0.5, 5, 2, 4, '#7a4a2a'); break;
     case 'armadura': r(-6, -6, 12, 12, '#2a1a10'); r(-5, -5, 10, 10, '#5fae4a'); r(-5, -5, 10, 2, '#8fd36a'); r(-1, -3, 2, 7, '#3f8a37'); break;
     case 'botas': r(-6, -4, 5, 8, '#7a4a2a'); r(-6, 2, 7, 3, '#5a3418'); r(1, -4, 5, 8, '#7a4a2a'); r(1, 2, 7, 3, '#5a3418'); r(-6, -4, 5, 2, '#9ad1ff'); r(1, -4, 5, 2, '#9ad1ff'); break;
+    case 'sopa': r(-7, -1, 14, 6, '#2a1a22'); r(-6, 0, 12, 4, '#c99a6a'); r(-5, -2, 10, 2, '#e8a060'); r(-2, -6, 1, 3, '#ffffff'); r(2, -7, 1, 3, '#ffffff'); break;
+    case 'buque': r(-1, 0, 2, 8, '#3f8a37'); r(-3, 2, 6, 2, '#e8c060'); for (const [a, b, c] of [[-5, -6, '#ff9ec7'], [0, -8, '#ffe066'], [4, -6, '#ff7a5a'], [-2, -3, '#ffffff'], [3, -2, '#b59cff']]) r(a, b, 4, 4, c); break;
+    case 'anel': ctx.strokeStyle = '#e0b040'; ctx.lineWidth = 2.5 * u; ctx.beginPath(); ctx.arc(0, 2 * u, 5 * u, 0, 7); ctx.stroke(); r(-2, -8, 4, 5, '#5fb8ff'); r(-1, -8, 1, 3, '#c8f0ff'); break;
     case 'coleira': ctx.strokeStyle = '#c8423b'; ctx.lineWidth = 3 * u; ctx.beginPath(); ctx.arc(0, 0, 5 * u, 0, 7); ctx.stroke(); r(-1.5, 4, 3, 3, '#e0a020'); break;
   }
   ctx.restore();
@@ -1680,14 +1696,21 @@ function drawDialog() {
   lines.forEach((ln, i) => { const part = ln.slice(0, Math.max(0, shown - n)); n += ln.length + 1; ctx.fillText(part, tx, by + 14 + i * 23); });
   const done = dialog.shown >= l.text.length;
   if (done && dialog.choices && dialog.i === dialog.lines.length - 1) {
-    let cx = tx; const cy = by + bh - 44;
-    dialog.choices.forEach((c, i) => {
-      ctx.font = `700 15px ${FONT}`; const w = ctx.measureText(c.t).width + 28;
-      ctx.fillStyle = i === 0 ? '#ffd65a' : 'rgba(255,250,235,0.9)'; ctx.strokeStyle = '#2a2238'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect(cx, cy, w, 34, 9); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#2a2238'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.t, cx + w / 2, cy + 17);
-      addBtn(cx, cy, w, 34, () => choose(c));
-      cx += w + 10;
+    // botões em uma ou duas linhas, conforme couber
+    ctx.font = `700 14px ${FONT}`;
+    const ws = dialog.choices.map(c => ctx.measureText(c.t).width + 24), maxX = bx + bw - 10;
+    const rows = [[]]; let acc = tx;
+    ws.forEach((w, i) => { if (acc + w > maxX && rows[rows.length - 1].length) { rows.push([]); acc = tx; } rows[rows.length - 1].push(i); acc += w + 8; });
+    rows.forEach((row, ri) => {
+      let cx = tx; const cy = by + bh - 40 - (rows.length - 1 - ri) * 38;
+      for (const i of row) {
+        const c = dialog.choices[i], w = ws[i];
+        ctx.fillStyle = i === 0 ? '#ffd65a' : 'rgba(255,250,235,0.92)'; ctx.strokeStyle = '#2a2238'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(cx, cy, w, 32, 9); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#2a2238'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.t, cx + w / 2, cy + 16);
+        addBtn(cx, cy, w, 32, () => choose(c));
+        cx += w + 8;
+      }
     });
   } else if (done) { ctx.fillStyle = '#ffe38a'; const yb = by + bh - 18 + Math.sin(time * 6) * 3; ctx.beginPath(); ctx.moveTo(bx + bw - 30, yb); ctx.lineTo(bx + bw - 18, yb); ctx.lineTo(bx + bw - 24, yb + 8); ctx.fill(); }
 }
@@ -1715,7 +1738,7 @@ function drawMenu() {
   const pw = Math.min(W - 24 - SAFE.l - SAFE.r, 820), ph = H - 20 - SAFE.t - SAFE.b, px = (W - pw) / 2, py = SAFE.t + 10;
   ctx.fillStyle = '#2b2219'; ctx.strokeStyle = '#e8d6a8'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 16); ctx.fill(); ctx.stroke();
-  const tabs = [['bag', 'Mochila'], ['craft', 'Criar'], ['quests', 'Missões'], ['config', 'Ajustes']];
+  const tabs = [['bag', 'Mochila'], ['craft', 'Criar'], ['quests', 'Missões'], ['people', 'Pessoas'], ['family', 'Família'], ['config', 'Ajustes']];
   const tw = Math.min(130, (pw - 80) / tabs.length);
   tabs.forEach(([id, t], i) => panelButton(t, px + 12 + i * (tw + 8), py + 10, tw, 34, () => { menu.tab = id; Audio.sfx('ui'); }, menu.tab === id ? 'on' : null));
   panelButton('✕', px + pw - 46, py + 10, 34, 34, () => { menu = null; Audio.sfx('ui'); });
@@ -1724,7 +1747,92 @@ function drawMenu() {
   if (menu.tab === 'bag') drawBagTab(cx, cy, cw, ch);
   else if (menu.tab === 'craft') drawCraftTab(cx, cy, cw, ch);
   else if (menu.tab === 'quests') drawQuestTab(cx, cy, cw, ch);
+  else if (menu.tab === 'people') drawPeopleTab(cx, cy, cw, ch);
+  else if (menu.tab === 'family') drawFamilyTab(cx, cy, cw, ch);
+  else if (menu.tab === 'gift') drawGiftTab(cx, cy, cw, ch);
   else drawConfigTab(cx, cy, cw, ch);
+}
+function smallHearts(x, y, n) { for (let i = 0; i < 10; i++) heart(x + i * 12, y, 10, '#ff5a7a', i >= n); }
+function drawPeopleTab(x, y, w, h) {
+  const list = RESIDENTS.filter(r => !r.kid);
+  const per = 6, pages = Math.ceil(list.length / per), pg = clamp(menu.page || 0, 0, pages - 1);
+  text('Moradores do Vale · amizade, gostos e lembranças', x, y + 6, 13, '#cfc3a6', 600, w - 120);
+  if (pages > 1) { panelButton('◀', x + w - 104, y - 8, 44, 28, () => { menu.page = Math.max(0, pg - 1); }); panelButton('▶', x + w - 52, y - 8, 44, 28, () => { menu.page = Math.min(pages - 1, pg + 1); }); }
+  const colW = (w - 10) / 2, rh = Math.min(84, (h - 26) / 3 - 6);
+  list.slice(pg * per, pg * per + per).forEach((r, i) => {
+    const cx = x + (i % 2) * (colW + 10), cy = y + 22 + Math.floor(i / 2) * (rh + 6), m = sm(r.id), info = SOCIAL[r.id] || {};
+    ctx.fillStyle = partnerOf(r.id) ? 'rgba(255,122,166,0.14)' : 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(cx, cy, colW, rh, 9); ctx.fill();
+    text((partnerOf(r.id) ? '♥ ' : '') + r.name + ', ' + r.age + ' anos', cx + 8, cy + 13, 14, '#fff6e6', 700, colW * 0.55);
+    text(r.prof, cx + colW * 0.58, cy + 13, 12, '#cfc3a6', 600, colW * 0.4);
+    smallHearts(cx + 14, cy + 32, hearts(r.id));
+    text(statusText(r.id) + (m.upset ? ' · chateado(a)' : ''), cx + 136, cy + 32, 12, m.upset ? '#ff9a8a' : '#ffd6e6', 600, colW - 144);
+    const b = info.bday;
+    let line3 = b ? 'Aniversário: ' + dateText(b[0], b[1]) : '';
+    if (m.likesKnown && m.likesKnown.length) line3 += ' · gosta de ' + m.likesKnown.map(k => NAMES[k].toLowerCase()).join(', ');
+    text(line3, cx + 8, cy + 50, 11, '#e8dcc0', 500, colW - 16);
+    const last = m.hist && m.hist[m.hist.length - 1];
+    text(last ? '“' + last.text + '” (dia ' + last.day + ')' : m.met ? 'Já se conhecem.' : 'Ainda não conversaram.', cx + 8, cy + 67, 11, '#b8ad94', 500, colW - 16);
+  });
+}
+function drawFamilyTab(x, y, w, h) {
+  const R = S.romance, colW = (w - 16) / 2;
+  text('Família', x, y + 8, 15, '#ffe38a', 700);
+  let yy = y + 28;
+  if (!R) {
+    ['Você ainda não tem um par.', '1. Converse todo dia e dê presentes que a pessoa gosta (aba Pessoas).', '2. Com 3 corações, convide para passear.',
+      '3. Com 7 corações e um Buquê de Flores (Criar: 5 flores + 1 fibra), peça em namoro.', '4. Namorando há 3 dias, com 9 corações e um Anel de Cristal (bancada), peça em casamento.',
+      'Só moradores adultos e solteiros aceitam namorar, e cada um decide por si.'].forEach((l, i) => text(l, x, yy + i * 20, 12, i ? '#e8dcc0' : '#fff6e6', 600, colW));
+  } else {
+    const p = RES_BY_ID[R.id], m = sm(R.id);
+    ctx.fillStyle = 'rgba(255,122,166,0.14)'; ctx.beginPath(); ctx.roundRect(x, yy, colW, 92, 9); ctx.fill();
+    text('♥ ' + p.name + ' · ' + statusText(R.id), x + 10, yy + 16, 15, '#fff6e6', 700, colW - 20);
+    smallHearts(x + 16, yy + 38, hearts(R.id));
+    const sub = R.status === 'noivos' ? 'Casamento no dia ' + (() => { const c = calOf(R.weddingDay); return dateText(c.season, c.dom); })() + ' (fale com ' + p.name + ')'
+      : R.status === 'casados' ? 'Casados desde o dia ' + R.married + ' · moram na Casa do Kai' : 'Namorando desde o dia ' + R.since;
+    text(sub, x + 10, yy + 58, 12, '#e8dcc0', 600, colW - 20);
+    text(m.upset ? 'Está chateado(a): converse e peça desculpas.' : 'Está feliz com vocês.', x + 10, yy + 78, 12, m.upset ? '#ff9a8a' : '#9be36a', 600, colW - 20);
+    yy += 102;
+    if (S.family.babyDue) { text('O bebê chega em ' + Math.max(0, S.family.babyDue - S.time.day) + ' dia(s)!', x, yy, 13, '#ffd6e6', 700); yy += 22; }
+    for (const k of S.family.kids) {
+      const st = kidStage(k), r = RES_BY_ID[k.id];
+      ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(x, yy, colW, 58, 9); ctx.fill();
+      text(k.name + ' · ' + { bebe: 'bebê', pequeno: 'criança pequena', crianca: 'criança' }[st] + ' · ' + (S.time.day - k.born) + ' dias', x + 10, yy + 14, 13, '#fff6e6', 700, colW - 20);
+      text(r && r.sleeping ? 'dormindo' : r && r.area === 'world' ? 'brincando na praça' : 'em casa', x + colW - 120, yy + 14, 11, '#cfc3a6', 600, 110);
+      for (const [j, [lab, v, col]] of [['Fome', k.needs.fome, '#e8a040'], ['Carinho', k.needs.carinho, '#ff7aa6']].entries()) {
+        text(lab, x + 10, yy + 34 + j * 14, 11, '#e8dcc0', 600);
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 70, yy + 29 + j * 14, colW - 90, 9);
+        ctx.fillStyle = col; ctx.fillRect(x + 70, yy + 29 + j * 14, (colW - 90) * v / 100, 9);
+      }
+      yy += 64;
+    }
+  }
+  // próximos eventos
+  const ex = x + colW + 16;
+  text('Próximos eventos', ex, y + 8, 15, '#ffe38a', 700);
+  const ev = [];
+  for (let d = S.time.day; d < S.time.day + 14; d++) {
+    const c = calOf(d), when = d === S.time.day ? 'Hoje' : d === S.time.day + 1 ? 'Amanhã' : dateText(c.season, c.dom);
+    for (const hdy of HOLIDAYS) if (hdy.s === c.season && hdy.d === c.dom) ev.push(when + ': ' + hdy.name + ' (praça, 17h)');
+    for (const [id, info] of Object.entries(SOCIAL)) if (info.bday[0] === c.season && info.bday[1] === c.dom && RES_BY_ID[id]) ev.push(when + ': aniversário de ' + RES_BY_ID[id].name);
+    if (R && R.status === 'noivos' && R.weddingDay === d) ev.push(when + ': seu casamento!');
+    for (const k of S.family.kids) if (d > k.born && (d - k.born) % 28 === 0) ev.push(when + ': aniversário de ' + k.name);
+  }
+  (ev.length ? ev : ['Nenhum evento nas próximas 2 semanas.']).slice(0, 12).forEach((l, i) => text('• ' + l, ex, y + 30 + i * 19, 12, '#e8dcc0', 600, colW));
+}
+function drawGiftTab(x, y, w, h) {
+  const r = RES_BY_ID[menu.npc], m = sm(menu.npc);
+  text('Presente para ' + r.name + ' · escolha um item', x, y + 8, 15, '#ffe38a', 700, w);
+  const items = GIFTABLE.filter(k => (k in S.inv ? S.inv[k] : S.bag[k] || 0) > 0);
+  if (!items.length) { text('Você não tem nada para dar. Junte flores, cogumelos, cristais ou cozinhe algo!', x, y + 40, 13, '#e8dcc0', 600, w); return; }
+  const cell = Math.min(110, (w - 10) / 5);
+  items.forEach((k, i) => {
+    const cx = x + (i % 5) * (cell + 2), cy = y + 26 + Math.floor(i / 5) * (cell * 0.8 + 6), n = k in S.inv ? S.inv[k] : S.bag[k];
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.roundRect(cx, cy, cell - 4, cell * 0.8, 9); ctx.fill();
+    drawIcon(k, cx + (cell - 4) / 2, cy + cell * 0.3, cell * 0.3);
+    text(NAMES[k] + ' x' + n, cx + 6, cy + cell * 0.62, 11, '#fff6e6', 600, cell - 14);
+    if (m.likesKnown.includes(k)) label('♥', cx + cell - 18, cy + 12, 14, '#ff7aa6');
+    addBtn(cx, cy, cell - 4, cell * 0.8, () => { menu = null; giveGift(r.id, k); });
+  });
 }
 function drawConfigTab(x, y, w, h) {
   text('Qualidade gráfica', x, y + 10, 15, '#ffe38a', 700);
@@ -1756,12 +1864,13 @@ function drawBagTab(x, y, w, h) {
   const ex = x + colW + 16;
   text('Itens', ex, y + 8, 15, '#ffe38a', 700);
   let yy = y + 26;
-  for (const k of ['pocao', 'torta', 'feixe']) {
-    ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(ex, yy, colW, 40, 8); ctx.fill();
-    drawIcon(k, ex + 20, yy + 20, 26);
-    text(NAMES[k] + '  x' + S.bag[k], ex + 40, yy + 20, 14, '#fff6e6', 600);
-    if (k !== 'feixe') panelButton('Usar', ex + colW - 70, yy + 6, 62, 28, () => useItem(k), S.bag[k] && player.hp < S.maxHp ? null : 'off');
-    yy += 46;
+  for (const k of ['pocao', 'torta', 'sopa', 'feixe', 'buque', 'anel']) {
+    if (!S.bag[k] && (k === 'buque' || k === 'anel' || k === 'sopa')) continue;
+    ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(ex, yy, colW, 32, 8); ctx.fill();
+    drawIcon(k, ex + 18, yy + 16, 22);
+    text(NAMES[k] + '  x' + S.bag[k], ex + 36, yy + 16, 13, '#fff6e6', 600);
+    if (k === 'pocao' || k === 'torta' || k === 'sopa') panelButton('Usar', ex + colW - 66, yy + 4, 58, 24, () => useItem(k), S.bag[k] && player.hp < S.maxHp ? null : 'off');
+    yy += 36;
   }
   text('Equipamento', ex, yy + 10, 15, '#ffe38a', 700); yy += 22;
   const eq = [['espada' + S.eq.espada, ['Espada de Madeira', 'Espada de Pedra', 'Espada de Cristal'][S.eq.espada - 1] + ' (dano ' + S.eq.espada + ')', true],
@@ -1853,7 +1962,9 @@ function startGame(fresh) {
   else S = loadSave() || newSave();
   player.hp = S.maxHp; player.inv = 0; dialog = null; endT = 0; menu = null; showMap = false; player.hidden = false;
   buildWorldEntities();
+  socialInit();
   snapResidents();
+  if (!S.homeTold) { S.homeTold = true; setTimeout(() => toast('Você tem uma casa: a Casa do Kai, a oeste da Praça!'), 4000); }
   mode = 'play';
   fade = { t: 0.35, dur: 0.7, mid: null };
   curRegion = null;
@@ -1986,6 +2097,6 @@ document.addEventListener('visibilitychange', () => {
 })();
 
 // para testes automáticos
-window.__vale = { get npcs() { return npcs; }, RESIDENTS, sleepUntilMorning, snapResidents, get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
+window.__vale = { giveGift, socialOpen, makeKid, get npcs() { return npcs; }, RESIDENTS, sleepUntilMorning, snapResidents, get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
   get enemies() { return enemies; }, get dialog() { return dialog; }, advanceDialog, choose, interact, get target() { return interactTarget; },
   openMenu(tab, station) { menu = { tab, station }; }, closeMenu() { menu = null; }, set showMap(v) { showMap = v; }, toWorld, REGIONS, INTERIORS, craft, RECIPES, props };

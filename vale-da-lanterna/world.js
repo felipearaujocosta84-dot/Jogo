@@ -47,7 +47,8 @@ const TRAILS = [
   [[800, 2150], [800, 950]],                                                       // clareira
   [[4600, 700], [4600, 1400], [5650, 1400]],                                       // corredor da horta
   [[800, 2150], [0, 2150]], [[7600, 2150], [7150, 2150], [6990, 2330]],            // saídas para o mundo
-  [[4700, 700], [4700, 0]], [[4700, 3350], [4700, 4500]]
+  [[4700, 700], [4700, 0]], [[4700, 3350], [4700, 4500]],
+  [[2950, 2500], [2950, 2580], [3100, 2700], [3550, 2720]]                        // trilha da Casa do Kai
 ];
 const RIVER = [[2500, 120], [2480, 700], [2400, 1100], [2450, 1500], [2350, 1900], [2250, 2300], [2200, 2700]];
 const WATER = [
@@ -192,6 +193,7 @@ function makeHouse(o, seed) {
       rect(sx, sy, 8, 1, '#2a1d16'); rect(sx + 1, sy + 1, 1, 2, '#2a1d16'); rect(sx + 6, sy + 1, 1, 2, '#2a1d16');
       rect(sx - 1, sy + 3, 10, 8, '#2a1d16'); rect(sx, sy + 4, 8, 6, '#c99a6a');
       if (o.sign === 'anvil') { rect(sx + 1, sy + 5, 6, 2, '#4f4c48'); rect(sx + 3, sy + 7, 2, 2, '#4f4c48'); }
+      if (o.sign === 'heart') { rect(sx + 2, sy + 5, 2, 2, '#e05a6a'); rect(sx + 5, sy + 5, 2, 2, '#e05a6a'); rect(sx + 2, sy + 6, 5, 2, '#e05a6a'); rect(sx + 3, sy + 8, 3, 1, '#e05a6a'); }
       if (o.sign === 'bag') { rect(sx + 2, sy + 5, 4, 4, '#e0b040'); rect(sx + 3, sy + 4, 2, 1, '#a07a20'); }
       if (o.sign === 'inn') { rect(sx + 2, sy + 5, 4, 4, '#e8e0c8'); rect(sx + 6, sy + 6, 1, 2, '#e8e0c8'); rect(sx + 2, sy + 5, 4, 1, '#ffffff'); }
       if (o.sign === 'bread') { rect(sx + 1, sy + 6, 6, 3, '#a0602a'); rect(sx + 2, sy + 5, 4, 1, '#d9a05a'); }
@@ -357,6 +359,7 @@ const BUILDINGS = [
   { kind: 'house', x: 1650, y: 2000, w: 52, roof: 'pink', wall: 'plaster', to: 'casaNina' },
   { kind: 'house', x: 4000, y: 2100, w: 58, roof: 'teal', wall: 'stone', chimney: true, to: 'casaLeo' },
   { kind: 'house', x: 4690, y: 2210, w: 54, roof: 'brown', wall: 'wood', chimney: true, to: 'cabanaTome' },
+  { kind: 'house', x: 2950, y: 2470, w: 62, roof: 'red', wall: 'plaster', chimney: true, to: 'casaKai', region: 'praca', sign: 'heart' },
   { kind: 'barn', x: 5380, y: 820 },
   { kind: 'tower', x: 6750, y: 2262 },
   { kind: 'well', x: 5640, y: 1420 },
@@ -383,7 +386,7 @@ function buildBuildings() {
     else if (b.kind === 'well') stampRect(valeGrid, b.x - 56, b.y - 70, b.x + 56, b.y - 6, 0);
     else if (b.kind === 'van') stampRect(valeGrid, b.x - 118, b.y - 100, b.x + 118, b.y - 8, 0);
     else if (b.kind === 'tent') stampRect(valeGrid, b.x - 76, b.y - 90, b.x + 76, b.y - 8, 0);
-    if (b.to) { const r = regionAt(b.x, b.y); r.doors.push({ x: b.x, y: b.y + 14, to: b.to }); }
+    if (b.to) { const r = b.region ? REGIONS[b.region] : regionAt(b.x, b.y); r.doors.push({ x: b.x, y: b.y + 14, to: b.to }); }
     addProp({ t: 'bld', x: b.x, y: b.y, b });
   });
 }
@@ -638,7 +641,14 @@ Object.assign(INTERIORS, {
   casaDavi: homeDef('Casa do Davi', 'wood', 1, ['#7a4a2a']),
   casaNina: homeDef('Casa da Nina', 'brick', 1, ['#b59cff']),
   casaLeo: homeDef('Casa do Léo e da Bia', 'stone', 2, ['#4f7fbf', '#e8944e']),
-  cabanaTome: homeDef('Cabana do Seu Tomé', 'wood', 2, ['#c8423b', '#5fa65a'])
+  cabanaTome: homeDef('Cabana do Seu Tomé', 'wood', 2, ['#c8423b', '#5fa65a']),
+  casaKai: { name: 'Casa do Kai', w: 12, h: 8, floor: 'wood', wall: 'wood',
+    furn: [{ t: 'window', x: 2, y: 0, w: 1, h: 2 }, { t: 'fireplace', x: 4, y: 0, w: 2, h: 2 }, { t: 'shelf', x: 7, y: 0, w: 2, h: 2 }, { t: 'window', x: 10, y: 0, w: 1, h: 2 },
+      { t: 'bed', x: 1, y: 2, w: 1, h: 2, block: 1, col: '#c8423b', use: 'bed' }, { t: 'bed', x: 2, y: 2, w: 1, h: 2, block: 1, col: '#4f7fbf', use: 'bed' },
+      { t: 'crib', x: 9, y: 2, w: 1, h: 1, block: 1 }, { t: 'crib', x: 10, y: 2, w: 1, h: 1, block: 1 },
+      { t: 'oven', x: 1, y: 5, w: 1, h: 1, block: 1, use: 'cook' }, { t: 'table', x: 6, y: 4, w: 2, h: 1, block: 1 },
+      { t: 'rug', x: 3, y: 4, w: 3, h: 3 }, { t: 'plant', x: 10, y: 6, w: 1, h: 1, block: 1 }, { t: 'chest', x: 8, y: 6, w: 1, h: 1, block: 1 }],
+    npcs: [] }
 });
 const CHEST_LOOT = { ch_aurora: { pocao: 1, flor: 2, moeda: 5 }, ch_mel: { fibra: 3, flor: 3, moeda: 5 } };
 function buildInterior(id) {
@@ -787,6 +797,12 @@ function drawFurniture(g, f, R) {
     }
     case 'chest': {
       box(x + 6, y + 14, 36, 28, '#8a5a34'); g.fillStyle = '#c99a3a'; g.fillRect(x + 6, y + 24, 36, 4); g.fillRect(x + 21, y + 22, 6, 8);
+      break;
+    }
+    case 'crib': {
+      box(x + 6, y + 10, 36, 30, '#c99a6a'); g.fillStyle = '#f4f1ea'; g.fillRect(x + 9, y + 13, 30, 20);
+      g.fillStyle = '#9ad1ff'; g.fillRect(x + 9, y + 24, 30, 9);
+      g.fillStyle = '#8a5a34'; for (let i = 0; i < 6; i++) g.fillRect(x + 8 + i * 6, y + 34, 3, 10);
       break;
     }
     case 'catbed': {

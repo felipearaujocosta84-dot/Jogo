@@ -68,8 +68,8 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 1 | Análise, arquitetura, backup, migração de saves | ✅ concluída |
 | 2 | Personagens 3D e animações (Kai + todos os NPCs) | ✅ concluída |
 | 3 | Mais NPCs, rotinas diárias, navegação (+ relógio e luz do dia antecipados) | ✅ concluída |
-| 4 | Relacionamentos, namoro, casamento, família | ⏳ próxima |
-| 5 | Empregos, profissões, economia | ⏳ |
+| 4 | Relacionamentos, namoro, casamento, família e filhos | ✅ concluída |
+| 5 | Empregos, profissões, economia | ⏳ próxima |
 | 6 | Agricultura e animais | ⏳ |
 | 7 | Construção livre e decoração | ⏳ |
 | 8 | Dia e noite, clima | ⏳ |
@@ -112,3 +112,34 @@ será antecipada no início da Fase 3.
   personalidade (saudação e despedida próprias), apresentação no primeiro encontro, e memória das últimas
   frases para não repetir. As missões continuam com prioridade nas falas dos NPCs de missão.
 - O alvo das missões no mapa acompanha o morador (ou a porta da casa onde ele está).
+
+## Fase 4 — Relacionamentos, casamento e família (`social.js`)
+- **Calendário**: mês de 28 dias, 4 estações (Primavera, Verão, Outono, Inverno); o relógio mostra a data.
+- **Datas comemorativas**: Festival das Flores (14 Prim.), Festa do Verão (21 Ver.), Festa da Lanterna (20 Out.),
+  Noite das Estrelas (25 Inv.). Nesses dias todos vão para a praça das 17h às 22h; presentes valem 50% a mais.
+- **Aniversários** de todos os moradores (presente vale o triplo).
+- **Amizade** de 0 a 10 corações: conversar uma vez por dia, presentes (cada um tem gostos e coisas que não gosta;
+  os gostos descobertos aparecem na aba Pessoas) e passeios.
+- **Ao falar com um morador** abre um menu: Conversar (nos NPCs das missões, cai na conversa da missão), Presente,
+  Passear (a partir de 3 corações; a pessoa pode recusar se estiver trabalhando) e opções românticas quando cabem.
+- **Passeio**: o morador acompanha o Kai por 2 horas do jogo, ganhando amizade; termina com uma fala.
+- **Namoro**: só adultos solteiros e elegíveis (Mel, Iara, Nina, Rosa, Davi, Joca, Bruno). Léo e Bia são casados,
+  Vó Aurora, Seu Tomé e Téo recusam com respeito. Precisa de 7 corações (8 para tímidos) e um **Buquê de Flores**.
+  Abaixo disso, a pessoa recusa com gentileza.
+- **Primeiro encontro**: o primeiro passeio namorando vira evento especial.
+- **Noivado**: namorando há 3 dias, 9 corações e um **Anel de Cristal** (bancada); o casamento fica marcado para 3 dias depois.
+- **Casamento**: cerimônia na praça com os moradores reunidos, Vó Aurora celebrando, chuva de flores.
+  Depois, o cônjuge **muda para a Casa do Kai** (casa nova a oeste da praça) e mantém o trabalho.
+- **Discussões**: se o Kai some por mais de 2 dias ou esquece o aniversário do par, ele fica chateado.
+  "Pedir desculpas" funciona com amizade alta ou com um presente no mesmo dia. Namoro com 4 dias de mágoa termina.
+- **Filhos**: casados há 3 dias e com 9 corações, "Aumentar a família?" → o bebê chega em 4 dias (até 2 filhos).
+  Nome escolhido pelo jogador; aparência misturando o Kai e o cônjuge; personalidade própria.
+  Crescimento: bebê (0–4 dias, no berço), criança pequena (5–13 dias, em casa), criança (14+ dias, brinca na praça).
+  Necessidades de fome e carinho (caem mais devagar com o cônjuge em casa); ações Ninar/Brincar, Alimentar
+  (sopa ou torta) e Abraçar. Festa de aniversário a cada 28 dias, em casa a partir das 16h.
+- **Memória**: cada morador guarda os últimos acontecimentos importantes (aparece na aba Pessoas).
+- **Itens novos**: Sopa de Cogumelo (2 cogumelos, também no fogão de casa), Buquê de Flores (5 flores + 1 fibra),
+  Anel de Cristal (bancada: 2 cristais + 3 pedras).
+- **Abas novas na Mochila**: Pessoas (corações, situação, aniversário, gostos, última lembrança) e Família
+  (par, filhos com barras de necessidades, bebê a caminho e próximos eventos de 2 semanas).
+- Pendente para a Fase 7: construir/decorar quarto infantil e comprar móveis (a Casa do Kai já tem 2 berços).

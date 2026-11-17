@@ -21,6 +21,7 @@ function updateClock(dt) {
 function onNewDay() {
   toast('Dia ' + S.time.day + ' · ' + weekday());
   for (const r of RESIDENTS) { const m = npcMem(r.id); m.todayTalk = false; }
+  socialNewDay();
 }
 // avança até as 6h (dormir)
 function sleepUntilMorning() {
@@ -128,6 +129,11 @@ const PLACES = {
 function hashStr(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return h; }
 function homeSpot(r, kind) {
   const I = INTERIORS[r.home];
+  if (kind === 'crib') {
+    const cribs = I.furn.filter(f => f.t === 'crib'), b = cribs[r.bed % Math.max(1, cribs.length)];
+    if (b) return { area: r.home, x: (b.x + 0.5) * TILE, y: (b.y + 0.95) * TILE, face: [0, 1] };
+    kind = 'bed';
+  }
   if (kind === 'bed') {
     const beds = I.furn.filter(f => f.t === 'bed'), b = beds[r.bed % beds.length] || beds[0];
     return { area: r.home, x: (b.x + 0.5) * TILE, y: (b.y + 1.55) * TILE, face: [0, 1] };
@@ -139,12 +145,13 @@ function homeSpot(r, kind) {
   return { area: r.home, x: I.w * TILE / 2 + (r.bed ? 50 : -30), y: I.h * TILE * 0.62, face: [0, 1] };
 }
 function placeFor(r, name) {
-  if (name === 'home' || name === 'bed' || name === 'eat') return homeSpot(r, name);
+  if (name === 'home' || name === 'bed' || name === 'eat' || name === 'crib') return homeSpot(r, name);
   const P = PLACES[name];
   const h = hashStr(r.id + name), a = (h % 628) / 100, d = P.spread * (0.4 + ((h >>> 8) % 60) / 100);
   return { area: P.area, x: P.x + Math.cos(a) * d, y: P.y + Math.sin(a) * d * 0.6, face: P.face };
 }
 function currentEntry(r, h = gameHour()) {
+  const o = socialOverride(r, h); if (o) return o;
   for (const e of r.sched) { if ((h >= e[0] && h < e[1]) || (h + 24 >= e[0] && h + 24 < e[1])) return e; }
   return r.sched[r.sched.length - 1];
 }
@@ -247,6 +254,7 @@ function residentActive(r) {
 function updateResidents(dt) {
   const h = gameHour();
   for (const r of RESIDENTS) {
+    if (S.walk && S.walk.id === r.id) { followPlayer(r, dt); r.entry = WALK_ENTRY; continue; }
     const e = currentEntry(r, h);
     if (e !== r.entry) {
       r.entry = e;
@@ -280,6 +288,8 @@ function updateResidents(dt) {
 function lifeUpdate(dt) {
   if (!menu && !showMap) updateClock(dt);
   updateResidents(dt);
+  updateFamily(dt);
+  checkKidParty();
   // moradores das cidades se recolhem à noite
   const h = gameHour(), night = h >= 22 || h < 6;
   for (const n of world.npcs) if (n.v) n.hiddenNight = night && (hashStr(n.id) & 3) !== 0;
@@ -357,7 +367,8 @@ function lifeTalk(n) {
 }
 // desenho do relógio no topo da tela
 function drawClockHUD(T) {
-  const t = 'Dia ' + S.time.day + ' · ' + weekday().slice(0, 3) + ' · ' + clockText() + ' · ' + periodName();
+  const c = calOf(), hol = holidayToday();
+  const t = c.dom + ' ' + SEASONS[c.season] + ' · ' + weekday().slice(0, 3) + ' · ' + clockText() + ' · ' + (hol ? hol.name : periodName());
   ctx.font = `700 13px ${FONT}`;
   const w = ctx.measureText(t).width + 26, x = W / 2 - w / 2, y = T;
   ctx.fillStyle = 'rgba(20,24,20,0.62)'; ctx.beginPath(); ctx.roundRect(x, y, w, 24, 10); ctx.fill();
