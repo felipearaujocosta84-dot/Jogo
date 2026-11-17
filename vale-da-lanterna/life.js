@@ -25,6 +25,7 @@ function onNewDay() {
   weatherNewDay();
   socialNewDay();
   farmNewDay();
+  footballNewDay();
 }
 // avança até as 6h (dormir)
 function sleepUntilMorning() {
@@ -162,11 +163,13 @@ function homeSpot(r, kind) {
 function placeFor(r, name) {
   if (name === 'home' || name === 'bed' || name === 'eat' || name === 'crib') return homeSpot(r, name);
   const P = PLACES[name];
-  const h = hashStr(r.id + name), a = (h % 628) / 100, d = P.spread * (0.4 + ((h >>> 8) % 60) / 100);
+  const h = hashStr(r.id + name);
+  if (P.rect) return { area: P.area, x: P.x + (((h >>> 0) % 1000) / 1000 - 0.5) * P.rect[0], y: P.y + (((h >>> 10) % 1000) / 1000 - 0.5) * P.rect[1], face: P.face };
+  const a = (h % 628) / 100, d = P.spread * (0.4 + ((h >>> 8) % 60) / 100);
   return { area: P.area, x: P.x + Math.cos(a) * d, y: P.y + Math.sin(a) * d * 0.6, face: P.face };
 }
 function currentEntry(r, h = gameHour()) {
-  const o = socialOverride(r, h); if (o) return weatherShelter(r, o);
+  const o = footballOverride(r, h) || socialOverride(r, h); if (o) return weatherShelter(r, o);
   for (const e of r.sched) { if ((h >= e[0] && h < e[1]) || (h + 24 >= e[0] && h + 24 < e[1])) return weatherShelter(r, e); }
   return weatherShelter(r, r.sched[r.sched.length - 1]);
 }
@@ -270,6 +273,7 @@ function updateResidents(dt) {
   const h = gameHour(), wetNow = valeRaining();
   for (const r of RESIDENTS) {
     if (S.walk && S.walk.id === r.id) { followPlayer(r, dt); r.entry = WALK_ENTRY; continue; }
+    if (r.fbCtl) continue;   // em campo: o futebol controla
     const e = currentEntry(r, h);
     if (e !== r.entry) {
       r.entry = e;
@@ -301,7 +305,7 @@ function updateResidents(dt) {
   }
 }
 function lifeUpdate(dt) {
-  if (!menu && !showMap) updateClock(dt);
+  if (!menu && !showMap && !fbFreeze()) updateClock(dt);
   updateResidents(dt);
   updateFamily(dt);
   checkKidParty();
@@ -359,7 +363,7 @@ function lifeLine(id) {
   else if (h >= 12 && h < 14) pool.push('Já almoçou? Eu estou faminto' + (r.age > 0 ? '!' : '.'));
   else if (h >= 18 && h < 21) pool.push('Que pôr do sol bonito, né?', 'O dia passou voando.');
   else if (h >= 21 || h < 5) pool.push('Já está tarde... daqui a pouco vou dormir.', 'A noite no vale é tão calma.');
-  pool.push(...weatherLine(r), ...weatherLine(r));
+  pool.push(...weatherLine(r), ...weatherLine(r), ...footballLine(r), ...footballLine(r));
   if (weekday() === 'Domingo') pool.push('Domingo é dia de descansar... ou quase.');
   if (S.done) pool.push('A Lanterna voltou a brilhar! Você é o orgulho do vale.');
   else if (relicCount() > 0) pool.push('Dizem que você já tem ' + relicCount() + ' relíquia' + (relicCount() > 1 ? 's' : '') + '. Que coragem!');

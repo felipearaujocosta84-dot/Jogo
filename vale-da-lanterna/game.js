@@ -14,7 +14,7 @@ function newSave() {
     tools: { vara: false, enxada: false, regador: false }, outfits: ['classico'], outfit: 'classico', job: null, shops: {}, props: { plots: { quintal: true }, houses: {} }, stats: { earned: 0, spent: 0, harvest: 0 },
     farm: {}, animals: [], seedSel: null, plotMode: {}, builds: [], decor: {}, storage: {}, myshop: { stock: {}, till: 0, sold: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
-    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, weather: { seed: Math.floor(Math.random() * 1e9), wet: 0, rainedDay: 0 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
+    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, football: { cfg: { start: 15, minutes: 4 }, ev: {}, history: [], stats: { matches: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, passes: 0, tackles: 0 }, rel: {}, pop: 0, xp: 0, trophies: [], npcGoals: {} }, weather: { seed: Math.floor(Math.random() * 1e9), wet: 0, rainedDay: 0 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
 }
 let S = newSave();
@@ -550,6 +550,7 @@ window.addEventListener('keydown', e => {
   if (k === 'escape') { menu = null; showMap = false; return; }
   if (k === 'i' || k === 'tab') { e.preventDefault(); if (menu) menu = null; else openMainMenu(); return; }
   if (k === 'm') { showMap = !showMap; return; }
+  if (k === 'f' && fbPlaying()) { fbButton('pass'); return; }
   if (k === 'q') { useItem(S.bag.pocao ? 'pocao' : 'torta'); return; }
   if (dialog && dialog.choices && dialog.i === dialog.lines.length - 1 && dialog.shown >= dialog.lines[dialog.i].text.length) {
     const n = parseInt(k, 10); if (n >= 1 && n <= dialog.choices.length) choose(dialog.choices[n - 1]);
@@ -564,7 +565,7 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
 
-function pressAction() { if (fade) return; if (build) { buildConfirm(); return; } if (interactTarget) interact(interactTarget); else attack(); }
+function pressAction() { if (fade) return; if (fbPlaying()) { fbButton('shoot'); return; } if (build) { buildConfirm(); return; } if (interactTarget) interact(interactTarget); else attack(); }
 function readMove() {
   let x = 0, y = 0;
   const k = input.keys;
@@ -702,6 +703,7 @@ function update(dt) {
   if (mode !== 'play' || rotateNeeded()) return;
   lifeUpdate(dt);
   weatherUpdate(dt);
+  footballTick(dt);
   updateLOD();
   if (work) { updateWork(dt); return; }
   if (menu || showMap) return;
@@ -714,6 +716,12 @@ function update(dt) {
     }
   }
   const busy = !!dialog || !!fade;
+  if (fbPlaying()) {
+    fbHuman(dt, busy); interactTarget = null; saveT += dt; if (saveT > 6) { saveT = 0; save(); }
+    for (const p of particles) { p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g || 0) * dt; }
+    particles = particles.filter(p => p.t > 0); ambient(dt); updateCamera(dt);
+    return;
+  }
   const [mx, my] = busy ? [0, 0] : readMove();
   const mag = Math.hypot(mx, my);
   player.running = input.joy ? mag > 0.82 : !(input.keys['shift']);
@@ -1102,6 +1110,7 @@ function drawWorld() {
     ctx.strokeRect(pl.x0, pl.y0, pl.x1 - pl.x0, pl.y1 - pl.y0); ctx.restore();
   }
   drawBuildGround(x0, y0, x1, y1);
+  drawFootballGround(x0, y0, x1, y1);
   drawPuddles(x0, y0, x1, y1);
   drawFarm(x0, y0, x1, y1);
   // entidades
@@ -1113,12 +1122,14 @@ function drawWorld() {
   for (const e of enemies) if (e.x > x0 - 200 && e.x < x1 + 200 && e.y > y0 - 100 && e.y < y1 + 300) list.push({ y: e.y, f: () => drawEnemy(e) });
   if (S.cat === 'lost' || S.cat === 'none') list.push({ y: CAT_SPOT[1], f: () => drawCatAt(CAT_SPOT[0], CAT_SPOT[1], false, true) });
   addCommon(list);
+  footballEntities(list);
   list.sort((a, b) => a.y - b.y);
   for (const o of list) { if (o.p) drawProp(o.p); else o.f(); }
   drawLanternGlow();
   drawFishing();
   drawLighting();
   drawWeatherFX();
+  drawFootballOverlay();
   drawBuildGhost();
   drawFarmTasks();
   drawOverlays();
@@ -1237,6 +1248,8 @@ function drawProp(p) {
         ctx.fillRect(b.x + Math.cos(a) * 34 * k - 3, b.y - 128 + (k * k) * 70 - Math.sin(k * 3.14) * 30, 6, 6);
       }
     }
+  } else if (p.t === 'fb') {
+    drawFootballProp(p);
   } else if (p.t === 'deco') {
     drawDeco(p);
   } else if (p.t === 'bush') {
@@ -1512,12 +1525,12 @@ function drawNpc(n) {
     if (talking) { anim = n.id === 'rui' || n.id === 'lina' ? 'rest' : 'talk'; const dx = player.x - n.x, dy = player.y - n.y, d = Math.hypot(dx, dy) || 1; fx = dx / d; fy = dy / d; }
     else if (anim === 'rest' && !n.resident) { fx = 0; fy = 1; }
     if (n.sleeping) { anim = 'sleep'; fx = 0; fy = 1; }
-    drawn = Char3D.drawPerson(ctx, n.atlasKey || n.id, app, anim, time + (n.x % 7), fx, fy, n.x, n.y + 3, KAI3D_SIZE);
+    drawn = Char3D.drawPerson(ctx, n.atlasKey || n.id, app, anim, time + (n.x % 7), fx, fy, n.x, n.y + 3 - (n.hopZ || 0), KAI3D_SIZE);
   }
   if (!drawn) {
     const sc = n.kid ? 6 * (KID_SCALE[n.stage] || 0.6) : n.id === 'teo' ? 5 : 6;
     if (n.sleeping) { spr(NPC[n.id], n.x, n.y - 10, sc * 0.9, false, false); ctx.fillStyle = '#5a4a6a'; ctx.fillRect(n.x - 26, n.y - 50, 52, 44); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(n.x - 26, n.y - 50, 52, 5); }
-    else spr(NPC[n.id], n.x, n.y + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
+    else spr(NPC[n.id], n.x, n.y - (n.hopZ || 0) + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
   }
   label(n.name, n.x, n.y + 22, 15, '#fff6d8', 0.9);
   if (n.sleeping) label('z z Z', n.x + 30, n.y - 70 - Math.sin(time * 2) * 5, 15, '#cfe6ff', 0.85);
@@ -1738,9 +1751,11 @@ function drawHUD() {
   const b = btn.action, it = interactTarget;
   ctx.fillStyle = it ? 'rgba(255,214,90,0.92)' : 'rgba(255,250,235,0.85)'; ctx.strokeStyle = '#2a2238'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); ctx.stroke();
-  if (build) { ctx.fillStyle = '#2a2238'; ctx.font = `700 15px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(build.mode === 'remove' ? 'Remover' : build.mode === 'move' && !build.moving ? 'Pegar' : 'Colocar', b.x, b.y + 1); }
+  if (fbPlaying()) drawFootballButtons(b);
+  else if (build) { ctx.fillStyle = '#2a2238'; ctx.font = `700 15px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(build.mode === 'remove' ? 'Remover' : build.mode === 'move' && !build.moving ? 'Pegar' : 'Colocar', b.x, b.y + 1); }
   else if (it) { ctx.fillStyle = '#2a2238'; ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(it.label, b.x, b.y + 1); }
   else drawIcon('espada' + S.eq.espada, b.x, b.y, 44);
+  if (!fbPlaying()) {
   hudButton(b.x - 92 * HS(), b.y + 14, 28, (x, y) => {
     ctx.fillStyle = '#c99a6a'; ctx.fillRect(x - 11, y - 7, 22, 17); ctx.fillStyle = '#8a5a34'; ctx.fillRect(x - 11, y - 7, 22, 5); ctx.fillRect(x - 5, y - 12, 10, 5);
     ctx.fillStyle = '#e0a020'; ctx.fillRect(x - 2, y - 3, 4, 4);
@@ -1750,6 +1765,7 @@ function drawHUD() {
   if (potion) {
     hudButton(b.x - 6, b.y - 82, 24, (x, y) => drawIcon(potion, x, y, 28), () => useItem(potion));
     label('x' + S.bag[potion], b.x + 16, b.y - 66, 13, '#fff6d8');
+  }
   }
   // faixa de nome
   if (banner) {
@@ -1774,6 +1790,7 @@ function drawHUD() {
   if (!build && buildContext() && !dialog && !menu && !work) label('Construir', b.x - 162 * HS(), b.y + 50, 11, '#fff6d8', 0.8);
   if (dialog) drawDialog();
   if (showMap) drawBigMap();
+  drawFootballHUD();
   drawPerfHUD();
   if (menu) drawMenu();
   if (work) drawWork();
@@ -2347,6 +2364,7 @@ document.addEventListener('visibilitychange', () => {
   buildBuildings();
   placeTownDecor();
   placeProps();
+  footballInitWorld();
   for (const id of Object.keys(INTERIORS)) buildInterior(id);
   grid = worldGrid;
   makeResidentObjects();

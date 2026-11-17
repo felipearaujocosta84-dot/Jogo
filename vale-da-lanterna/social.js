@@ -93,6 +93,7 @@ function socialOpen(n, questTalk) {
   if (S.walk && S.walk.id === n.id) ch.push({ t: 'Encerrar passeio', fn: () => { S.walk.end = 0; updateWalk(); } });
   else if (!S.walk && !info.child && m.met) ch.push({ t: 'Passear', fn: () => inviteWalk(n) });
   ch.push(...economyChoices(n));
+  ch.push(...footballChoices(n));
   const rom = romanceOption(n);
   if (rom) ch.push(rom);
   ch.push({ t: 'Tchau' });

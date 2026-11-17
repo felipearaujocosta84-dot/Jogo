@@ -274,3 +274,51 @@ será antecipada no início da Fase 3.
   armazenamento cheio; auto-ajuste; limite de partículas; cidade com 28 NPCs nas 4 qualidades (60 fps estável depois
   de preparar os bonecos); **60 dias simulados** com casamento, filho, animais, canteiros, clima e interiores sem
   nenhum erro, save de 3 KB, recarregado intacto; regressões das fases anteriores.
+
+## Expansão: Futebol de várzea (`football.js`)
+**Análise antes de programar:** engine própria em Canvas 2D (scripts globais, sem build), câmera top-down que segue o Kai,
+joystick virtual + botão de ação, moradores com rotina por horário (`currentEntry` → `placeFor` → rede de caminhos),
+amizade 0–1000 (`social.js`), clima determinístico por dia (`weather.js`), calendário e abas (`menus.js`), save `S` com
+`deepDefaults`. O futebol entrou como módulo independente, ligado por ganchos pequenos nesses sistemas.
+
+- **Campo** na Clareira dos Cogumelos, a oeste da Vila do Rio (x 420–1340, y 930–1490): grama listrada com terra batida
+  irregular (mais gasta perto das traves e do meio), linhas de cal falhadas, círculo central, áreas, marcas de pênalti,
+  duas traves com rede (desenhadas em duas partes para ordenar com quem está dentro do gol), 5 bancos para a torcida,
+  4 postes (acendem à noite), placa "Campo da Várzea" e trilha até a vila. Só foram retiradas árvores/pedras de dentro da
+  clareira; os 41 cogumelos de lá foram **realocados** para a mata em volta (o mapa continua com 121; missão da Rosa igual).
+- **Sexta-feira** (horário configurável na aba Futebol: jogo às 14h/15h/16h/17h; organização = jogo − 6h, convites − 5h,
+  conversas + 1h): o Joca organiza e monta dois times equilibrados (goleiros Rosa e Seu Tomé); às 10h o morador mais amigo
+  do Kai entre os jogadores manda o **convite** (Aceitar / "Hoje não dá", sem penalidade); jogadores vão ao campo 1h antes,
+  a torcida meia hora antes; depois do jogo ficam conversando. Aparece no **calendário** (marcador verde) e na aba Futebol.
+  Se o Kai aceitou e não aparece, o pessoal espera meia hora e joga sem ele. Em dia de festa o jogo é mais cedo.
+- **Amistosos:** opção "Amistoso" na conversa com amigos (≥ 3 corações) marca para o dia seguinte às 17h; amigos também
+  convidam sozinhos (20% ao dia), nunca em sexta ou feriado.
+- **Partida 5 × 5 jogável:** joystick original; botões **Chute** (o botão de ação; sem bola vira **Desarme**), **Passe**
+  (sem bola vira **Pedir**) e **Correr** (liga/desliga; Shift no teclado; F = passe). Fôlego, placar, cronômetro (40'
+  de jogo em 3, 4 ou 6 minutos reais), indicador de posse, "Sair do jogo" (dois toques, sem penalidade). O relógio do dia
+  para enquanto o Kai joga e vai para o horário das conversas no fim.
+- **Física da bola:** rolar com atrito (menor com campo molhado), altura com gravidade e quique, traves e travessão com
+  ricochete, rede segurando a bola, gol só entre as traves e abaixo do travessão, lateral, escanteio e tiro de meta.
+- **IA:** goleiro se posiciona entre a bola e o gol, prevê o chute, defende/espalma/sai do gol e repõe; os outros procuram a
+  bola, pressionam (os 2 mais próximos), dão bote, passam escolhendo o companheiro mais livre e mais à frente, conduzem
+  desviando do marcador, chutam quando têm ângulo e se posicionam pela formação (2 zagueiros, meia, atacante) que anda com a bola.
+- **Atributos** (velocidade, chute, controle, fôlego, passe, defesa) por morador: Joca e Iara habilidosos, Léo zagueiro,
+  Gil veterano, Davi e Nina iniciantes etc. O Kai melhora com a experiência (+1 em tudo a cada 4 pontos, até +3).
+- **Torcida:** quem não joga senta nos bancos, conversa, pula e grita no gol, reage a defesas e bolas na trave, torce pelo
+  Kai se for amigo; apito, chute, trave e torcida com sons gerados na hora.
+- **Social:** +12 de amizade com os companheiros (mais na vitória e por gol do Kai), +5 com os adversários, +3 por passe
+  certo (até 5 por jogador), +8 para quem fez gol com assistência do Kai, torcida amiga +3 quando o Kai marca;
+  desarmes repetidos entre o Kai e alguém viram **rivalidade**; lembranças e falas sobre o último jogo.
+- **Clima:** tempestade ou chuva forte no horário cancelam (moradores seguem a rotina e se abrigam); chuva fraca deixa o
+  campo molhado (bola desliza mais, menos controle, goleiro escorrega).
+- **Recompensas** (opcionais): moedas (40 vitória, 20 empate, 10 derrota, +15 por gol, +8 por assistência),
+  popularidade com títulos (Novato, Boleiro, Craque da vila, Lenda da várzea), experiência e 8 conquistas.
+- **Salvo em `S.football`:** configuração, eventos futuros e status, histórico das últimas 30 partidas (times, placar,
+  gols com minuto e assistência, números do Kai), estatísticas, relações (jogos juntos, contra, desarmes, rivalidade),
+  popularidade, experiência, conquistas e artilharia dos moradores.
+- **Testes:** caminho vila → campo livre; convite de sexta e calendário; ida ao campo; partida começa às 15h com 10
+  jogadores e relógio parado; chute vira gol; passe aumenta amizade; IA ao vivo (passes, desarmes, defesas, placar
+  plausível, bola nunca presa); fim com recompensas, conquistas e falas; save/recarregar; tempestade cancela; chuva fraca
+  molha o campo; recusa + longe → resultado calculado; amistoso pela conversa e convites aleatórios; desarme do Kai;
+  desistência sem penalidade; toque real nos botões; Android emulado (Pixel 5, CPU 4× mais lenta): a partida custa cerca
+  de +4–6 ms por quadro em relação à mesma cena sem futebol (+0,7 ms com CPU normal).

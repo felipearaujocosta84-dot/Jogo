@@ -75,7 +75,7 @@ function weatherNewDay() {
 
 // ---------------------------------------------------------------- moradores se abrigam
 function weatherShelter(r, e) {
-  if (!e || !valeRaining()) return e;
+  if (!e || e.fb || !valeRaining()) return e;
   const P = PLACES[e[2]];
   if (!P || P.area !== 'world') return e;
   if (e[3] === 'walk' && weatherBase().type === 'chuva') return e;   // o guarda faz a ronda na chuva

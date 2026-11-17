@@ -4,7 +4,7 @@
 
 const MENU_TABS = [
   ['bag', 'Mochila'], ['craft', 'Criar'], ['quests', 'Missões'], ['people', 'Pessoas'], ['family', 'Família'],
-  ['job', 'Trabalho'], ['farm', 'Fazenda'], ['build', 'Construção'], ['props', 'Propriedades'], ['calendar', 'Calendário'], ['config', 'Ajustes']
+  ['job', 'Trabalho'], ['farm', 'Fazenda'], ['futebol', 'Futebol'], ['build', 'Construção'], ['props', 'Propriedades'], ['calendar', 'Calendário'], ['config', 'Ajustes']
 ];
 const MENU_TITLES = { gift: 'Presente', shop: 'Loja', storage: 'Baú', myshop: 'Loja do Kai' };
 let lastMenuTab = 'bag';
@@ -50,6 +50,7 @@ function drawMenu() {
   else if (T === 'build') drawBuildTab(cx, cy, cw, ch);
   else if (T === 'props') drawPropsTab(cx, cy, cw, ch);
   else if (T === 'calendar') drawCalendarTab(cx, cy, cw, ch);
+  else if (T === 'futebol') drawFootballTab(cx, cy, cw, ch);
   else drawConfigTab(cx, cy, cw, ch);
 }
 // bolinha vermelha nas abas que pedem atenção
@@ -58,6 +59,7 @@ function tabBadge(id) {
   if (id === 'farm') return S.animals.some(a => a.ready) || Object.values(S.farm).some(f => f.crop && !f.dead && f.days >= CROPS[f.crop].days);
   if (id === 'job') return S.job && S.job.lastShift !== S.time.day && onShiftHours();
   if (id === 'props') return S.myshop && S.myshop.till > 0;
+  if (id === 'futebol') { const e = fbEvent(S.time.day, false); return !!(e && !e.virtual && e.status === 'pendente' && e.invited && gameHour() < e.start); }
   return false;
 }
 
@@ -70,6 +72,8 @@ function dayEvents(d) {
   if (S.romance && S.romance.status === 'noivos' && S.romance.weddingDay === d) ev.push({ t: 'Seu casamento!', k: 'casamento' });
   for (const k of S.family.kids) if (d > k.born && (d - k.born) % 28 === 0) ev.push({ t: 'Aniversário de ' + k.name, k: 'niver' });
   if (S.family.babyDue === d) ev.push({ t: 'O bebê deve chegar', k: 'casamento' });
+  const fe = S.football && fbEvent(d, false);
+  if (fe) ev.push({ t: (fe.kind === 'sexta' ? 'Futebol de várzea' : 'Amistoso') + ' às ' + fe.start + 'h (' + (fe.virtual ? 'campo da vila' : evStatusText(fe)) + ')', k: 'futebol' });
   return ev;
 }
 const FORECAST_DAYS = 3;   // previsão conhecida: hoje e os próximos 2 dias
@@ -92,8 +96,8 @@ function drawCalendarTab(x, y, w, h) {
     ctx.textAlign = 'left'; ctx.font = `700 12px ${FONT}`; ctx.fillStyle = past ? '#7a7060' : '#fff6e6';
     ctx.fillText(String(i + 1), cx + 7, cy + 12);
     if (d >= S.time.day && d < S.time.day + FORECAST_DAYS) drawWeatherIcon(weatherDay(d).type, cx + cellW - 14, cy + 13);
-    ev.slice(0, 2).forEach((e, j) => {
-      ctx.fillStyle = e.k === 'festa' ? '#ffd65a' : e.k === 'casamento' ? '#ff7aa6' : '#9ad1ff';
+    ev.slice(0, 3).forEach((e, j) => {
+      ctx.fillStyle = e.k === 'festa' ? '#ffd65a' : e.k === 'casamento' ? '#ff7aa6' : e.k === 'futebol' ? '#7be36a' : '#9ad1ff';
       ctx.beginPath(); ctx.arc(cx + 10 + j * 11, cy + cellH - 12, 4, 0, 7); ctx.fill();
     });
     addBtn(cx, cy, cellW, cellH, () => { menu.calSel = d; });
@@ -116,7 +120,7 @@ function drawCalendarTab(x, y, w, h) {
   const crops = Object.values(CROPS).filter(C => C.seasons.includes(sc.season)).map(C => C.name);
   text(crops.join(', ') || 'Nada cresce nesta estação.', ex, yy, 11, '#e8dcc0', 600, ew); yy += 22;
   let lx = ex;
-  for (const [t, c] of [['festa', '#ffd65a'], ['aniver.', '#9ad1ff'], ['casório/bebê', '#ff7aa6']]) {
+  for (const [t, c] of [['festa', '#ffd65a'], ['aniver.', '#9ad1ff'], ['casório/bebê', '#ff7aa6'], ['futebol', '#7be36a']]) {
     ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx + 4, y + h - 8, 4, 0, 7); ctx.fill();
     text(t, lx + 12, y + h - 8, 10, '#b8ad94', 500); ctx.font = `500 10px ${FONT}`; lx += ctx.measureText(t).width + 20;
   }
