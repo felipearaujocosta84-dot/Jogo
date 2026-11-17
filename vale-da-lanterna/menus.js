@@ -66,63 +66,68 @@ function tabBadge(id) {
 // ---------------------------------------------------------------- calendário e clima
 const WEEK_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 function dayEvents(d) {
-  const c = calOf(d), ev = [];
-  for (const h of HOLIDAYS) if (h.s === c.season && h.d === c.dom) ev.push({ t: h.name + ' (praça, 17h)', k: 'festa' });
-  for (const [id, info] of Object.entries(SOCIAL)) if (info.bday && info.bday[0] === c.season && info.bday[1] === c.dom && RES_BY_ID[id]) ev.push({ t: 'Aniversário de ' + RES_BY_ID[id].name, k: 'niver' });
+  const c = calOf(d), ev = [], hol = holidayOn(d);
+  if (hol) ev.push({ t: hol.name + ' (praça, ' + Math.floor(hol.start) + 'h)', k: 'festa' });
+  for (const [id, info] of Object.entries(SOCIAL)) if (info.bday && sameDate(info.bday, c) && RES_BY_ID[id]) ev.push({ t: 'Aniversário de ' + RES_BY_ID[id].name + (hol ? '' : ' (festa às 18h)'), k: 'niver' });
+  if (S.fest && sameDate(S.fest.kaiBday, c)) ev.push({ t: 'Seu aniversário!', k: 'niver' });
   if (S.romance && S.romance.status === 'noivos' && S.romance.weddingDay === d) ev.push({ t: 'Seu casamento!', k: 'casamento' });
-  for (const k of S.family.kids) if (d > k.born && (d - k.born) % 28 === 0) ev.push({ t: 'Aniversário de ' + k.name, k: 'niver' });
+  for (const k of S.family.kids) if (d > k.born && (d - k.born) % 28 === 0) ev.push({ t: 'Mêsversário de ' + k.name, k: 'niver' });
   if (S.family.babyDue === d) ev.push({ t: 'O bebê deve chegar', k: 'casamento' });
   const fe = S.football && fbEvent(d, false);
   if (fe) ev.push({ t: (fe.kind === 'sexta' ? 'Futebol de várzea' : 'Amistoso') + ' às ' + fe.start + 'h (' + (fe.virtual ? 'campo da vila' : evStatusText(fe)) + ')', k: 'futebol' });
+  for (const ci of cityFestToday(d)) ev.push({ t: 'Festa de ' + ci.name, k: 'festa' });
   return ev;
 }
 const FORECAST_DAYS = 3;   // previsão conhecida: hoje e os próximos 2 dias
+// calendário do mês (ano real), com navegação de mês em mês
 function drawCalendarTab(x, y, w, h) {
-  const now = calOf(), base = S.time.day - (now.dom - 1);           // primeiro dia da estação atual
-  const off = menu.calOff || 0, first = base + off * 28, c0 = calOf(first);
-  const gw = Math.min(w * 0.6, 520), cellW = gw / 7, cellH = Math.min(58, (h - 52) / 4);
+  const now = calOf(), off = menu.calOff || 0;
+  let my = now.y, mm = now.m + off; my += Math.floor(mm / 12); mm = ((mm % 12) + 12) % 12;
+  const gw = Math.min(w * 0.6, 520), cellW = gw / 7, first = new Date(Date.UTC(my, mm, 1)).getUTCDay(), nd = daysInMonth(my, mm);
+  const rows = Math.ceil((first + nd) / 7), cellH = Math.min(52, (h - 52) / rows);
   panelButton('◀', x, y - 4, 40, 30, () => { menu.calOff = off - 1; menu.calSel = null; });
   panelButton('▶', x + gw - 40, y - 4, 40, 30, () => { menu.calOff = off + 1; menu.calSel = null; });
   ctx.textAlign = 'center'; ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#fff6e6';
-  ctx.fillText(SEASONS[c0.season] + ' · ano ' + c0.year, x + gw / 2, y + 11);
+  ctx.fillText(MONTHS[mm][0].toUpperCase() + MONTHS[mm].slice(1) + ' de ' + my, x + gw / 2, y + 11);
   WEEK_SHORT.forEach((d, i) => { ctx.font = `600 11px ${FONT}`; ctx.fillStyle = '#b8ad94'; ctx.fillText(d, x + i * cellW + cellW / 2, y + 38); });
   const sel = menu.calSel || S.time.day;
-  for (let i = 0; i < 28; i++) {
-    const d = first + i, cx = x + (i % 7) * cellW, cy = y + 48 + Math.floor(i / 7) * cellH, ev = dayEvents(d);
+  for (let dd = 1; dd <= nd; dd++) {
+    const i = first + dd - 1, d = dayOfDate(my, mm, dd), cx = x + (i % 7) * cellW, cy = y + 48 + Math.floor(i / 7) * cellH, ev = d >= 1 ? dayEvents(d) : [];
     const past = d < S.time.day, today = d === S.time.day;
     ctx.fillStyle = today ? 'rgba(255,214,90,0.28)' : past ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.08)';
     ctx.beginPath(); ctx.roundRect(cx + 2, cy + 2, cellW - 4, cellH - 4, 7); ctx.fill();
     if (d === sel) { ctx.strokeStyle = '#ffd65a'; ctx.lineWidth = 2; ctx.stroke(); }
     ctx.textAlign = 'left'; ctx.font = `700 12px ${FONT}`; ctx.fillStyle = past ? '#7a7060' : '#fff6e6';
-    ctx.fillText(String(i + 1), cx + 7, cy + 12);
+    ctx.fillText(String(dd), cx + 7, cy + 12);
     if (d >= S.time.day && d < S.time.day + FORECAST_DAYS) drawWeatherIcon(weatherDay(d).type, cx + cellW - 14, cy + 13);
     ev.slice(0, 3).forEach((e, j) => {
       ctx.fillStyle = e.k === 'festa' ? '#ffd65a' : e.k === 'casamento' ? '#ff7aa6' : e.k === 'futebol' ? '#7be36a' : '#9ad1ff';
-      ctx.beginPath(); ctx.arc(cx + 10 + j * 11, cy + cellH - 12, 4, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 10 + j * 11, cy + cellH - 11, 4, 0, 7); ctx.fill();
     });
-    addBtn(cx, cy, cellW, cellH, () => { menu.calSel = d; });
+    if (d >= 1) addBtn(cx, cy, cellW, cellH, () => { menu.calSel = d; });
+    else { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(cx + 2, cy + 2, cellW - 4, cellH - 4); }
   }
   ctx.textAlign = 'left';
   // detalhes do dia escolhido
   const ex = x + gw + 18, ew = w - gw - 18, sc = calOf(sel);
-  text(weekday(sel) + ', ' + dateText(sc.season, sc.dom), ex, y + 11, 15, '#ffe38a', 700, ew);
-  let yy = y + 34;
+  text(weekday(sel) + ', ' + dateText(sc.m, sc.d) + ' de ' + sc.y, ex, y + 11, 15, '#ffe38a', 700, ew);
+  let yy = y + 32;
   const rel = sel - S.time.day;
-  text(rel === 0 ? 'Hoje · agora: ' + weatherName() + ', ' + clockText() : rel === 1 ? 'Amanhã' : rel > 0 ? 'Daqui a ' + rel + ' dias' : 'Já passou', ex, yy, 12, '#cfc3a6', 600, ew); yy += 22;
-  if (rel >= 0 && rel < FORECAST_DAYS) { drawWeatherIcon(weatherDay(sel).type, ex + 9, yy); text('Previsão: ' + forecastText(sel), ex + 24, yy, 12, '#e8dcc0', 600, ew - 24); }
-  else text(rel < 0 ? '' : 'Previsão do tempo: só para os próximos ' + FORECAST_DAYS + ' dias.', ex, yy, 11, '#b8ad94', 500, ew);
-  yy += 24;
+  text((rel === 0 ? 'Hoje · ' + weatherName() + ', ' + clockText() : rel === 1 ? 'Amanhã' : rel > 0 ? 'Daqui a ' + rel + ' dias' : 'Já passou') + ' · ' + SEASONS[sc.season], ex, yy, 12, '#cfc3a6', 600, ew); yy += 20;
+  if (rel >= 0 && rel < FORECAST_DAYS) { drawWeatherIcon(weatherDay(sel).type, ex + 9, yy); text('Previsão: ' + forecastText(sel), ex + 24, yy, 12, '#e8dcc0', 600, ew - 24); yy += 20; }
   const ev = dayEvents(sel);
   text('Eventos', ex, yy, 13, '#ffe38a', 700); yy += 18;
-  (ev.length ? ev.map(e => e.t) : ['Nenhum evento.']).forEach(l => { text('• ' + l, ex, yy, 12, '#e8dcc0', 600, ew); yy += 17; });
-  yy += 8;
-  text('Plantar em ' + SEASONS[sc.season], ex, yy, 13, '#ffe38a', 700); yy += 18;
-  const crops = Object.values(CROPS).filter(C => C.seasons.includes(sc.season)).map(C => C.name);
-  text(crops.join(', ') || 'Nada cresce nesta estação.', ex, yy, 11, '#e8dcc0', 600, ew); yy += 22;
-  let lx = ex;
+  (ev.length ? ev.map(e => e.t) : ['Nenhum evento.']).slice(0, 5).forEach(l => { yy = wrapText('• ' + l, ex, yy, 12, '#e8dcc0', 600, ew, 15); });
+  yy += 6;
+  text('Plantar no(a) ' + SEASONS[sc.season].toLowerCase(), ex, yy, 13, '#ffe38a', 700); yy += 18;
+  yy = wrapText(Object.values(CROPS).filter(C => C.seasons.includes(sc.season)).map(C => C.name).join(', ') || 'Nada cresce nesta estação.', ex, yy, 11, '#e8dcc0', 600, ew, 14);
+  const F = festState();
+  text('Seu aniversário: ' + dateText(F.kaiBday[0], F.kaiBday[1]) + ' · ' + F.kaiAge + ' anos', ex, y + h - 52, 11, '#ffd6e6', 600, ew);
+  panelButton('Este é meu aniversário', ex, y + h - 40, Math.min(ew, 200), 28, () => { F.kaiBday = [sc.m, sc.d]; toast('Seu aniversário agora é ' + dateText(sc.m, sc.d) + '.'); save(); }, sameDate(F.kaiBday, sc) ? 'on' : null);
+  let lx = x;
   for (const [t, c] of [['festa', '#ffd65a'], ['aniver.', '#9ad1ff'], ['casório/bebê', '#ff7aa6'], ['futebol', '#7be36a']]) {
-    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx + 4, y + h - 8, 4, 0, 7); ctx.fill();
-    text(t, lx + 12, y + h - 8, 10, '#b8ad94', 500); ctx.font = `500 10px ${FONT}`; lx += ctx.measureText(t).width + 20;
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx + 4, y + h - 6, 4, 0, 7); ctx.fill();
+    text(t, lx + 12, y + h - 6, 10, '#b8ad94', 500); ctx.font = `500 10px ${FONT}`; lx += ctx.measureText(t).width + 20;
   }
 }
 

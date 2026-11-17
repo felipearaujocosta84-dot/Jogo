@@ -163,7 +163,6 @@ const FB_TROPHIES = {
 // ---------------------------------------------------------------- eventos (sexta e amistosos)
 function fbCfg() { return S.football.cfg; }
 const isFriday = d => weekday(d) === 'Sexta';
-const holidayOn = d => { const c = calOf(d); return HOLIDAYS.some(h => h.s === c.season && h.d === c.dom); };
 // devolve o evento do dia (cria a partida de sexta quando precisa)
 function fbEvent(d = S.time.day, create = true) {
   const F = S.football, key = String(d);
@@ -839,7 +838,7 @@ function drawFootballTab(x, y, w, h) {
   const up = [];
   for (let d = S.time.day; d < S.time.day + 10; d++) { const e = fbEvent(d, false); if (e && !(fbDone(e) && d < S.time.day)) up.push(e); }
   up.slice(0, 3).forEach(e => {
-    const c = calOf(e.day), when = e.day === S.time.day ? 'Hoje' : e.day === S.time.day + 1 ? 'Amanhã' : weekday(e.day) + ', ' + dateText(c.season, c.dom);
+    const c = calOf(e.day), when = e.day === S.time.day ? 'Hoje' : e.day === S.time.day + 1 ? 'Amanhã' : weekday(e.day) + ', ' + dateText(c.m, c.dom);
     ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(x, yy, colW, 46, 8); ctx.fill();
     const btns = !e.virtual && !fbDone(e) && e.day === S.time.day && gameHour() < e.start && e.orgDone;
     text((e.kind === 'sexta' ? 'Futebol de sexta' : 'Amistoso com ' + (RES_BY_ID[e.host] ? RES_BY_ID[e.host].name : '?')) + ' · ' + when + ', ' + e.start + 'h', x + 8, yy + 14, 12, '#fff6e6', 700, colW - (btns ? 160 : 16));

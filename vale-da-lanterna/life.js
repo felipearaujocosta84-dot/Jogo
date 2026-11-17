@@ -12,7 +12,7 @@ function clockText() {
 function periodName(h = gameHour()) {
   return h < 5 ? 'Madrugada' : h < 12 ? 'Manhã' : h < 17.5 ? 'Tarde' : h < 19.5 ? 'Pôr do sol' : 'Noite';
 }
-function weekday(d = S.time.day) { return WEEK[(d - 1) % 7]; }
+function weekday(d = S.time.day) { return WEEK[calOf(d).wd]; }
 function dayMinutes() { return (CONFIG.dayMinutes || 60); }
 function updateClock(dt) {
   S.time.min += dt * 1440 / (dayMinutes() * 60);
@@ -20,12 +20,13 @@ function updateClock(dt) {
 }
 function onNewDay() {
   dailyBackup();
-  toast('Dia ' + S.time.day + ' · ' + weekday());
+  { const c = calOf(); toast(weekday() + ', ' + dateText(c.m, c.d) + ' de ' + c.y); }
   for (const r of RESIDENTS) { const m = npcMem(r.id); m.todayTalk = false; }
   weatherNewDay();
   socialNewDay();
   farmNewDay();
   footballNewDay();
+  festNewDay();
 }
 // avança até as 6h (dormir)
 function sleepUntilMorning() {
@@ -392,7 +393,7 @@ function lifeTalk(n) {
 // desenho do relógio no topo da tela
 function drawClockHUD(T) {
   const c = calOf(), hol = holidayToday();
-  const t = c.dom + ' ' + SEASONS[c.season] + ' · ' + weekday().slice(0, 3) + ' · ' + clockText() + ' · ' + (hol ? hol.name : periodName()) + ' · ' + weatherName();
+  const t = c.d + ' ' + MONTHS_SHORT[c.m] + ' ' + c.y + ' · ' + weekday().slice(0, 3) + ' · ' + clockText() + ' · ' + (hol ? hol.name : periodName()) + ' · ' + weatherName();
   ctx.font = `700 13px ${FONT}`;
   const w = ctx.measureText(t).width + 48, x = W / 2 - w / 2, y = T;
   ctx.fillStyle = 'rgba(20,24,20,0.62)'; ctx.beginPath(); ctx.roundRect(x, y, w, 24, 10); ctx.fill();

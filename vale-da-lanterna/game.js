@@ -4,7 +4,7 @@
 let MINI = null;
 
 // ---------------------------------------------------------------- estado salvo
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 function newSave() {
   return { version: SAVE_VERSION,
     stage: 0, relics: { petala: false, orvalho: false, brasa: false }, got: {}, kills: {},
@@ -14,7 +14,7 @@ function newSave() {
     tools: { vara: false, enxada: false, regador: false }, outfits: ['classico'], outfit: 'classico', job: null, shops: {}, props: { plots: { quintal: true }, houses: {} }, stats: { earned: 0, spent: 0, harvest: 0 },
     farm: {}, animals: [], seedSel: null, plotMode: {}, builds: [], decor: {}, storage: {}, myshop: { stock: {}, till: 0, sold: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
-    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, football: { cfg: { start: 15, minutes: 4 }, ev: {}, history: [], stats: { matches: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, passes: 0, tackles: 0 }, rel: {}, pop: 0, xp: 0, trophies: [], npcGoals: {} }, weather: { seed: Math.floor(Math.random() * 1e9), wet: 0, rainedDay: 0 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
+    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, calOffset: 0, fest: { kaiBday: [2, 15], kaiAge: 20 }, football: { cfg: { start: 15, minutes: 4 }, ev: {}, history: [], stats: { matches: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, passes: 0, tackles: 0 }, rel: {}, pop: 0, xp: 0, trophies: [], npcGoals: {} }, weather: { seed: Math.floor(Math.random() * 1e9), wet: 0, rainedDay: 0 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
 }
 let S = newSave();
@@ -38,6 +38,7 @@ function loadSave() {
   if (!raw) return null;
   const ver = raw.version || 2;
   if (ver < SAVE_VERSION) store('vale-da-lanterna-backup-v' + ver, raw);
+  if (ver < 4) migrateCalendar(raw);
   const out = deepDefaults(raw, newSave());
   out.version = SAVE_VERSION;
   return out;
@@ -704,6 +705,7 @@ function update(dt) {
   lifeUpdate(dt);
   weatherUpdate(dt);
   footballTick(dt);
+  festTick(dt);
   updateLOD();
   if (work) { updateWork(dt); return; }
   if (menu || showMap) return;
@@ -1124,13 +1126,16 @@ function drawWorld() {
   if (S.cat === 'lost' || S.cat === 'none') list.push({ y: CAT_SPOT[1], f: () => drawCatAt(CAT_SPOT[0], CAT_SPOT[1], false, true) });
   addCommon(list);
   footballEntities(list);
+  festEntities(list);
   list.sort((a, b) => a.y - b.y);
   for (const o of list) { if (o.p) drawProp(o.p); else o.f(); }
+  drawFestGround(x0, y0, x1, y1);
   drawLanternGlow();
   drawFishing();
   drawLighting();
   drawWeatherFX();
   drawFootballOverlay();
+  drawFestOverlay();
   drawBuildGhost();
   drawFarmTasks();
   drawOverlays();
@@ -1160,6 +1165,7 @@ function drawInterior() {
   if (area === 'casaTeo' && S.cat === 'home') { const cb = I.furn.find(f => f.t === 'catbed'); list.push({ y: (cb.y + 1) * TILE, f: () => drawCatAt((cb.x + 0.5) * TILE, (cb.y + 0.85) * TILE, false, false, true) }); }
   addCommon(list);
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
+  drawFestInterior();
   drawLighting();
   drawWeatherFX();
   drawBuildGhost();
@@ -1896,7 +1902,7 @@ function drawFamilyTab(x, y, w, h) {
     ctx.fillStyle = 'rgba(255,122,166,0.14)'; ctx.beginPath(); ctx.roundRect(x, yy, colW, 92, 9); ctx.fill();
     text('♥ ' + p.name + ' · ' + statusText(R.id), x + 10, yy + 16, 15, '#fff6e6', 700, colW - 20);
     smallHearts(x + 16, yy + 38, hearts(R.id));
-    const sub = R.status === 'noivos' ? 'Casamento no dia ' + (() => { const c = calOf(R.weddingDay); return dateText(c.season, c.dom); })() + ' (fale com ' + p.name + ')'
+    const sub = R.status === 'noivos' ? 'Casamento no dia ' + (() => { const c = calOf(R.weddingDay); return dateText(c.m, c.dom); })() + ' (fale com ' + p.name + ')'
       : R.status === 'casados' ? 'Casados desde o dia ' + R.married + ' · moram na Casa do Kai' : 'Namorando desde o dia ' + R.since;
     text(sub, x + 10, yy + 58, 12, '#e8dcc0', 600, colW - 20);
     text(m.upset ? 'Está chateado(a): converse e peça desculpas.' : 'Está feliz com vocês.', x + 10, yy + 78, 12, m.upset ? '#ff9a8a' : '#9be36a', 600, colW - 20);
@@ -1920,11 +1926,8 @@ function drawFamilyTab(x, y, w, h) {
   text('Próximos eventos', ex, y + 8, 15, '#ffe38a', 700);
   const ev = [];
   for (let d = S.time.day; d < S.time.day + 14; d++) {
-    const c = calOf(d), when = d === S.time.day ? 'Hoje' : d === S.time.day + 1 ? 'Amanhã' : dateText(c.season, c.dom);
-    for (const hdy of HOLIDAYS) if (hdy.s === c.season && hdy.d === c.dom) ev.push(when + ': ' + hdy.name + ' (praça, 17h)');
-    for (const [id, info] of Object.entries(SOCIAL)) if (info.bday[0] === c.season && info.bday[1] === c.dom && RES_BY_ID[id]) ev.push(when + ': aniversário de ' + RES_BY_ID[id].name);
-    if (R && R.status === 'noivos' && R.weddingDay === d) ev.push(when + ': seu casamento!');
-    for (const k of S.family.kids) if (d > k.born && (d - k.born) % 28 === 0) ev.push(when + ': aniversário de ' + k.name);
+    const c = calOf(d), when = d === S.time.day ? 'Hoje' : d === S.time.day + 1 ? 'Amanhã' : dateText(c.m, c.d);
+    for (const e of dayEvents(d)) ev.push(when + ': ' + e.t);
   }
   (ev.length ? ev : ['Nenhum evento nas próximas 2 semanas.']).slice(0, 12).forEach((l, i) => text('• ' + l, ex, y + 30 + i * 19, 12, '#e8dcc0', 600, colW));
 }

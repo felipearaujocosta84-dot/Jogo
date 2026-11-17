@@ -347,3 +347,30 @@ amizade 0–1000 (`social.js`), clima determinístico por dia (`weather.js`), ca
   fim de semana; nenhuma opção romântica para os 7 menores (com 9,5♥ e romance 100); pedido com lista, "não" respeitoso,
   encontro com cena e resposta certa (+18 romance), aceite, término, declaração da Iara, save/recarregar; fluxo antigo de
   noivado, casamento e filhos; regressões de todas as fases e do futebol.
+
+## Ano real e festas (`social.js` calendário, `festas.js`)
+- **Calendário igual ao da vida real:** 12 meses com os tamanhos reais, anos bissextos (29/02/2028 existe; 2027 não),
+  dias da semana reais e anos de verdade. O jogo começa na terça, 22 de setembro de 2026 (início da primavera no Brasil);
+  estações do hemisfério sul (primavera 22/09–20/12, verão 21/12–19/03, outono 20/03–20/06, inverno 21/06–21/09) — as
+  plantações e o clima continuam por estação. Relógio: "22 set 2026 · Ter · 07:00". Calendário mês a mês com ◀ ▶.
+- **Saves antigos** (versão 3, estações de 28 dias) migram para a versão 4 sem mudar a contagem de dias (idade dos filhos,
+  namoro e plantações continuam certos): a data nova fica na mesma estação e no mesmo ponto dela (ex.: dia 30 antigo,
+  "2 de Verão" → 24 de dezembro). Cópia de segurança antes da migração. Partidas de sexta ainda não organizadas são refeitas.
+- **Festas da vila** na praça (todos os moradores vão, bandeirinhas, lanternas acesas à noite; dia sempre com céu limpo):
+  Ano Novo (1/1), Festa do Verão (20/1), Festa da Lanterna (20/4), **Festa Junina** (24/6, fogueira e quadrilha), Noite das
+  Estrelas (12/8, estrelas cadentes), Festival das Flores (10/10), **Aniversário do Vale** (15/11, fogos), **Natal** (25/12,
+  árvore iluminada; amigos com 4♥ dão um presentinho) e **Réveillon** (31/12 das 21h, contagem regressiva às 23h58 e fogos à
+  meia-noite). Na festa dá para **Dançar** (ou **Quadrilha**) com cada adulto (+amizade, +romance) e pegar a **Prenda da festa**
+  com a Vó Aurora (uma por festa por ano).
+- **Ano Novo:** faixa "Feliz Ano Novo! 2027", fogos por um minuto e **retrospectiva** do ano (dias, moedas ganhas, melhores
+  amigos, par, futebol); quem está na praça ganha amizade.
+- **Aniversário dos moradores:** festa na casa de quem faz anos, das 18h às 21h, com quem mora junto e até 4 amigos da mesma
+  faixa de idade; aviso de manhã e no calendário; quando o Kai chega: todos cantam "Parabéns pra você" (com a melodia), bolo
+  com velas na mesa, confete, +30 de amizade e um pedaço de torta. Em dia de festa da vila o aniversário é comemorado na praça.
+- **Aniversário do Kai:** escolhido no Calendário ("Este é meu aniversário"; padrão 15 de março, 20 anos). No dia: faixa de
+  parabéns, a idade aumenta, e às 19h os melhores amigos fazem uma **festa surpresa** na Casa do Kai com presentes e moedas.
+- **Festa de cada cidade grande:** cada cidade tem sua data; nas cidades visitadas ela aparece no calendário; no dia, a praça
+  da cidade ganha bandeirinhas e fogos à noite.
+- **Testes:** datas e dias da semana reais; bissexto; migração de save antigo; festa da Mel com convidados e "Parabéns";
+  surpresa do Kai com presentes; Natal (prenda, presente de amigo, 23 moradores na praça); Réveillon (contagem, virada para
+  2027, fogos, retrospectiva); quadrilha na Festa Junina; festa de cidade; calendário; regressões de todas as fases.

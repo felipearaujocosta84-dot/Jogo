@@ -83,15 +83,15 @@ function schedFor(r) { return (r.weekend && isWeekend()) ? r.weekend : r.sched; 
 
 Object.assign(SOCIAL, {
   cida: { bday: [2, 10], eligible: false, gender: 'f', dislikes: ['pedra', 'seiva'], no: 'Ah, Kai... meu coração é do meu marido, que trabalha na cidade grande. Mas obrigada pelo carinho.' },
-  zeca: { bday: [1, 18], eligible: false, gender: 'm', dislikes: ['flor'], no: 'Rapaz, desde que a minha Lurdes partiu, meu coração é do rio.' },
-  marta: { bday: [0, 26], eligible: false, gender: 'f', dislikes: ['pedra'], no: 'Kai, que gentil... mas agora minha vida é cuidar dos meus três.' },
-  pedro: { bday: [3, 7], eligible: false, teen: true, gender: 'm', dislikes: ['flor'] },
-  duda: { bday: [1, 2], eligible: false, teen: true, gender: 'f', dislikes: ['seiva'] },
-  rafa: { bday: [2, 23], eligible: false, teen: true, gender: 'm', dislikes: ['pedra'] },
-  lia: { bday: [0, 17], eligible: false, child: true, gender: 'f', dislikes: ['cogumelo'] },
-  bento: { bday: [3, 14], eligible: false, child: true, gender: 'm', dislikes: ['flor'] },
+  zeca: { bday: [11, 18], eligible: false, gender: 'm', dislikes: ['flor'], no: 'Rapaz, desde que a minha Lurdes partiu, meu coração é do rio.' },
+  marta: { bday: [9, 26], eligible: false, gender: 'f', dislikes: ['pedra'], no: 'Kai, que gentil... mas agora minha vida é cuidar dos meus três.' },
+  pedro: { bday: [6, 7], eligible: false, teen: true, gender: 'm', dislikes: ['flor'] },
+  duda: { bday: [11, 2], eligible: false, teen: true, gender: 'f', dislikes: ['seiva'] },
+  rafa: { bday: [4, 23], eligible: false, teen: true, gender: 'm', dislikes: ['pedra'] },
+  lia: { bday: [9, 17], eligible: false, child: true, gender: 'f', dislikes: ['cogumelo'] },
+  bento: { bday: [6, 14], eligible: false, child: true, gender: 'm', dislikes: ['flor'] },
   malu: { bday: [1, 11], eligible: false, child: true, gender: 'f', dislikes: ['pedra'] },
-  nico: { bday: [2, 2], eligible: false, child: true, gender: 'm', dislikes: ['cogumelo'] }
+  nico: { bday: [3, 2], eligible: false, child: true, gender: 'm', dislikes: ['cogumelo'] }
 });
 Object.assign(PROF_LINES, {
   'Professora': ['A escola começa às 8h. Os pequenos adoram a aula de desenho!', 'Ensinar é plantar devagar.'],

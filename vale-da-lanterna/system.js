@@ -37,7 +37,7 @@ function placeName() {
 }
 function saveSlot(i) {
   save();
-  const c = calOf(), meta = { day: S.time.day, date: dateText(c.season, c.dom) + ', ano ' + c.year, hour: clockText(), coins: S.coins, place: placeName(), at: Date.now() };
+  const c = calOf(), meta = { day: S.time.day, date: dateText(c.m, c.dom) + ' de ' + c.year, hour: clockText(), coins: S.coins, place: placeName(), at: Date.now() };
   if (storeChecked(SLOT_KEY(i), { meta, data: S })) { Audio.sfx('pick'); toast('Salvo no espaço ' + i + '.'); }
 }
 function loadSlot(i) {

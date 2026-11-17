@@ -2,33 +2,78 @@
    filhos (nascimento, crescimento, necessidades), aniversários, datas comemorativas, discussões e memória. */
 'use strict';
 
-// ---------------------------------------------------------------- calendário (mês de 28 dias, 4 estações)
+// ---------------------------------------------------------------- calendário real: 12 meses, anos bissextos, dias da semana reais
+// O dia 1 do jogo é 22 de setembro de 2026 (início da primavera no Brasil); as estações seguem o hemisfério sul.
 const SEASONS = ['Primavera', 'Verão', 'Outono', 'Inverno'];
-function calOf(day = S.time.day) { const doy = (day - 1) % 112; return { season: Math.floor(doy / 28), dom: doy % 28 + 1, year: Math.floor((day - 1) / 112) + 1 }; }
-const dateText = (s, d) => d + ' de ' + SEASONS[s];
+const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const CAL_EPOCH = Date.UTC(2026, 8, 22), DAY_MS = 86400000;
+// primavera 22/09–20/12 · verão 21/12–19/03 · outono 20/03–20/06 · inverno 21/06–21/09
+function seasonOfDate(m, d) {
+  const md = m * 100 + d;
+  if (md >= 822 && md <= 1120) return 0;
+  if (md >= 1121 || md <= 219) return 1;
+  if (md >= 220 && md <= 520) return 2;
+  return 3;
+}
+const calCache = new Map();
+function calOf(day = S.time.day) {
+  const k = day + (S.calOffset || 0);
+  let c = calCache.get(k);
+  if (!c) {
+    const t = new Date(CAL_EPOCH + (k - 1) * DAY_MS), y = t.getUTCFullYear(), m = t.getUTCMonth(), d = t.getUTCDate();
+    c = { y, year: y, m, d, dom: d, wd: t.getUTCDay(), season: seasonOfDate(m, d), doy: Math.round((Date.UTC(y, m, d) - Date.UTC(y, 0, 1)) / DAY_MS) };
+    if (calCache.size > 2000) calCache.clear();
+    calCache.set(k, c);
+  }
+  return c;
+}
+// número do dia do jogo para uma data real
+function dayOfDate(y, m, d) { return Math.round((Date.UTC(y, m, d) - CAL_EPOCH) / DAY_MS) + 1 - (S.calOffset || 0); }
+const daysInMonth = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+const dateText = (m, d) => d + ' de ' + MONTHS[m];
+const sameDate = (md, c) => md && md[0] === c.m && md[1] === c.d;
+// festas da vila (dia e mês reais); start/end = horário de reunião na praça
 const HOLIDAYS = [
-  { s: 0, d: 14, name: 'Festival das Flores', line: 'Feliz Festival das Flores!' },
-  { s: 1, d: 21, name: 'Festa do Verão', line: 'Que calor gostoso! Feliz Festa do Verão!' },
-  { s: 2, d: 20, name: 'Festa da Lanterna', line: 'Feliz Festa da Lanterna! A praça fica linda à noite.' },
-  { s: 3, d: 25, name: 'Noite das Estrelas', line: 'Hoje é a Noite das Estrelas. Faça um pedido!' }];
-function holidayToday() { const c = calOf(); return HOLIDAYS.find(h => h.s === c.season && h.d === c.dom) || null; }
+  { m: 0, d: 1, name: 'Ano Novo', line: 'Feliz Ano Novo! Que esse ano seja incrível!', start: 0, end: 1.5, key: 'anonovo', fireworks: true },
+  { m: 0, d: 20, name: 'Festa do Verão', line: 'Que calor gostoso! Feliz Festa do Verão!', start: 17, end: 22, key: 'verao' },
+  { m: 3, d: 20, name: 'Festa da Lanterna', line: 'Feliz Festa da Lanterna! A praça fica linda à noite.', start: 17, end: 22, key: 'lanterna', lanterns: true },
+  { m: 5, d: 24, name: 'Festa Junina', line: 'Arraiá do vale! Bora pra quadrilha?', start: 17, end: 23, key: 'junina', bonfire: true },
+  { m: 7, d: 12, name: 'Noite das Estrelas', line: 'Hoje é a Noite das Estrelas. Faça um pedido!', start: 19, end: 23, key: 'estrelas', fireworks: true },
+  { m: 9, d: 10, name: 'Festival das Flores', line: 'Feliz Festival das Flores!', start: 15, end: 21, key: 'flores' },
+  { m: 10, d: 15, name: 'Aniversário do Vale', line: 'Parabéns pro nosso vale! Hoje tem desfile e bolo na praça!', start: 16, end: 22, key: 'vale', fireworks: true },
+  { m: 11, d: 25, name: 'Natal', line: 'Feliz Natal, Kai! A árvore da praça está linda.', start: 18, end: 22, key: 'natal', tree: true },
+  { m: 11, d: 31, name: 'Réveillon', line: 'Hoje tem festa de Réveillon na praça! À meia-noite tem fogos!', start: 21, end: 24.5, key: 'reveillon', fireworks: true }];
+function holidayOn(day) { const c = calOf(day); return HOLIDAYS.find(h => h.m === c.m && h.d === c.d) || null; }
+function holidayToday() { return holidayOn(S.time.day); }
+// migração de saves do calendário antigo (4 estações de 28 dias): mantém a estação e o ponto dentro dela
+function migrateCalendar(raw) {
+  if (raw.calOffset !== undefined) return;
+  const day = (raw.time && raw.time.day) || 1, doy = (day - 1) % 112, s = Math.floor(doy / 28), dom = doy % 28 + 1, yr = Math.floor((day - 1) / 112);
+  const starts = [[2026, 8, 22, 90], [2026, 11, 21, 89], [2027, 2, 20, 93], [2027, 5, 21, 93]];
+  const [y, m, d, len] = starts[s];
+  const target = Date.UTC(y + yr, m, d) + Math.floor((dom - 1) / 28 * len) * DAY_MS;
+  raw.calOffset = Math.round((target - CAL_EPOCH) / DAY_MS) - (day - 1);
+  // partidas de sexta marcadas pelo calendário antigo deixam de valer (os dias da semana mudaram)
+  if (raw.football && raw.football.ev) for (const k of Object.keys(raw.football.ev)) { const e = raw.football.ev[k]; if (e.kind === 'sexta' && !e.orgDone) delete raw.football.ev[k]; }
+}
 
 // ---------------------------------------------------------------- perfil social dos moradores
 // gender: 'f'/'m' (usado em "mamãe/papai"); eligible: adulto que aceita romance; dislikes: presentes que não gosta
 const SOCIAL = {
-  aurora: { bday: [3, 12], eligible: false, gender: 'f', dislikes: ['seiva', 'pedra'], no: 'Ah, querido... meu coração ainda é do meu falecido Joaquim. Mas fico lisonjeada!' },
-  mel: { bday: [0, 8], eligible: true, gender: 'f', dislikes: ['seiva', 'pedra'] },
-  tome: { bday: [1, 3], eligible: false, gender: 'm', dislikes: ['flor'], no: 'Rapaz, eu tô velho e casado com a minha horta!' },
-  bruno: { bday: [2, 17], eligible: true, gender: 'm', dislikes: ['flor', 'fibra'] },
-  rosa: { bday: [0, 22], eligible: true, gender: 'f', dislikes: ['seiva', 'pedra'] },
+  aurora: { bday: [6, 12], eligible: false, gender: 'f', dislikes: ['seiva', 'pedra'], no: 'Ah, querido... meu coração ainda é do meu falecido Joaquim. Mas fico lisonjeada!' },
+  mel: { bday: [9, 8], eligible: true, gender: 'f', dislikes: ['seiva', 'pedra'] },
+  tome: { bday: [0, 3], eligible: false, gender: 'm', dislikes: ['flor'], no: 'Rapaz, eu tô velho e casado com a minha horta!' },
+  bruno: { bday: [4, 17], eligible: true, gender: 'm', dislikes: ['flor', 'fibra'] },
+  rosa: { bday: [10, 22], eligible: true, gender: 'f', dislikes: ['seiva', 'pedra'] },
   teo: { bday: [1, 15], eligible: false, child: true, gender: 'm', dislikes: ['cogumelo'] },
-  iara: { bday: [1, 25], eligible: true, gender: 'f', dislikes: ['flor'] },
-  davi: { bday: [2, 6], eligible: true, gender: 'm', dislikes: ['seiva'] },
-  nina: { bday: [3, 2], eligible: true, gender: 'f', dislikes: ['pedra', 'madeira'] },
-  leo: { bday: [2, 28], eligible: false, gender: 'm', dislikes: ['flor'], no: 'Kai... eu sou casado com a Bia. Mas valeu pela amizade.' },
-  bia: { bday: [0, 4], eligible: false, gender: 'f', dislikes: ['pedra'], no: 'Ai, que fofo! Mas eu e o Léo somos casados há anos.' },
-  joca: { bday: [3, 19], eligible: true, gender: 'm', dislikes: ['flor'] },
-  gil: { bday: [1, 9], eligible: false, gender: 'm', dislikes: ['seiva'], no: 'Hahaha! Kai, eu sou casado com este armazém!' }
+  iara: { bday: [2, 5], eligible: true, gender: 'f', dislikes: ['flor'] },
+  davi: { bday: [3, 6], eligible: true, gender: 'm', dislikes: ['seiva'] },
+  nina: { bday: [7, 2], eligible: true, gender: 'f', dislikes: ['pedra', 'madeira'] },
+  leo: { bday: [4, 28], eligible: false, gender: 'm', dislikes: ['flor'], no: 'Kai... eu sou casado com a Bia. Mas valeu pela amizade.' },
+  bia: { bday: [8, 30], eligible: false, gender: 'f', dislikes: ['pedra'], no: 'Ai, que fofo! Mas eu e o Léo somos casados há anos.' },
+  joca: { bday: [7, 19], eligible: true, gender: 'm', dislikes: ['flor'] },
+  gil: { bday: [0, 27], eligible: false, gender: 'm', dislikes: ['seiva'], no: 'Hahaha! Kai, eu sou casado com este armazém!' }
 };
 const GIFTABLE = ['flor', 'cogumelo', 'madeira', 'pedra', 'fibra', 'seiva', 'cristal', 'torta', 'pocao', 'sopa', 'pao', 'peixe', 'truta', 'carpa', 'tabua', 'couve', 'cenoura', 'morango', 'tomate', 'abobora', 'nabo', 'ovo', 'leite', 'la', 'trufa', 'omelete'];
 function sm(id) {
@@ -39,7 +84,7 @@ function sm(id) {
 const hearts = id => Math.floor(sm(id).friend / 100);
 function addFriend(id, v) { const m = sm(id); m.friend = clamp(m.friend + v, 0, 1000); }
 function remember(id, text) { const m = sm(id); m.hist.push({ day: S.time.day, text }); if (m.hist.length > 12) m.hist.shift(); }
-function isBirthday(id) { const b = (SOCIAL[id] || {}).bday; if (!b) return false; const c = calOf(); return b[0] === c.season && b[1] === c.dom; }
+function isBirthday(id, day = S.time.day) { const b = (SOCIAL[id] || {}).bday; return !!b && sameDate(b, calOf(day)); }
 const romance = () => S.romance;
 const partnerOf = id => S.romance && S.romance.id === id;
 function statusText(id) {
@@ -55,7 +100,7 @@ const FEST_ENTRY = [17, 22, 'praca_fonte', 'talk'];
 const WALK_ENTRY = [0, 24, 'walk_with', 'idle'];
 function socialOverride(r, h) {
   if (S.walk && S.walk.id === r.id) return WALK_ENTRY;
-  if (holidayToday() && h >= 17 && h < 22 && !(r.kid && r.stage === 'bebe')) return FEST_ENTRY;
+  const fe = festOverride(r, h); if (fe) return fe;
   return null;
 }
 function followPlayer(r, dt) {
@@ -87,6 +132,7 @@ function updateWalk() {
 function socialOpen(n, questTalk) {
   const r = RES_BY_ID[n.id], m = sm(n.id), info = SOCIAL[n.id] || {};
   if (r.kid) return kidOpen(r);
+  festGreeting(n);
   if (romanceConfess(n)) return;
   const first = !m.met;
   const ch = [];
@@ -94,6 +140,7 @@ function socialOpen(n, questTalk) {
   if (m.giftDay !== S.time.day) ch.push({ t: 'Presente', fn: () => { menu = { tab: 'gift', npc: n.id }; } });
   if (S.walk && S.walk.id === n.id) ch.push({ t: 'Encerrar passeio', fn: () => { S.walk.end = 0; updateWalk(); } });
   else if (!S.walk && !info.child && m.met) ch.push({ t: 'Passear', fn: () => inviteWalk(n) });
+  ch.push(...festChoices(n));
   ch.push(...economyChoices(n));
   ch.push(...footballChoices(n));
   ch.push(...romanceOptions(n));
@@ -195,7 +242,7 @@ function proposeMarriage(id) {
   addFriend(id, 80); remember(id, 'Ficamos noivos!');
   flash = 0.6; Audio.sfx('relic');
   const c = calOf(S.romance.weddingDay);
-  say([r.name + ': SIM! Mil vezes sim!', r.name + ': Vamos casar na praça, no dia ' + dateText(c.season, c.dom) + '. Fale comigo nesse dia!']);
+  say([r.name + ': SIM! Mil vezes sim!', r.name + ': Vamos casar na praça, no dia ' + dateText(c.m, c.dom) + '. Fale comigo nesse dia!']);
   save();
 }
 function wedding(id) {
@@ -316,7 +363,7 @@ function updateFamily(dt) {
 // ---------------------------------------------------------------- virada do dia: aniversários, festas, saudade, nascimentos
 function socialNewDay() {
   const d = S.time.day, c = calOf();
-  const h = holidayToday(); if (h) setTimeout(() => toast('Hoje é ' + h.name + '! Festa na praça às 17h.'), 2600);
+  const h = holidayToday(); if (h) setTimeout(() => toast('Hoje é ' + h.name + '! Festa na praça às ' + Math.floor(h.start) + 'h.'), 2600);
   for (const r of RESIDENTS) if (!r.kid && isBirthday(r.id)) setTimeout(() => toast('Hoje é aniversário de ' + r.name + '!'), 5200);
   if (S.romance) {
     const id = S.romance.id, m = sm(id);
@@ -324,7 +371,7 @@ function socialNewDay() {
     if ((m.talkDay || 0) < d - 2) { addFriend(id, -40); if (!m.upset) { m.upset = true; remember(id, 'Fiquei chateado(a): o Kai sumiu.'); } m.upsetDays++; }
     // aniversário do par esquecido
     const pb = SOCIAL[id].bday, yest = calOf(d - 1);
-    if (pb[0] === yest.season && pb[1] === yest.dom && m.bdayGift !== d - 1) { addFriend(id, -80); m.upset = true; remember(id, 'O Kai esqueceu meu aniversário.'); }
+    if (sameDate(pb, yest) && m.bdayGift !== d - 1) { addFriend(id, -80); m.upset = true; remember(id, 'O Kai esqueceu meu aniversário.'); }
     if (S.romance.status === 'namorando' && m.upsetDays >= 4) {
       const name = RES_BY_ID[id].name;
       remember(id, 'Terminamos o namoro.'); addFriend(id, -150); m.upset = false; m.upsetDays = 0; S.romance = null;

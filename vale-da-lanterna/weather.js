@@ -23,7 +23,7 @@ function weatherDay(day = S.time.day) {
   const key = wst().seed + ':' + day;
   if (wxCache.has(key)) return wxCache.get(key);
   let d = { type: 'sol', from: 0, to: 0, power: 1 };
-  const c = calOf(day), hol = HOLIDAYS.find(h => h.s === c.season && h.d === c.dom);
+  const c = calOf(day), hol = holidayOn(day);
   if (day > 1 && !hol) {
     const odds = WEATHER_ODDS[c.season], r = wrand(day, 'tipo');
     let acc = 0;
