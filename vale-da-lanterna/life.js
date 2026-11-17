@@ -22,6 +22,7 @@ function onNewDay() {
   toast('Dia ' + S.time.day + ' · ' + weekday());
   for (const r of RESIDENTS) { const m = npcMem(r.id); m.todayTalk = false; }
   socialNewDay();
+  farmNewDay();
 }
 // avança até as 6h (dormir)
 function sleepUntilMorning() {

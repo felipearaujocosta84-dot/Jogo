@@ -8,7 +8,8 @@ const BASE_PRICE = { madeira: 2, pedra: 2, fibra: 2, flor: 2, cogumelo: 4, seiva
 function dayMul(item) { return 0.85 + 0.3 * hash2(S.time.day * 13 + 7, hashStr(item) & 0xffff); }
 const buyPrice = (item, mul = 1) => Math.max(1, Math.round(BASE_PRICE[item] * 1.7 * dayMul(item) * mul));
 const sellPrice = (item, mul = 1) => Math.max(1, Math.round(BASE_PRICE[item] * dayMul(item) * mul));
-const TOOLS = { vara: { name: 'Vara de Pesca', price: 40, desc: 'Pesque perto de rios, lagos e do mar' } };
+const TOOLS = { vara: { name: 'Vara de Pesca', price: 40, desc: 'Pesque perto de rios, lagos e do mar' },
+  enxada: { name: 'Enxada', price: 35, desc: 'Ara a terra dos seus terrenos' }, regador: { name: 'Regador', price: 30, desc: 'Rega as plantações' } };
 const OUTFITS = [
   { id: 'classico', name: 'Clássico', scarf: '#c8423b', tunic: '#7a4a2a', price: 0 },
   { id: 'mar', name: 'Marinheiro', scarf: '#3b62a0', tunic: '#e6dccb', price: 45 },
@@ -19,9 +20,10 @@ const OUTFITS = [
 
 // ---------------------------------------------------------------- lojas
 const SHOPS = {
-  armazem: { name: 'Armazém do Vale', owner: 'gil', area: 'armazem', hours: [8, 18], sells: { pao: 12, torta: 6, cogumelo: 10, madeira: 30, pedra: 30, fibra: 20, flor: 15, cristal: 3 }, tools: ['vara'],
-    buys: ['peixe', 'truta', 'carpa', 'bota', 'madeira', 'pedra', 'fibra', 'flor', 'cogumelo', 'cristal', 'seiva', 'tabua', 'sopa', 'torta', 'pao', 'feixe'] },
-  padaria: { name: 'Padaria da Rosa', owner: 'rosa', area: 'padaria', hours: [6, 15], sells: { pao: 15, torta: 6 }, buys: ['cogumelo', 'flor'] },
+  armazem: { name: 'Armazém do Vale', owner: 'gil', area: 'armazem', hours: [8, 18], sells: { pao: 12, torta: 6, cogumelo: 10, madeira: 30, pedra: 30, fibra: 20, flor: 15, cristal: 3, racao: 30, adubo: 20 }, tools: ['vara', 'enxada', 'regador'], seeds: true,
+    buys: ['peixe', 'truta', 'carpa', 'bota', 'madeira', 'pedra', 'fibra', 'flor', 'cogumelo', 'cristal', 'seiva', 'tabua', 'sopa', 'torta', 'pao', 'feixe', 'couve', 'cenoura', 'morango', 'tomate', 'trigo', 'abobora', 'nabo', 'ovo', 'leite', 'la', 'trufa'] },
+  padaria: { name: 'Padaria da Rosa', owner: 'rosa', area: 'padaria', hours: [6, 15], sells: { pao: 15, torta: 6, omelete: 4 }, buys: ['cogumelo', 'flor', 'trigo', 'ovo', 'leite', 'morango'] },
+  animais: { name: 'Sítio do Seu Tomé', owner: 'tome', area: 'world', hours: [6, 18], sells: { racao: 20, adubo: 10 }, seeds: true, animals: true, buys: ['couve', 'cenoura', 'morango', 'tomate', 'trigo', 'abobora', 'nabo', 'ovo', 'leite', 'la', 'trufa'] },
   oficina: { name: 'Oficina do Bruno', owner: 'bruno', area: 'oficina', hours: [7, 19], sells: { pedra: 10, cristal: 2 }, tools: ['vara'], buys: ['pedra', 'cristal', 'seiva', 'tabua'] },
   feira: { name: 'Ateliê da Nina', owner: 'nina', area: 'world', hours: [8, 17], sells: {}, clothes: true, buys: ['fibra', 'flor'] }
 };
@@ -30,7 +32,7 @@ function cityShop(c) {
   if (!SHOPS[id]) {
     const extra = { deserto: 'cristal', neve: 'cristal', pantano: 'cogumelo', floresta: 'madeira', outono: 'madeira', cerejeiras: 'flor', campo: 'fibra' }[c.biome] || 'fibra';
     SHOPS[id] = { name: 'Mercado de ' + c.name, city: c, hours: [7, 19], sells: { pocao: 5, torta: 6, pao: 10, madeira: 20, pedra: 20, [extra]: 15 }, tools: ['vara'],
-      buys: ['peixe', 'truta', 'carpa', 'madeira', 'pedra', 'fibra', 'flor', 'cogumelo', 'cristal', 'seiva', 'tabua', 'sopa', 'feixe'], mul: 1.1 };
+      buys: ['peixe', 'truta', 'carpa', 'madeira', 'pedra', 'fibra', 'flor', 'cogumelo', 'cristal', 'seiva', 'tabua', 'sopa', 'feixe', 'couve', 'cenoura', 'morango', 'tomate', 'trigo', 'abobora', 'nabo', 'ovo', 'leite', 'la', 'trufa'], mul: 1.1 };
   }
   return id;
 }
@@ -38,7 +40,10 @@ const shopOpen = id => { const sh = SHOPS[id], h = gameHour(); return h >= sh.ho
 function shopStock(id) {
   S.shops = S.shops || {};
   let st = S.shops[id];
-  if (!st || st.day !== S.time.day) st = S.shops[id] = { day: S.time.day, stock: Object.assign({}, SHOPS[id].sells) };
+  if (!st || st.day !== S.time.day) {
+    st = S.shops[id] = { day: S.time.day, stock: Object.assign({}, SHOPS[id].sells) };
+    if (SHOPS[id].seeds) for (const [c, C] of Object.entries(CROPS)) if (C.seasons.includes(calOf().season)) st.stock['sem_' + c] = 15;
+  }
   return st.stock;
 }
 const itemCount = k => k in S.inv ? S.inv[k] : (S.bag[k] || 0);
@@ -325,7 +330,16 @@ function deliverFish(n) {
 
 // ---------------------------------------------------------------- propriedades
 function plotTalk(pl) {
-  if (S.props.plots[pl.id]) { say(['Este é o ' + pl.name + ', seu terreno.', 'A construção livre chega na próxima etapa da expansão (Fase 7).']); return; }
+  if (S.props.plots[pl.id]) {
+    const mode = plotMode(pl), hasCrops = Object.keys(S.farm).some(k => k.startsWith(pl.id + ':')), hasAnimals = animalsIn(pl).length > 0;
+    const ch = [];
+    if (mode === 'horta' && !hasCrops && !pl.free) ch.push({ t: 'Virar pasto', fn: () => { S.plotMode = S.plotMode || {}; S.plotMode[pl.id] = 'pasto'; toast('Agora é um pasto para animais'); save(); } });
+    if (mode === 'pasto' && !hasAnimals) ch.push({ t: 'Virar horta', fn: () => { S.plotMode[pl.id] = 'horta'; toast('Agora é uma horta'); save(); } });
+    ch.push({ t: 'Ok' });
+    say(['Este é o ' + pl.name + ' (' + (mode === 'pasto' ? 'pasto: ' + animalsIn(pl).length + ' animais' : 'horta') + ').',
+      mode === 'pasto' ? 'Compre animais no Sítio do Seu Tomé e cuide deles todo dia.' : 'Horta: are com a enxada, plante sementes, regue todo dia e colha. A construção livre chega na Fase 7.'], null, ch);
+    return;
+  }
   say([pl.name + ' à venda por ' + pl.price + ' moedas.'], null, [{ t: 'Comprar (' + pl.price + ')', fn: () => {
     if (S.coins < pl.price) { say(['Você ainda não tem moedas suficientes.']); return; }
     S.coins -= pl.price; S.stats.spent += pl.price; S.props.plots[pl.id] = true; Audio.sfx('relic'); flash = 0.4;

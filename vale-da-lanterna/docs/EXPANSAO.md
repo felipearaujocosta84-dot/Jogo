@@ -70,8 +70,8 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 3 | Mais NPCs, rotinas diárias, navegação (+ relógio e luz do dia antecipados) | ✅ concluída |
 | 4 | Relacionamentos, namoro, casamento, família e filhos | ✅ concluída |
 | 5 | Empregos, profissões, economia | ✅ concluída |
-| 6 | Agricultura e animais | ⏳ próxima |
-| 7 | Construção livre e decoração | ⏳ |
+| 6 | Agricultura e animais | ✅ concluída |
+| 7 | Construção livre e decoração | ⏳ próxima |
 | 8 | Dia e noite, clima | ⏳ |
 | 9 | Interface, menus, controles | ⏳ |
 | 10 | Salvamento completo, otimização, testes gerais | ⏳ |
@@ -168,3 +168,26 @@ será antecipada no início da Fase 3.
 - **Aba Trabalho** na Mochila: emprego atual, experiência, turno do dia, lista de empregos, propriedades, roupas,
   ferramentas e total ganho/gasto. Lojas abrem numa tela com Comprar, Vender, Ferramentas e Roupas.
 - Ajuste: o Bruno trabalha ao lado da bigorna; postos de trabalho têm prioridade sobre "Falar".
+
+## Fase 6 — Agricultura e animais (`farm.js`)
+- **Quintal do Kai**: terreno pequeno grátis ao lado da Casa do Kai (10 canteiros). Os terrenos comprados também
+  viram horta ou pasto (troca na placa do terreno).
+- **Ferramentas**: Enxada e Regador (Armazém). **Sementes** da estação no Armazém e no Sítio do Seu Tomé.
+- **Ciclo**: arar (enxada) → plantar a semente escolhida na barra da fazenda → regar (regador) → adubar (opcional) →
+  crescer em 4 estágios visíveis → colher. Solo molhado fica mais escuro.
+- **7 culturas**: couve, cenoura, morango (rebrota), tomate (rebrota), trigo, abóbora e nabo, cada uma com dias de
+  crescimento, necessidade de água (todo dia ou a cada 2 dias), estações certas, preço de venda e de semente.
+  Sem água além do limite, ou fora da estação, a planta seca (botão "Limpar"). Adubo acelera e rende o dobro.
+- **Chuva**: `weatherRainToday()` já é consultado na virada do dia; quando o clima da Fase 8 chegar, a chuva rega sozinha.
+- **Animais** (modelos 3D próprios, também filhotes): galinha (ovo), vaca (leite), ovelha (lã a cada 3 dias) e
+  porco (trufa, 60% dos dias). Comprados no **Sítio do Seu Tomé**; vivem num terreno-pasto cercado (máx. 6 por
+  terreno, 12 no total, para não pesar no celular). Andam pelo pasto, dormem à noite.
+- **Cuidados**: Alimentar (ração, uma vez por dia) e Carinho aumentam a afeição; produto só sai se comeu no dia
+  anterior; afeição alta rende produto em dobro. Sem comida a afeição cai.
+- **Filhotes**: dois adultos da mesma espécie, alimentados 3 dias seguidos e com afeição alta, geram um filhote
+  (no máx. a cada 7 dias); o filhote vira adulto em 5 dias.
+- **Itens e receitas novas**: ração (2 fibras ou 1 trigo → 2), adubo (1 seiva + 2 fibras → 2), omelete (2 ovos);
+  colheitas e produtos são vendidos no Armazém, no Sítio, na Padaria (trigo, ovo, leite, morango) e nas cidades.
+- **Aba Fazenda**: estado de cada terreno, animais (fome, afeição, produto pronto), ferramentas e guia de plantio
+  com as estações (o que não cresce agora fica apagado).
+- Ajustes: a loja mostra todo o estoque (inclui o que você vendeu); abas do menu cabem com o botão fechar.

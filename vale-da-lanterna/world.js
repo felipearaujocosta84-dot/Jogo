@@ -63,7 +63,8 @@ const FIELDS = [[4740, 900, 260, 380], [5200, 900, 360, 380], [4740, 1460, 260, 
 const PLOTS = [
   { id: 'lote1', name: 'Terreno do Oeste', x0: 2450, y0: 2250, x1: 2780, y1: 2650, price: 300 },
   { id: 'lote2', name: 'Terreno do Sul', x0: 4150, y0: 2900, x1: 4550, y1: 3250, price: 400 },
-  { id: 'lote3', name: 'Terreno do Penhasco', x0: 880, y0: 2380, x1: 1180, y1: 2700, price: 250 }
+  { id: 'lote3', name: 'Terreno do Penhasco', x0: 880, y0: 2380, x1: 1180, y1: 2700, price: 250 },
+  { id: 'quintal', name: 'Quintal do Kai', x0: 2790, y0: 2520, x1: 2905, y1: 2760, price: 0, free: true }
 ];
 const inPlot = (x, y, pad = 0) => PLOTS.find(p => x > p.x0 - pad && x < p.x1 + pad && y > p.y0 - pad && y < p.y1 + pad);
 const LANDMARKS = [

@@ -30,7 +30,7 @@ const SOCIAL = {
   joca: { bday: [3, 19], eligible: true, gender: 'm', dislikes: ['flor'] },
   gil: { bday: [1, 9], eligible: false, gender: 'm', dislikes: ['seiva'], no: 'Hahaha! Kai, eu sou casado com este armazém!' }
 };
-const GIFTABLE = ['flor', 'cogumelo', 'madeira', 'pedra', 'fibra', 'seiva', 'cristal', 'torta', 'pocao', 'sopa', 'pao', 'peixe', 'truta', 'carpa', 'tabua'];
+const GIFTABLE = ['flor', 'cogumelo', 'madeira', 'pedra', 'fibra', 'seiva', 'cristal', 'torta', 'pocao', 'sopa', 'pao', 'peixe', 'truta', 'carpa', 'tabua', 'couve', 'cenoura', 'morango', 'tomate', 'abobora', 'nabo', 'ovo', 'leite', 'la', 'trufa', 'omelete'];
 function sm(id) {
   const m = npcMem(id);
   if (m.friend === undefined) Object.assign(m, { friend: 0, hist: [], likesKnown: [], giftDay: 0, upset: false, upsetDays: 0, firstDate: false, walkDay: 0 });

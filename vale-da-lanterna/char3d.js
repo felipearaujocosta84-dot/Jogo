@@ -151,7 +151,52 @@ const Char3D = (() => {
   }
   // ------------------------------------------------ pessoas genéricas (NPCs)
   // app = { skin, hair, hairStyle, top, bottom, dress, apron, hat, beard, shoes, scale }
+  // animais da fazenda (corpo de blocos, pernas animadas)
+  function buildAnimal(app) {
+    const root = new T.Group(), P = { animal: app.animal, legs: [] };
+    P.body = pivot(root, 0, 0, 0);
+    P.body.scale.setScalar(app.baby ? 0.6 : 1);
+    const k = app.animal;
+    const leg = (x, z, h, w, col) => { const p = pivot(P.body, x, h, z); box(p, w, h, w, col, 0, -h / 2, 0); P.legs.push(p); return p; };
+    if (k === 'galinha') {
+      box(P.body, 0.32, 0.28, 0.4, 0xffffff, 0, 0.36, 0);
+      box(P.body, 0.06, 0.2, 0.26, 0xe8e4dc, -0.18, 0.38, -0.02, false); box(P.body, 0.06, 0.2, 0.26, 0xe8e4dc, 0.18, 0.38, -0.02, false);
+      box(P.body, 0.18, 0.2, 0.14, 0xffffff, 0, 0.44, -0.24);
+      P.head = pivot(P.body, 0, 0.52, 0.18);
+      box(P.head, 0.18, 0.2, 0.18, 0xffffff, 0, 0.08, 0);
+      box(P.head, 0.06, 0.08, 0.12, 0xd83a3a, 0, 0.22, 0.02, false);
+      box(P.head, 0.08, 0.05, 0.08, 0xf0a020, 0, 0.06, 0.12, false);
+      for (const x of [-0.05, 0.05]) box(P.head, 0.03, 0.04, 0.02, 0x1d1a24, x, 0.12, 0.09, false);
+      leg(-0.07, 0.02, 0.22, 0.05, 0xf0a020); leg(0.07, 0.02, 0.22, 0.05, 0xf0a020);
+    } else {
+      const big = k === 'vaca', col = k === 'vaca' ? 0xf4f1ea : k === 'ovelha' ? 0xeae6de : 0xf0a8b8;
+      const bw = big ? 0.5 : 0.42, bh = big ? 0.46 : 0.38, bl = big ? 0.9 : 0.7, ly = big ? 0.42 : 0.3;
+      box(P.body, bw, bh, bl, col, 0, ly + bh / 2, 0);
+      if (k === 'vaca') { box(P.body, 0.52, 0.2, 0.26, 0x2a2622, 0, ly + 0.3, 0.12, false); box(P.body, 0.3, 0.16, 0.2, 0x2a2622, 0.12, ly + 0.36, -0.28, false); box(P.body, 0.16, 0.1, 0.18, 0xf0a0b0, 0, ly - 0.02, 0.05, false); }
+      if (k === 'ovelha') for (const [x, y, z] of [[-0.18, 0.5, 0.2], [0.18, 0.5, -0.1], [0, 0.62, 0], [-0.15, 0.6, -0.22], [0.16, 0.6, 0.22]]) { const b = new T.Mesh(new T.SphereGeometry(0.17, 6, 5), M(0xffffff)); b.position.set(x, y, z); P.body.add(b); }
+      P.head = pivot(P.body, 0, ly + bh * 0.75, bl / 2 + 0.06);
+      const hc = k === 'ovelha' ? 0x4a4450 : col;
+      box(P.head, big ? 0.32 : 0.26, big ? 0.3 : 0.24, 0.26, hc, 0, 0, 0.08);
+      if (k === 'porco') box(P.head, 0.14, 0.1, 0.06, 0xd87890, 0, -0.04, 0.23);
+      if (k === 'vaca') { box(P.head, 0.2, 0.1, 0.06, 0xf0b0b8, 0, -0.08, 0.23); box(P.head, 0.06, 0.1, 0.06, 0xe8e0c8, -0.14, 0.18, 0.02); box(P.head, 0.06, 0.1, 0.06, 0xe8e0c8, 0.14, 0.18, 0.02); }
+      box(P.head, 0.08, 0.1, 0.05, k === 'porco' ? 0xd87890 : hc, -0.15, 0.1, 0.02, false); box(P.head, 0.08, 0.1, 0.05, k === 'porco' ? 0xd87890 : hc, 0.15, 0.1, 0.02, false);
+      for (const x of [-0.07, 0.07]) box(P.head, 0.04, 0.05, 0.02, 0x1d1a24, x, 0.04, 0.215, false);
+      const lc = k === 'ovelha' ? 0x4a4450 : k === 'vaca' ? 0xe8e4dc : col;
+      for (const [x, z] of [[-bw / 3, bl / 3], [bw / 3, bl / 3], [-bw / 3, -bl / 3], [bw / 3, -bl / 3]]) leg(x, z, ly, 0.12, lc);
+    }
+    return { root, P };
+  }
+  function poseAnimal(P, anim, k) {
+    const s = Math.sin(k * Math.PI * 2);
+    P.body.position.set(0, 0, 0); P.body.rotation.set(0, 0, 0); P.head.rotation.set(0, 0, 0);
+    P.legs.forEach((l, i) => l.rotation.set(0, 0, 0));
+    if (anim === 'walk' || anim === 'run') { P.legs.forEach((l, i) => { l.rotation.x = (i % 2 === (i < 2 ? 0 : 1) ? 1 : -1) * s * 0.6; }); P.body.position.y = Math.abs(s) * 0.03; }
+    else if (anim === 'work' || anim === 'farm') { P.head.rotation.x = 0.7 + s * 0.15; }
+    else if (anim === 'sleep' || anim === 'rest') { P.body.position.y = -0.12; P.legs.forEach(l => { l.rotation.x = 1.3; }); P.head.rotation.x = 0.3; }
+    else { P.head.rotation.set(s * 0.06, Math.sin(k * Math.PI * 4) * 0.2, 0); }
+  }
   function buildPerson(app) {
+    if (app.animal) return buildAnimal(app);
     const root = new T.Group(), P = {};
     const sk = hex(app.skin || '#f0c08a'), hr = hex(app.hair || '#5a3a26'), tp = hex(app.top || '#4f7fbf');
     const bt = hex(app.bottom || '#33384e'), sh = hex(app.shoes || '#3b2618');
@@ -206,6 +251,7 @@ const Char3D = (() => {
   }
   // anim: idle walk run talk work farm fish rest — k é a fase (0..1) do quadro
   function posePerson(P, anim, k) {
+    if (P.animal) return poseAnimal(P, anim, k);
     const s = Math.sin(k * Math.PI * 2), c = Math.cos(k * Math.PI * 2);
     P.body.position.set(0, 0, 0); P.body.rotation.set(0, 0, 0); P.torso.rotation.set(0, 0, 0); P.head.rotation.set(0, 0, 0);
     P.legs.forEach(l => l.rotation.set(0, 0, 0)); P.arms[0].rotation.set(0, 0, 0.08); P.arms[1].rotation.set(0, 0, -0.08);
