@@ -27,6 +27,8 @@ function onNewDay() {
   farmNewDay();
   footballNewDay();
   festNewDay();
+  phoneNewDay();
+  gramNewDay();
 }
 // avança até as 6h (dormir)
 function sleepUntilMorning() {
@@ -308,7 +310,7 @@ function updateResidents(dt) {
   }
 }
 function lifeUpdate(dt) {
-  if (!menu && !showMap && !fbFreeze()) updateClock(dt);
+  if (!menu && !showMap && !fbFreeze() && !phoneBlocks()) updateClock(dt);
   updateResidents(dt);
   updateFamily(dt);
   checkKidParty();

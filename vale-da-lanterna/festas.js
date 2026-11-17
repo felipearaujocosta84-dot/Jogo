@@ -59,7 +59,7 @@ function festNewDay() {
   const F = festState(), c = calOf();
   const host = partyHostToday();
   if (host && npcMem(host.id).met) setTimeout(() => toast('Festa de aniversário de ' + host.name + ' hoje às 18h, na casa ' + (SOCIAL[host.id] && SOCIAL[host.id].gender === 'f' ? 'dela' : 'dele') + '!'), 7800);
-  if (isKaiBirthday()) { F.kaiAge++; setTimeout(() => { banner = { text: 'Feliz aniversário, Kai!', sub: 'Você faz ' + F.kaiAge + ' anos hoje', t: 3.2 }; Audio.sfx('relic'); }, 1200); }
+  if (isKaiBirthday()) { gramEvent('kainiver'); F.kaiAge++; setTimeout(() => { banner = { text: 'Feliz aniversário, Kai!', sub: 'Você faz ' + F.kaiAge + ' anos hoje', t: 3.2 }; Audio.sfx('relic'); }, 1200); }
   if (c.m === 0 && c.d === 1) newYear();
   if (c.m === 11 && c.d === 31) setTimeout(() => toast('Hoje é Réveillon! Festa na praça a partir das 21h, fogos à meia-noite.'), 2600);
   const cf = cityFestToday(); for (const ci of cf) setTimeout(() => toast('Hoje é a festa de ' + ci.name + '!'), 10400);
@@ -77,7 +77,7 @@ function newYear() {
   if (S.romance) lines.push('E ' + RES_BY_ID[S.romance.id].name + ' ao seu lado.');
   if (S.football && S.football.stats.matches) lines.push('No futebol: ' + S.football.stats.matches + ' jogos e ' + S.football.stats.goals + ' gols.');
   lines.push('Feliz ' + c.y + ', Kai!');
-  F.yearRecap = lines;
+  F.yearRecap = lines; gramEvent('anonovo');
   F.yearStart = { day: S.time.day, earned: S.stats.earned || 0, year: c.y };
   for (const r of RESIDENTS) if (!r.kid && r.area === 'world' && Math.hypot(r.x - 3550, r.y - 2200) < 700) addFriend(r.id, 10);
 }
@@ -96,7 +96,7 @@ function festTick(dt) {
     const g = partyGuests(host).filter(r => r.area === host.home);
     talkPid = host.id; talkFace = host;
     singParabens(); confetti(interiorDef.pw / 2, interiorDef.ph / 2); flash = 0.3;
-    addFriend(host.id, 30); for (const r of g) addFriend(r.id, 5); remember(host.id, 'O Kai veio na minha festa de aniversário!');
+    addFriend(host.id, 30); for (const r of g) addFriend(r.id, 5); remember(host.id, 'O Kai veio na minha festa de aniversário!'); gramEvent('niver', { id: host.id });
     for (const r of [host].concat(g)) { r.hopT = 1.6; }
     say(['Todos: ♪ Parabéns pra você, nesta data querida... ♪', 'Todos: ♪ Muitas felicidades, muitos anos de vida! ♪', host.name + ': Que bom que você veio, Kai! Pega um pedaço de bolo!',
       'Dica: um presente hoje vale o triplo.']);
@@ -127,6 +127,7 @@ function festTick(dt) {
   if (c.m === 11 && c.d === 31 && h >= 23 + 58 / 60 && countdownShown !== S.time.day) { countdownShown = S.time.day; banner = { text: '10... 9... 8...', sub: 'Contagem regressiva para ' + (c.y + 1) + '!', t: 3 }; }
   // fogos
   const hol = holidayToday(), night = h >= 19 || h < 2;
+  if (hol && h >= hol.start + 1 && h < hol.end && !F.seen[festKey('post:' + hol.key)]) { F.seen[festKey('post:' + hol.key)] = true; gramEvent('festa', hol); }
   const fwOn = fireworksT > 0 || (hol && hol.fireworks && night && h >= hol.start && h < Math.max(hol.end, hol.start + 1)) || (cityFestNear() && night && h < 24);
   if (fireworksT > 0) fireworksT -= dt;
   if (fwOn && area === 'world' && (Math.hypot(player.x - 3550, player.y - 2050) < 3200 || cityFestNear()) && Math.random() < dt * (fireworksT > 0 ? 2.6 : 0.8) * Q().fx + 0.0) launchFirework();

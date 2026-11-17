@@ -90,7 +90,7 @@ const Audio = {
   BASS: [48, 55, 52, 55, 45, 52, 48, 52],
   tick() {
     if (!this.ac || !this.musicOn) return;
-    const spb = 0.27;
+    const spb = this.spb || 0.27;
     while (this.nextNote < this.ac.currentTime + 0.4) {
       const t = this.nextNote, i = this.step % 32;
       if (!this.muted) {

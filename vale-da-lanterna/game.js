@@ -14,7 +14,7 @@ function newSave() {
     tools: { vara: false, enxada: false, regador: false }, outfits: ['classico'], outfit: 'classico', job: null, shops: {}, props: { plots: { quintal: true }, houses: {} }, stats: { earned: 0, spent: 0, harvest: 0 },
     farm: {}, animals: [], seedSel: null, plotMode: {}, builds: [], decor: {}, storage: {}, myshop: { stock: {}, till: 0, sold: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
-    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, calOffset: 0, fest: { kaiBday: [2, 15], kaiAge: 20 }, football: { cfg: { start: 15, minutes: 4 }, ev: {}, history: [], stats: { matches: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, passes: 0, tackles: 0 }, rel: {}, pop: 0, xp: 0, trophies: [], npcGoals: {} }, weather: { seed: Math.floor(Math.random() * 1e9), wet: 0, rainedDay: 0 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
+    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, phone: {}, calOffset: 0, fest: { kaiBday: [2, 15], kaiAge: 20 }, football: { cfg: { start: 15, minutes: 4 }, ev: {}, history: [], stats: { matches: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, passes: 0, tackles: 0 }, rel: {}, pop: 0, xp: 0, trophies: [], npcGoals: {} }, weather: { seed: Math.floor(Math.random() * 1e9), wet: 0, rainedDay: 0 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
 }
 let S = newSave();
@@ -528,7 +528,9 @@ cv.addEventListener('pointerdown', e => {
   e.preventDefault();
   Audio.init();
   const x = e.clientX, y = e.clientY;
+  phonePointerDown(x, y);
   if (hitUI(x, y)) return;
+  if (phoneBlocks()) return;
   if (mode !== 'play' || rotateNeeded()) return;
   if (menu) return;
   if (showMap) { showMap = false; return; }
@@ -537,10 +539,11 @@ cv.addEventListener('pointerdown', e => {
   if (!input.joy && (CONFIG.leftHand ? x > W * 0.45 : x < W * 0.55)) input.joy = { id: e.pointerId, ox: x, oy: y, x, y };
 });
 cv.addEventListener('pointermove', e => { if (input.joy && e.pointerId === input.joy.id) { input.joy.x = e.clientX; input.joy.y = e.clientY; } });
-const endPointer = e => { if (input.joy && e.pointerId === input.joy.id) input.joy = null; };
+const endPointer = e => { phonePointerUp(e.clientX, e.clientY); if (input.joy && e.pointerId === input.joy.id) input.joy = null; };
 cv.addEventListener('pointerup', endPointer);
 cv.addEventListener('pointercancel', endPointer);
 window.addEventListener('keydown', e => {
+  if (typing()) return;
   const k = e.key.toLowerCase();
   input.keys[k] = true;
   Audio.init();
@@ -548,6 +551,8 @@ window.addEventListener('keydown', e => {
   if (mode !== 'play') return;
   if (work) { if (k === ' ' || k === 'enter' || k === 'j' || k === 'e') { e.preventDefault(); workAction(); } return; }
   if (build) { if (k === 'escape') closeBuild(); else if (k === 'r') build.rot = (build.rot + 1) % 4; else if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); buildConfirm(); } return; }
+  if (PH.open) { if (k === 'escape') phoneBack(); else if (k === 'p') closePhone(); return; }
+  if (k === 'p' && !dialog) { openPhone(); return; }
   if (k === 'escape') { menu = null; showMap = false; return; }
   if (k === 'i' || k === 'tab') { e.preventDefault(); if (menu) menu = null; else openMainMenu(); return; }
   if (k === 'm') { showMap = !showMap; return; }
@@ -706,9 +711,10 @@ function update(dt) {
   weatherUpdate(dt);
   footballTick(dt);
   festTick(dt);
+  phoneTick(dt);
   updateLOD();
   if (work) { updateWork(dt); return; }
-  if (menu || showMap) return;
+  if (menu || showMap || phoneBlocks()) return;
 
   if (dialog) {
     const l = dialog.lines[dialog.i];
@@ -1029,12 +1035,12 @@ function ambient(dt) {
 
 // ---------------------------------------------------------------- câmera
 function computeView() {
-  if (area === 'world') view.s = window.__zoom || Math.min(H, W * 0.75) / 820;
+  if (area === 'world') view.s = (window.__zoom || Math.min(H, W * 0.75) / 820) * phoneZoom();
   else { const I = interiorDef; view.s = Math.min(H / (I.ph + 150), W / (I.pw + 260)); }
   view.vw = W / view.s; view.vh = H / view.s;
 }
 function camTarget() {
-  if (area === 'world') return [player.x - view.vw / 2, player.y - view.vh * (build ? 0.68 : 0.56)];
+  if (area === 'world') { const [ox, oy] = phoneCamOffset(); return [player.x - view.vw / 2 + ox, player.y - view.vh * (build ? 0.68 : 0.56) + oy]; }
   const bw = area === 'world' ? WW : interiorDef.pw, bh = area === 'world' ? WH : interiorDef.ph + 24;
   const tx = view.vw >= bw ? (bw - view.vw) / 2 : clamp(player.x - view.vw / 2, 0, bw - view.vw);
   const ty = view.vh >= bh ? (bh - view.vh) / 2 : clamp(player.y - view.vh * 0.56, 0, bh - view.vh);
@@ -1715,6 +1721,7 @@ function hudButton(x, y, r, drawFn, fn, active) {
 function drawHUD() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   layoutButtons();
+  if (phoneCamActive()) { drawCameraUI(); return; }
   const L = 12 + SAFE.l, T = 10 + SAFE.t;
   for (let i = 0; i < S.maxHp; i++) heart(L + 12 + i * 25, T + 12, 20, '#ff4d63', i >= player.hp);
   ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(L + 11, T + 40, 8, 0, 7); ctx.fill();
@@ -1740,6 +1747,8 @@ function drawHUD() {
     ctx.stroke();
   }, () => Audio.setMuted(!Audio.muted));
   drawClockHUD(T + 2);
+  drawPhoneHUD(mx, my);
+  drawWaypoint();
   // chefe
   if (bossRef && !bossRef.dead) {
     const bw = Math.min(300, W - 360), bx = (W - bw) / 2, by = T + 50;
@@ -1800,6 +1809,7 @@ function drawHUD() {
   drawFootballHUD();
   drawPerfHUD();
   if (menu) drawMenu();
+  drawPhone();
   if (work) drawWork();
   if (flash > 0) { ctx.fillStyle = `rgba(255,245,210,${Math.min(0.7, flash)})`; ctx.fillRect(0, 0, W, H); }
 }
@@ -2339,7 +2349,8 @@ function frame(now) {
       uiButtons = [];
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#14201a'; ctx.fillRect(0, 0, cv.width, cv.height);
-      drawWorld();
+      if (phoneFrozen()) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(PH.snap, 0, 0); }
+      else { drawWorld(); phoneAfterWorld(); phoneSnap(); }
       drawHUD();
       if (rotateNeeded()) { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); uiButtons = []; drawRotate(); }
     } else if (mode === 'title') { time += dt; Audio.tick(); drawTitle(); }

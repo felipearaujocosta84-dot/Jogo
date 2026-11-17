@@ -93,7 +93,7 @@ function romanceConfess(n) {
 function startRomance(id, line) {
   const r = RES_BY_ID[id];
   S.romance = { id, status: 'namorando', since: S.time.day };
-  addFriend(id, 60); remember(id, 'Começamos a namorar.');
+  addFriend(id, 60); remember(id, 'Começamos a namorar.'); addContactAuto(id);
   flash = 0.5; Audio.sfx('relic');
   for (let i = 0; i < 18; i++) particles.push({ x: r.x + rand(-60, 60), y: r.y - 80 + rand(-40, 20), vx: rand(-30, 30), vy: rand(-80, -30), g: 0, t: 1.6, max: 1.6, col: '#ff7aa6', s: 7 });
   say([line, 'Agora vocês estão namorando. Encontros, conversas e passeios deixam o namoro mais forte!']);

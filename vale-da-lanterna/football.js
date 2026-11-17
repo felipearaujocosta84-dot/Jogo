@@ -256,6 +256,7 @@ function fbHostOf(ev) {
 }
 function fbShowInvite(ev) {
   const host = fbHostOf(ev), r = RES_BY_ID[host]; ev.host = host; ev.teams = null;
+  if (phoneFootballInvite(ev, host)) return;
   const msg = ev.kind === 'sexta' ? 'Ei, Kai! Hoje tem futebol de várzea às ' + ev.start + 'h no campo, do lado oeste da Vila do Rio. Bora jogar no meu time?' : 'Kai, bora um amistoso hoje às ' + ev.start + 'h no campo?';
   const wet = ev.wet ? ' Vai estar molhado, mas dá jogo!' : '';
   say([r.name + ': ' + msg + wet], null, [
@@ -717,6 +718,7 @@ function fbFinish(m) {
   const rec = { day: ev.day, kind: ev.kind, wet: !!ev.wet, teams: T, score: m.score.slice(), scorers: m.scorers.slice(), kai: played ? Object.assign({}, m.kai) : null, kaiTeam: played ? 0 : null, result: played ? (res === 0 ? 'vitoria' : res === 1 ? 'derrota' : 'empate') : null, live: m.live };
   F.history.unshift(rec); if (F.history.length > 30) F.history.length = 30;
   ev.status = 'jogado'; ev.result = { score: rec.score };
+  gramEvent('futebol', rec);
   for (const p of m.players) if (!p.human) { p.ref.fbCtl = false; p.ref.entry = null; }
   // gols de todos (artilharia da vila)
   for (const s of m.scorers) if (s.id && s.id !== 'kai') F.npcGoals[s.id] = (F.npcGoals[s.id] || 0) + 1;

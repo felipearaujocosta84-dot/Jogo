@@ -374,3 +374,49 @@ amizade 0–1000 (`social.js`), clima determinístico por dia (`weather.js`), ca
 - **Testes:** datas e dias da semana reais; bissexto; migração de save antigo; festa da Mel com convidados e "Parabéns";
   surpresa do Kai com presentes; Natal (prenda, presente de amigo, 23 moradores na praça); Réveillon (contagem, virada para
   2027, fogos, retrospectiva); quadrilha na Festa Junina; festa de cidade; calendário; regressões de todas as fases.
+
+## Smartphone (`phone.js`, `phone_media.js`)
+**Análise:** engine própria em Canvas 2D; interface desenhada por quadro com botões `addBtn`/`hitUI` e toque via
+`pointerdown`; NPCs em `RESIDENTS` com rotina, amizade/romance (`social.js`, `romance.js`) e falas por contexto
+(`lifeLine`); eventos em `football.js`/`festas.js`; save em `S` com `deepDefaults`. O celular é mais uma camada da mesma
+interface: com ele aberto o mundo pausa (como o menu) e a imagem do mundo é congelada (não é redesenhada).
+- **Interface:** botão do celular no HUD (abaixo do som; tecla P), com contador de não lidas. Tela inicial com relógio,
+  data, clima, widget de notificações, 12 apps com ícones; barra de status com Voltar, Início, notificações, bateria e
+  fechar; animação de abrir/fechar; papel de parede (6 cores ou foto da galeria). Bateria gasta com o celular aberto
+  (mais na câmera/vídeos) e carrega em casa e dormindo; com 0% o celular desliga.
+- **Mensagens:** conversas individuais e grupos (Futebol de Sexta, Família, Vale da Lanterna), horário, não lidas,
+  fotos e vídeos, histórico (60 por conversa), respostas rápidas e **texto digitado** (campo de texto real, abre o
+  teclado do Android). As respostas dos moradores usam o contexto: onde estão de verdade, próximo futebol, próxima festa,
+  tempo, trabalho, filhos (para o par casado), carinho (só para o par); quem está dormindo responde de manhã.
+  Mensagens espontâneas só com motivo: par dando bom dia e perguntando onde você está (se não conversaram), família com
+  notícias dos filhos e pedido de sopa quando a criança está com fome, amigo chamando para passear, aniversariante
+  convidando para a festa, aviso da festa da vila no grupo, convite do futebol de sexta e de amistosos **pelo celular**
+  (com botões Bora!/Hoje não dá que confirmam de verdade), chefe lembrando do turno.
+- **Contatos:** "Pedir número" na conversa com moradores de 12 anos ou mais (precisa de um pouco de amizade); par vira
+  contato automaticamente. Agenda com busca, adicionar/remover, perfil, ligar e mensagem.
+- **Telefone:** favoritos, histórico (feitas, recebidas, perdidas, sem resposta). Ligações com tela própria (retrato,
+  chamando, cronômetro, assuntos de conversa, mudo, desligar); a pessoa pode não atender (dormindo/ocupada → caixa postal e
+  depois manda mensagem). Ligações recebidas (par à noite) com Atender/Recusar/Silenciar, mesmo com o celular fechado.
+- **VilaGram:** perfil do Kai (bio digitada, foto: Kai, Floco ou da galeria), feed paginado (2 por página) só de quem você
+  segue, Pessoas (seguir/deixar de seguir), perfis com posts, curtir, comentar (rápido ou digitado), compartilhar por
+  mensagem, nova publicação com texto e foto/vídeo da galeria. Moradores postam o próprio dia (profissão, casa, chuva,
+  viagens) e os acontecimentos reais: futebol (com placar), festas da vila, festa de aniversário, aniversário do Kai,
+  casamento, bebê, Ano Novo. Eles curtem e comentam os posts do Kai com o tempo e passam a seguir você com amizade.
+- **Lanterna Vídeos:** feed vertical infinito e carregado sob demanda (só o vídeo da tela é desenhado), animado com os
+  personagens do jogo (dança, futebol, momentos engraçados, receitas, timelapse da horta, animais, vida na vila) + vídeos
+  dos acontecimentos + vídeos gravados pelo Kai; curtir, comentar, enviar para contato, anterior/próximo e deslizar.
+- **Câmera e Galeria:** visor com grade, zoom (1×–2,5×), enquadramento (mover a câmera sem mover o Kai) e o Kai pode andar;
+  foto (320×200) e vídeo (4 s, 16 quadros) capturados da cena sem HUD; galeria com fotos e vídeos, publicar, enviar, usar
+  como papel de parede/foto de perfil, apagar. Guardados em `vale-da-lanterna-fotos` (até 30) e `vale-da-lanterna-videos`
+  (até 5), separados do save.
+- **Outros apps:** Calendário (mês real e próximos eventos), Banco (saldo, salário do emprego, movimentações com motivo),
+  Mapas (lugares e onde os contatos estão; "Ir" marca uma rota com seta e distância na tela), Música (5 faixas originais
+  compostas para o jogo; toca com o celular fechado), Configurações (papel de parede, notificações por tipo, sons, toque,
+  modo silencioso).
+- **Notificações:** mensagens, comentários/curtidas, convites, aniversários, eventos da cidade e família; aparecem como
+  aviso no jogo (toque abre o app certo) e na central; cada tipo pode ser desligado.
+- **Salvo em `S.phone`:** contatos e números, conversas e mensagens, posts/curtidas/comentários, seguindo/seguidores,
+  configurações, notificações, ligações, banco, música, rota. Saves antigos ganham um celular novo (`deepDefaults`).
+- **Desempenho:** com o celular aberto o mundo não é redesenhado (imagem congelada): no Android emulado com CPU 4× mais
+  lenta o quadro caiu de ~22 ms para 4–6 ms; listas paginadas; vídeos desenhados só quando visíveis; nada roda quando o
+  celular está fechado além de mensagens agendadas e música.

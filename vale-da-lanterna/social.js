@@ -141,6 +141,7 @@ function socialOpen(n, questTalk) {
   if (S.walk && S.walk.id === n.id) ch.push({ t: 'Encerrar passeio', fn: () => { S.walk.end = 0; updateWalk(); } });
   else if (!S.walk && !info.child && m.met) ch.push({ t: 'Passear', fn: () => inviteWalk(n) });
   ch.push(...festChoices(n));
+  ch.push(...phoneChoices(n));
   ch.push(...economyChoices(n));
   ch.push(...footballChoices(n));
   ch.push(...romanceOptions(n));
@@ -228,7 +229,7 @@ function askDate(id) {
   }
   S.bag.buque--;
   S.romance = { id, status: 'namorando', since: S.time.day };
-  addFriend(id, 60); remember(id, 'Começamos a namorar.');
+  addFriend(id, 60); remember(id, 'Começamos a namorar.'); addContactAuto(id);
   flash = 0.5; Audio.sfx('relic');
   for (let i = 0; i < 18; i++) particles.push({ x: r.x + rand(-60, 60), y: r.y - 80 + rand(-40, 20), vx: rand(-30, 30), vy: rand(-80, -30), g: 0, t: 1.6, max: 1.6, col: '#ff7aa6', s: 7 });
   say([r.name + ': Um buquê... pra mim? Eu... eu aceito! Vamos namorar!', 'Agora vocês estão namorando. Passeiem juntos e conversem todo dia!']);
@@ -266,6 +267,7 @@ function wedding(id) {
       flash = 1; Audio.sfx('relic');
       for (let i = 0; i < 60; i++) particles.push({ x: 3550 + rand(-300, 300), y: 2250 + rand(-80, 80), vx: rand(-60, 60), vy: rand(-140, -40), g: 120, t: 2.5, max: 2.5, col: FLOWER_COLS[i % 5], s: 7 });
       applySpouseHome();
+      gramEvent('casamento', { id });
       say([r.name + ': A partir de hoje eu moro com você na Casa do Kai, a oeste da praça!']);
       save();
     });
@@ -320,6 +322,7 @@ function makeKid() {
     app: { skin: R() < 0.5 ? '#f0c08a' : sp.app.skin, hair: R() < 0.5 ? '#f3f0ea' : sp.app.hair, hairStyle: ['short', 'spiky', 'pony', 'bun'][Math.floor(R() * 4)],
       top: ['#f2c94c', '#9ad1ff', '#ff9ec7', '#7fc46a'][Math.floor(R() * 4)], bottom: '#4a6fa5' } };
   S.family.kids.push(k);
+  if (typeof gramEvent === 'function') gramEvent('bebe', { name: k.name });
   kidResident(k);
   snapResidents();
   return k;
