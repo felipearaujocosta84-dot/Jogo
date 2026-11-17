@@ -11,7 +11,11 @@ App nativo e leve que roda o jogo num WebView em tela cheia, deitado, com a tela
 sudo apt-get install aapt apksigner dalvik-exchange zipalign android-sdk-platform-23 openjdk-17-jdk
 ./build-apk.sh                          # → dist/vale-da-lanterna.apk
 VERSION_CODE=2 VERSION_NAME=1.1 ./build-apk.sh   # próximas versões
+PAD_MB=0 ./build-apk.sh                 # versão leve (~400 KB)
 ```
+**Tamanho:** por padrão o APK final tem exatamente 200 MB (200.000.000 bytes, como o Android mostra). O excesso é um
+arquivo de dados gerado no build (`assets/dados/pacote.bin`) que o jogo não usa; ele não vai para o Git. `PAD_MB=` muda o
+tamanho (em MB) e `PAD_MB=0` desliga.
 A assinatura usa `keystore/vale-da-lanterna.jks` (senha padrão `valedalanterna`, troque com `KS_PASS=`).
 **Guarde essa chave** (ela não vai para o Git): atualizações precisam da mesma chave para instalar por cima sem
 perder o progresso. Para usar uma chave guardada: `KEYSTORE=/caminho/chave.jks KS_PASS=... ./build-apk.sh`.
