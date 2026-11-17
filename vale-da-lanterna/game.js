@@ -2395,3 +2395,16 @@ document.addEventListener('visibilitychange', () => {
 window.__vale = { get build() { return build; }, openBuild, buildConfirm, closeBuild, get work() { return work; }, startShift, workAction, workPick, openShop, shopBuy, shopSell, giveGift, socialOpen, makeKid, get npcs() { return npcs; }, RESIDENTS, sleepUntilMorning, snapResidents, get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
   get enemies() { return enemies; }, get dialog() { return dialog; }, advanceDialog, choose, interact, get target() { return interactTarget; },
   openMenu(tab, station) { menu = { tab, station }; }, closeMenu() { menu = null; }, get menuTab() { return menu && menu.tab; }, get menuSel() { return menu && menu.calSel; }, set showMap(v) { showMap = v; }, toWorld, REGIONS, INTERIORS, craft, RECIPES, props };
+
+// ---------------------------------------------------------------- app Android: botão Voltar e salvar ao sair
+window.__androidBack = () => {
+  if (typing()) { hideInput(); return true; }
+  if (PH.call && PH.call.phase === 'incoming') { PH.call.declined = true; endCall(); return true; }
+  if (PH.open) { phoneBack(); return true; }
+  if (menu) { menu = null; return true; }
+  if (showMap) { showMap = false; return true; }
+  if (build) { closeBuild(); return true; }
+  if (dialog && dialog.choices) return true;
+  return false;
+};
+window.__androidSave = () => { if (mode === 'play') save(); };
