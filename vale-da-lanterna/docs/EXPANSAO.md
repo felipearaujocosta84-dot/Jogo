@@ -69,8 +69,8 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 2 | Personagens 3D e animações (Kai + todos os NPCs) | ✅ concluída |
 | 3 | Mais NPCs, rotinas diárias, navegação (+ relógio e luz do dia antecipados) | ✅ concluída |
 | 4 | Relacionamentos, namoro, casamento, família e filhos | ✅ concluída |
-| 5 | Empregos, profissões, economia | ⏳ próxima |
-| 6 | Agricultura e animais | ⏳ |
+| 5 | Empregos, profissões, economia | ✅ concluída |
+| 6 | Agricultura e animais | ⏳ próxima |
 | 7 | Construção livre e decoração | ⏳ |
 | 8 | Dia e noite, clima | ⏳ |
 | 9 | Interface, menus, controles | ⏳ |
@@ -143,3 +143,28 @@ será antecipada no início da Fase 3.
 - **Abas novas na Mochila**: Pessoas (corações, situação, aniversário, gostos, última lembrança) e Família
   (par, filhos com barras de necessidades, bebê a caminho e próximos eventos de 2 semanas).
 - Pendente para a Fase 7: construir/decorar quarto infantil e comprar móveis (a Casa do Kai já tem 2 berços).
+
+## Fase 5 — Empregos e economia (`economy.js`)
+- **Armazém do Vale** (construção nova na Horta) com o comerciante **Gil**, 13º morador (mora nos fundos).
+- **Lojas com horário e estoque**: Armazém (8h–18h), Padaria (6h–15h), Oficina (7h–19h), Ateliê da Nina na barraca
+  da praça (8h–17h, roupas) e o mercado de cada cidade (7h–19h). Lojas só abrem com o dono presente; as portas do
+  Armazém, da Padaria e dos mercados ficam trancadas fora do horário. O estoque renova todo dia.
+- **Preços** variam ±15% por dia e por item; cada loja compra uma lista própria de itens. O que você vende entra no
+  estoque da loja. As cidades pagam/cobram 10% a mais.
+- **6 empregos** com chefe, horário, local e salário: agricultor (Seu Tomé), ferreiro (Bruno), pescador (Iara),
+  comerciante (Gil), carpinteiro (Davi) e cozinheiro (Bia). Contratação conversando com o chefe ("Emprego");
+  um emprego por vez, com opção de pedir demissão.
+- **Trabalho interativo**: forja e serraria (acertar a marca no verde, 3 golpes por rodada), balcão do armazém
+  (escolher o pacote certo antes do tempo acabar), cozinha (memorizar e montar a receita), horta (andar até 6
+  canteiros marcados e regar/plantar/colher/adubar) e pesca (entregar 4 peixes à Iara). Cada rodada avança o relógio.
+- **Experiência e promoção**: Aprendiz → Ajudante → Profissional → Especialista → Mestre(a); cada nível +25% de salário.
+  A carpintaria também rende tábuas (material para a Fase 7).
+- **Pesca** em qualquer água com a Vara de Pesca: lançar, esperar a mordida e puxar no tempo certo.
+  Peixe, truta, carpa dourada (mais comum no deserto e no pântano) e, às vezes, uma bota velha.
+- **Roupas**: 6 conjuntos que mudam o cachecol e a túnica do Kai em 3D (Ateliê da Nina).
+- **Propriedades**: 3 terrenos à venda no Vale (placa e contorno no chão; construção na Fase 7) e casas à venda
+  nas cidades (placa "À venda"); a casa comprada tem cama para dormir.
+- **Itens novos**: pão, peixe, truta, carpa dourada, bota velha, tábua e vara de pesca.
+- **Aba Trabalho** na Mochila: emprego atual, experiência, turno do dia, lista de empregos, propriedades, roupas,
+  ferramentas e total ganho/gasto. Lojas abrem numa tela com Comprar, Vender, Ferramentas e Roupas.
+- Ajuste: o Bruno trabalha ao lado da bigorna; postos de trabalho têm prioridade sobre "Falar".

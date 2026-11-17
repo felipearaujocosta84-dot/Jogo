@@ -59,6 +59,13 @@ const WATER = [
 ];
 const PLAZAS = [[3550, 2080, 430, 640], [6750, 2380, 280, 210], [1900, 1660, 170, 110], [800, 3170, 230, 150]];
 const FIELDS = [[4740, 900, 260, 380], [5200, 900, 360, 380], [4740, 1460, 260, 380], [5200, 1460, 360, 380]];
+// terrenos que podem ser comprados (construção na Fase 7)
+const PLOTS = [
+  { id: 'lote1', name: 'Terreno do Oeste', x0: 2450, y0: 2250, x1: 2780, y1: 2650, price: 300 },
+  { id: 'lote2', name: 'Terreno do Sul', x0: 4150, y0: 2900, x1: 4550, y1: 3250, price: 400 },
+  { id: 'lote3', name: 'Terreno do Penhasco', x0: 880, y0: 2380, x1: 1180, y1: 2700, price: 250 }
+];
+const inPlot = (x, y, pad = 0) => PLOTS.find(p => x > p.x0 - pad && x < p.x1 + pad && y > p.y0 - pad && y < p.y1 + pad);
 const LANDMARKS = [
   { name: 'Clareira dos Cogumelos', x: 800, y: 900 }, { name: 'Praia', x: 2700, y: 3950 }, { name: 'Lago', x: 7050, y: 3900 },
   { name: 'Bosque Norte', x: 6750, y: 900 }, { name: 'Campos do Sul', x: 4700, y: 3950 }
@@ -360,6 +367,7 @@ const BUILDINGS = [
   { kind: 'house', x: 4000, y: 2100, w: 58, roof: 'teal', wall: 'stone', chimney: true, to: 'casaLeo' },
   { kind: 'house', x: 4690, y: 2210, w: 54, roof: 'brown', wall: 'wood', chimney: true, to: 'cabanaTome' },
   { kind: 'house', x: 2950, y: 2470, w: 62, roof: 'red', wall: 'plaster', chimney: true, to: 'casaKai', region: 'praca', sign: 'heart' },
+  { kind: 'house', x: 5550, y: 2230, w: 66, roof: 'orange', wall: 'wood', chimney: true, to: 'armazem', sign: 'bag' },
   { kind: 'barn', x: 5380, y: 820 },
   { kind: 'tower', x: 6750, y: 2262 },
   { kind: 'well', x: 5640, y: 1420 },
@@ -437,6 +445,10 @@ function placeTownDecor() {
   deco('crate', 1080, 3140, { block: 18 }); deco('chair', 1000, 3240);
   // placas nas entradas
   for (const [x, y, t] of [[3110, 1890, 'Praça das Telhas'], [2700, 1540, 'Vila do Rio'], [5040, 640, 'Horta'], [6480, 2700, 'Torre'], [860, 2960, 'Penhasco'], [5740, 1260, 'Bosque Norte']]) deco('sign', x, y, { text: t, block: 8 });
+  for (const pl of PLOTS) {
+    deco('sign', pl.x0 + 70, pl.y1 - 10, { text: 'À venda', plot: pl.id, block: 8 });
+    for (const [x, y] of [[pl.x0, pl.y0], [pl.x1, pl.y0], [pl.x0, pl.y1], [pl.x1, pl.y1]]) deco('stake', x, y);
+  }
   for (const p of props) if (p.t === 'deco' && p.block) stampGrid(valeGrid, p.x, p.y - 6, p.block, 0);
   for (const p of props) if (p.t === 'deco' && (p.d === 'fenceH')) stampRect(valeGrid, p.x - 24, p.y - 12, p.x + 24, p.y, 0);
   for (const p of props) if (p.t === 'deco' && (p.d === 'fenceV')) stampRect(valeGrid, p.x - 6, p.y - 46, p.x + 6, p.y, 0);
@@ -445,7 +457,7 @@ function placeProps() {
   const R = mulberry(20261116);
   const town = (x, y) => REGION_LIST.some(r => x > r.ox + 60 && x < r.ox + r.iw - 60 && y > r.oy + 60 && y < r.oy + r.ih - 60);
   const okTree = (x, y) => x > 60 && y > 120 && x < WW - 60 && y < WH - 40 && clearOf(x, y, 66, [1, 2, 3, 4, 5, 6, 7]) &&
-    !nearBuilding(x, y, 90) && Math.hypot(x - CAT_SPOT[0], y - CAT_SPOT[1]) > 230 && !PLAZAS.some(([px, py, rx, ry]) => ((x - px) / (rx + 90)) ** 2 + ((y - py) / (ry + 90)) ** 2 < 1);
+    !nearBuilding(x, y, 90) && !inPlot(x, y, 60) && Math.hypot(x - CAT_SPOT[0], y - CAT_SPOT[1]) > 230 && !PLAZAS.some(([px, py, rx, ry]) => ((x - px) / (rx + 90)) ** 2 + ((y - py) / (ry + 90)) ** 2 < 1);
   const tree = (x, y) => {
     let idx = y < 1300 && R() < 0.6 ? 5 + Math.floor(R() * 2) : Math.floor(R() * 5);
     if (x > 5600 && R() < 0.4) idx = 3;
@@ -465,7 +477,7 @@ function placeProps() {
     if (x < 200 || y < 200 || x > WW - 200 || y > WH - 200 || !clearOf(x, y, 40, [1, 2, 3, 4, 5, 6, 7]) || nearBuilding(x, y, 60)) continue;
     addProp({ t: 'bush', x, y, img: BUSH_IMGS[Math.floor(R() * BUSH_IMGS.length)], s: 3.5 + R() * 1.5 });
   }
-  const meadow = (x, y) => x > 200 && y > 200 && x < WW - 200 && y < WH - 200 && clearOf(x, y, 34, [1, 2, 3, 4, 5, 6, 7]) && !nearBuilding(x, y, 70);
+  const meadow = (x, y) => x > 200 && y > 200 && x < WW - 200 && y < WH - 200 && !inPlot(x, y, 20) && clearOf(x, y, 34, [1, 2, 3, 4, 5, 6, 7]) && !nearBuilding(x, y, 70);
   const notSafe = (x, y) => { const r = regionAt(x, y); return !(r && r.safe); };
   const farFromTrees = (x, y, d) => !props.some(p => (p.t === 'tree' || p.t === 'bld') && Math.abs(p.x - x) < d && Math.abs(p.y - y) < d * 0.7);
   for (let i = 0; i < 190; i++) {
@@ -603,7 +615,7 @@ const TILE = 48;
 const INTERIORS = {
   oficina: { name: 'Oficina do Bruno', w: 12, h: 8, floor: 'stone', wall: 'stone',
     furn: [{ t: 'forge', x: 1, y: 0, w: 2, h: 2 }, { t: 'shelf', x: 8, y: 0, w: 2, h: 2 }, { t: 'window', x: 5, y: 0, w: 1, h: 2 },
-      { t: 'anvil', x: 3, y: 3, w: 1, h: 1, block: 1 }, { t: 'bancada', x: 8, y: 3, w: 2, h: 1, block: 1, use: 'bancada' },
+      { t: 'anvil', x: 3, y: 3, w: 1, h: 1, block: 1, use: 'work_forge' }, { t: 'bancada', x: 8, y: 3, w: 2, h: 1, block: 1, use: 'bancada' },
       { t: 'barrel', x: 10, y: 5, w: 1, h: 1, block: 1 }, { t: 'barrel', x: 10, y: 6, w: 1, h: 1, block: 1 }, { t: 'rug', x: 4, y: 5, w: 3, h: 2 }],
     npcs: [] },
   casaTeo: { name: 'Casa do Téo', w: 10, h: 7, floor: 'wood', wall: 'wood',
@@ -617,7 +629,7 @@ const INTERIORS = {
       { t: 'table', x: 1, y: 4, w: 2, h: 1, block: 1 }, { t: 'plant', x: 1, y: 2, w: 1, h: 1, block: 1 }, { t: 'chest', x: 8, y: 5, w: 1, h: 1, block: 1, use: 'chest', id: 'ch_aurora' }],
     npcs: [] },
   padaria: { name: 'Padaria da Rosa', w: 12, h: 8, floor: 'wood', wall: 'brick',
-    furn: [{ t: 'oven', x: 1, y: 0, w: 2, h: 2 }, { t: 'window', x: 5, y: 0, w: 1, h: 2 }, { t: 'shelf', x: 8, y: 0, w: 3, h: 2, bread: 1 },
+    furn: [{ t: 'oven', x: 1, y: 0, w: 2, h: 2, use: 'work_cook' }, { t: 'window', x: 5, y: 0, w: 1, h: 2 }, { t: 'shelf', x: 8, y: 0, w: 3, h: 2, bread: 1 },
       { t: 'counter', x: 3, y: 3, w: 5, h: 1, block: 1 }, { t: 'sack', x: 10, y: 3, w: 1, h: 1, block: 1 }, { t: 'sack', x: 10, y: 4, w: 1, h: 1, block: 1 },
       { t: 'table', x: 2, y: 5, w: 2, h: 1, block: 1 }, { t: 'table', x: 7, y: 5, w: 2, h: 1, block: 1 }],
     npcs: [] },
@@ -642,6 +654,11 @@ Object.assign(INTERIORS, {
   casaNina: homeDef('Casa da Nina', 'brick', 1, ['#b59cff']),
   casaLeo: homeDef('Casa do Léo e da Bia', 'stone', 2, ['#4f7fbf', '#e8944e']),
   cabanaTome: homeDef('Cabana do Seu Tomé', 'wood', 2, ['#c8423b', '#5fa65a']),
+  armazem: { name: 'Armazém do Vale', w: 12, h: 8, floor: 'wood', wall: 'wood',
+    furn: [{ t: 'shelf', x: 1, y: 0, w: 3, h: 2 }, { t: 'window', x: 5, y: 0, w: 1, h: 2 }, { t: 'shelf', x: 7, y: 0, w: 3, h: 2, bread: 1 },
+      { t: 'counter', x: 3, y: 3, w: 5, h: 1, block: 1, use: 'work_shop' }, { t: 'barrel', x: 1, y: 5, w: 1, h: 1, block: 1 }, { t: 'sack', x: 2, y: 5, w: 1, h: 1, block: 1 },
+      { t: 'sack', x: 1, y: 6, w: 1, h: 1, block: 1 }, { t: 'bed', x: 10, y: 3, w: 1, h: 2, block: 1, col: '#6e5a48' }, { t: 'barrel', x: 10, y: 6, w: 1, h: 1, block: 1 }],
+    npcs: [] },
   casaKai: { name: 'Casa do Kai', w: 12, h: 8, floor: 'wood', wall: 'wood',
     furn: [{ t: 'window', x: 2, y: 0, w: 1, h: 2 }, { t: 'fireplace', x: 4, y: 0, w: 2, h: 2 }, { t: 'shelf', x: 7, y: 0, w: 2, h: 2 }, { t: 'window', x: 10, y: 0, w: 1, h: 2 },
       { t: 'bed', x: 1, y: 2, w: 1, h: 2, block: 1, col: '#c8423b', use: 'bed' }, { t: 'bed', x: 2, y: 2, w: 1, h: 2, block: 1, col: '#4f7fbf', use: 'bed' },

@@ -239,7 +239,7 @@ function cityLayout(c) {
       const id = 'c' + c.key + '_' + c.doors.length;
       o.to = id;
       c.doors.push({ x: o.x, y: o.y + 14, to: id });
-      DYN.set(id, { kind: enter, city: c, door: [o.x, o.y + 14], seed: Math.floor(R() * 1e6) });
+      DYN.set(id, { kind: enter, city: c, door: [o.x, o.y + 14], seed: Math.floor(R() * 1e6), price: 600 + Math.floor(R() * 5) * 100 });
     }
   };
   const deco2 = (d, x, y, extra) => c.props.push(Object.assign({ t: 'deco', d, x, y, seed: Math.floor(x * 7 + y * 13) }, extra || {}));
@@ -253,7 +253,8 @@ function cityLayout(c) {
       const sp = kind === 'special' ? specials[idx] : null;
       const o = { kind: 'house', x: bk.x + Math.round((R() - 0.5) * 20), y: bk.y + 150, w: sp ? 66 : 52 + Math.floor(R() * 4) * 4,
         roof: pick(st.roofs), wall: pick(st.walls), chimney: R() < 0.6, snow: !!st.snow, sign: sp ? sp[1] : null };
-      addBld(o, sp ? sp[0] : (R() < 0.4 ? 'casa' : null));
+      const rr = R();
+      addBld(o, sp ? sp[0] : (rr < 0.4 ? 'casa' : rr < 0.55 ? 'venda' : null));
       if (R() < 0.5) deco2(pick(['barrel', 'crate', 'flowerbed']), bk.x + (R() < 0.5 ? -130 : 130), bk.y + 168, { block: 14 });
     } else if (kind === 'tower') {
       c.hasTower = true;
@@ -305,6 +306,7 @@ function ensureInterior(id) {
       { t: 'anvil', x: 3, y: 3, w: 1, h: 1, block: 1 }, { t: 'bancada', x: 8, y: 3, w: 2, h: 1, block: 1, use: 'bancada2' },
       { t: 'barrel', x: 10, y: 5, w: 1, h: 1, block: 1 }, { t: 'rug', x: 4, y: 5, w: 3, h: 2 }],
     npcs: [{ id: npcId, x: 5.5, y: 4.2, name: 'Ferreira', role: 'ferreiro' }] };
+  else if (m.kind === 'venda') def = Object.assign(homeDef('Sua casa em ' + c.name, 'wood', 1, ['#c8423b']), {});
   else def = { name: 'Casa em ' + c.name, w: 10, h: 7, floor: 'wood', wall: R() < 0.5 ? 'wood' : 'brick',
     furn: [{ t: 'window', x: 2, y: 0, w: 1, h: 2 }, { t: 'shelf', x: 5, y: 0, w: 2, h: 2 }, { t: 'window', x: 8, y: 0, w: 1, h: 2 },
       { t: 'bed', x: 1, y: 2, w: 1, h: 2, block: 1, col: ['#4f7fbf', '#c8423b', '#5fa65a', '#e86a9a'][Math.floor(R() * 4)] }, { t: 'rug', x: 3, y: 4, w: 3, h: 2 },

@@ -104,7 +104,10 @@ const RESIDENTS = [
     sched: [[6, 7, 'home', 'idle'], [7, 15, 'padaria_forno', 'work'], [15, 18, 'praca_fonte', 'talk'], [18, 22, 'home', 'idle'], [22, 30, 'bed', 'sleep']] },
   { id: 'joca', name: 'Joca', age: 20, prof: 'Lenhador', pers: 'brincalhao', home: 'cabanaTome', bed: 1,
     likes: ['madeira', 'cogumelo'], app: { skin: '#f0c08a', hair: '#d0542e', hairStyle: 'spiky', top: '#5fa65a', bottom: '#4a3a2a', beard: null },
-    sched: [[6, 7, 'home', 'idle'], [7, 12, 'bosque', 'work'], [12, 13, 'horta', 'idle'], [13, 17, 'bosque', 'work'], [17, 21, 'praca_fonte', 'talk'], [21, 30, 'bed', 'sleep']] }
+    sched: [[6, 7, 'home', 'idle'], [7, 12, 'bosque', 'work'], [12, 13, 'horta', 'idle'], [13, 17, 'bosque', 'work'], [17, 21, 'praca_fonte', 'talk'], [21, 30, 'bed', 'sleep']] },
+  { id: 'gil', name: 'Gil', age: 52, prof: 'Comerciante', pers: 'alegre', home: 'armazem', bed: 0,
+    likes: ['cristal', 'carpa'], app: { skin: '#c98f5e', hair: '#bfbcc8', hairStyle: 'short', top: '#6e5a48', bottom: '#33384e', apron: '#c99a6a', beard: '#a9a6bb' },
+    sched: [[6, 8, 'home', 'idle'], [8, 18, 'armazem_balcao', 'idle'], [18, 21, 'praca_fonte', 'talk'], [21, 30, 'bed', 'sleep']] }
 ];
 const RES_BY_ID = {};
 // lugares do mundo (ponto, espalhamento) e de interiores
@@ -121,10 +124,11 @@ const PLACES = {
   bosque: { area: 'world', x: 4300, y: 1060, spread: 120 },
   ronda_praca: { area: 'world', x: 3550, y: 2480, spread: 120 },
   ronda_vila: { area: 'world', x: 1900, y: 1300, spread: 60 },
-  oficina_bigorna: { area: 'oficina', x: 3.5 * 48, y: 4.35 * 48, spread: 0, face: [0, -1] },
+  oficina_bigorna: { area: 'oficina', x: 2.3 * 48, y: 4.1 * 48, spread: 0, face: [1, -0.3] },
   padaria_balcao: { area: 'padaria', x: 5.5 * 48, y: 2.55 * 48, spread: 30 },
   padaria_forno: { area: 'padaria', x: 2 * 48, y: 2.6 * 48, spread: 0, face: [0, -1] },
-  padaria_mesa: { area: 'padaria', x: 3 * 48, y: 6.6 * 48, spread: 220 }
+  padaria_mesa: { area: 'padaria', x: 3 * 48, y: 6.6 * 48, spread: 220 },
+  armazem_balcao: { area: 'armazem', x: 5.5 * 48, y: 2.55 * 48, spread: 20 }
 };
 function hashStr(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return h; }
 function homeSpot(r, kind) {
@@ -181,7 +185,7 @@ function buildNav() {
   for (const P of Object.values(PLACES)) if (P.area === 'world') add(P.x, P.y);
   for (const r of REGION_LIST) for (const d of r.doors) add(d.x, d.y + 36);
   for (const [x, y] of [[3550, 2420], [3550, 1700], [3250, 2000], [3850, 2000], [3550, 2700], [1900, 1300], [1900, 950], [2200, 1600], [2350, 1300], [2050, 1500],
-    [4990, 1320], [5100, 1300], [4300, 900], [4400, 700], [1590, 1000], [1750, 960], [3330, 2010], [4100, 2200], [4700, 2300], [4945, 2300], [1700, 2100], [1800, 1760], [2260, 1000], [2300, 1180]]) add(x, y);
+    [4990, 1320], [5100, 1300], [5550, 2290], [5300, 2300], [4945, 2290], [4300, 900], [4400, 700], [1590, 1000], [1750, 960], [3330, 2010], [4100, 2200], [4700, 2300], [4945, 2300], [1700, 2100], [1800, 1760], [2260, 1000], [2300, 1180]]) add(x, y);
   for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
     const a = pts[i], b = pts[j];
     if (a.e.includes(b) || Math.hypot(a.x - b.x, a.y - b.y) > 520) continue;
@@ -321,6 +325,7 @@ const PROF_LINES = {
   'Cozinheira': ['Hoje tem sopa de cogumelo!', 'A Rosa faz o pão, eu faço o resto.'],
   'Lenhador': ['Corta, empilha, corta, empilha!', 'Machado afiado, braço cansado.'],
   'Criança': ['Sabia que o Floco é o cachorro mais rápido do vale?', 'Quando eu crescer quero ser aventureiro igual você!'],
+  'Comerciante': ['Compro, vendo e troco! Peixe fresco eu pago bem.', 'O preço muda todo dia, fique de olho.'],
   'Anciã do vale': ['O vale já viu muitas lanternas se apagarem e acenderem.', 'Paciência é a melhor ferramenta.']
 };
 const PLACE_LINES = {

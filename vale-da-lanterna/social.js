@@ -27,9 +27,10 @@ const SOCIAL = {
   nina: { bday: [3, 2], eligible: true, gender: 'f', dislikes: ['pedra', 'madeira'] },
   leo: { bday: [2, 28], eligible: false, gender: 'm', dislikes: ['flor'], no: 'Kai... eu sou casado com a Bia. Mas valeu pela amizade.' },
   bia: { bday: [0, 4], eligible: false, gender: 'f', dislikes: ['pedra'], no: 'Ai, que fofo! Mas eu e o Léo somos casados há anos.' },
-  joca: { bday: [3, 19], eligible: true, gender: 'm', dislikes: ['flor'] }
+  joca: { bday: [3, 19], eligible: true, gender: 'm', dislikes: ['flor'] },
+  gil: { bday: [1, 9], eligible: false, gender: 'm', dislikes: ['seiva'], no: 'Hahaha! Kai, eu sou casado com este armazém!' }
 };
-const GIFTABLE = ['flor', 'cogumelo', 'madeira', 'pedra', 'fibra', 'seiva', 'cristal', 'torta', 'pocao', 'sopa'];
+const GIFTABLE = ['flor', 'cogumelo', 'madeira', 'pedra', 'fibra', 'seiva', 'cristal', 'torta', 'pocao', 'sopa', 'pao', 'peixe', 'truta', 'carpa', 'tabua'];
 function sm(id) {
   const m = npcMem(id);
   if (m.friend === undefined) Object.assign(m, { friend: 0, hist: [], likesKnown: [], giftDay: 0, upset: false, upsetDays: 0, firstDate: false, walkDay: 0 });
@@ -91,11 +92,12 @@ function socialOpen(n, questTalk) {
   if (m.giftDay !== S.time.day) ch.push({ t: 'Presente', fn: () => { menu = { tab: 'gift', npc: n.id }; } });
   if (S.walk && S.walk.id === n.id) ch.push({ t: 'Encerrar passeio', fn: () => { S.walk.end = 0; updateWalk(); } });
   else if (!S.walk && !info.child && m.met) ch.push({ t: 'Passear', fn: () => inviteWalk(n) });
+  ch.push(...economyChoices(n));
   const rom = romanceOption(n);
   if (rom) ch.push(rom);
   ch.push({ t: 'Tchau' });
   const greet = isBirthday(n.id) ? 'Hoje é meu aniversário!' : holidayToday() ? holidayToday().line : partnerOf(n.id) ? partnerGreet(n.id) : first ? 'Oi! Acho que ainda não nos conhecemos.' : m.upset ? 'Hmm... oi.' : 'Oi, Kai! O que manda?';
-  say([n.name + ': ' + greet], null, ch.slice(0, 5));
+  say([n.name + ': ' + greet], null, ch);
 }
 function partnerGreet(id) {
   const m = sm(id), st = S.romance.status;
@@ -286,10 +288,10 @@ function kidOpen(r) {
   const st = kidStage(k), hungry = k.needs.fome < 40, lonely = k.needs.carinho < 40;
   const line = st === 'bebe' ? (hungry ? 'Buáá! (está com fome)' : 'Gu-gu, da-da! (sorri pra você)')
     : hungry ? 'Papai, tô com fome...' : lonely ? 'Papai, brinca comigo?' : ['Papai! Hoje eu ' + (st === 'crianca' ? 'brinquei com o Téo na praça!' : 'aprendi a pular!'), 'A ' + parentWord() + ' contou uma história!', 'Eu te amo, papai!'][S.time.day % 3];
-  const food = (S.bag.sopa || 0) > 0 ? 'sopa' : (S.bag.torta || 0) > 0 ? 'torta' : null;
+  const food = (S.bag.sopa || 0) > 0 ? 'sopa' : (S.bag.torta || 0) > 0 ? 'torta' : (S.bag.pao || 0) > 0 ? 'pao' : null;
   say([k.name + ': ' + line], null, [
     { t: st === 'bebe' ? 'Ninar' : 'Brincar', fn: () => { k.needs.carinho = Math.min(100, k.needs.carinho + 35); Audio.sfx('heal'); burst(r.x, r.y - 50, '#ffb7d0', 10, 80); say([k.name + (st === 'bebe' ? ' adormeceu sorrindo.' : ' deu muitas risadas!')]); save(); } },
-    { t: food ? 'Alimentar (' + NAMES[food] + ')' : 'Alimentar', fn: () => { if (!food) { say(['Você não tem comida. Cozinhe uma sopa no fogão de casa (2 cogumelos) ou compre torta.']); return; } S.bag[food]--; k.needs.fome = 100; Audio.sfx('pick'); say([k.name + ' comeu tudinho!']); save(); } },
+    { t: food ? 'Alimentar (' + NAMES[food] + ')' : 'Alimentar', fn: () => { if (!food) { say(['Você não tem comida. Cozinhe uma sopa no fogão de casa (2 cogumelos) ou compre pão ou torta.']); return; } S.bag[food]--; k.needs.fome = 100; Audio.sfx('pick'); say([k.name + ' comeu tudinho!']); save(); } },
     { t: 'Abraçar', fn: () => { k.needs.carinho = Math.min(100, k.needs.carinho + 15); say(['Você abraçou ' + k.name + '. Que quentinho!']); } },
     { t: 'Tchau' }]);
 }

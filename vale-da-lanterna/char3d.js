@@ -26,6 +26,7 @@ const Char3D = (() => {
 
   const mats = {};
   const M = col => mats[col] || (mats[col] = new T.MeshLambertMaterial({ color: col, flatShading: true }));
+  const hex = c => typeof c === 'number' ? c : parseInt(String(c).replace('#', ''), 16);
   const OUT = new T.MeshBasicMaterial({ color: 0x1d1a24, side: T.BackSide });
   const OUTW = 0.07;
   function box(parent, w, h, d, col, x, y, z, outline = true) {
@@ -52,9 +53,9 @@ const Char3D = (() => {
     return { p, boot };
   });
   const torso = pivot(body, 0, 0.6, 0);
-  box(torso, 0.52, 0.54, 0.32, 0x7a4a2a, 0, 0.27, 0);
+  const tunic = box(torso, 0.52, 0.54, 0.32, 0x7a4a2a, 0, 0.27, 0);
   box(torso, 0.54, 0.07, 0.34, 0xc99a3a, 0, 0.06, 0, false);
-  box(torso, 0.56, 0.13, 0.36, 0xc8423b, 0, 0.55, 0);
+  const scarf = box(torso, 0.56, 0.13, 0.36, 0xc8423b, 0, 0.55, 0);
   const scarfTail = box(torso, 0.14, 0.32, 0.06, 0xb5352e, 0.14, 0.38, -0.22);
   const armor = [box(torso, 0.22, 0.12, 0.38, 0x5fae4a, -0.32, 0.5, 0), box(torso, 0.22, 0.12, 0.38, 0x5fae4a, 0.32, 0.5, 0)];
   // mochila redonda azul com o "olho"
@@ -81,9 +82,10 @@ const Char3D = (() => {
     const s = box(head, 0.12, 0.15, 0.12, 0xf3f0ea, x, y, z); s.rotation.set(0, r * 0.5, r);
   });
   // braços
+  const sleeves = [];
   const arms = [-0.34, 0.34].map(x => {
     const p = pivot(torso, x, 0.5, 0);
-    box(p, 0.15, 0.36, 0.17, 0x7a4a2a, 0, -0.17, 0);
+    sleeves.push(box(p, 0.15, 0.36, 0.17, 0x7a4a2a, 0, -0.17, 0));
     box(p, 0.13, 0.12, 0.15, 0xf0c08a, 0, -0.4, 0);
     return p;
   });
@@ -127,6 +129,8 @@ const Char3D = (() => {
     const tier = st.espada || 1, bladeCol = tier >= 3 ? 0x8fd8ff : tier === 2 ? 0xa9a6a0 : 0xe8eef5;
     bsBlade.material = M(bladeCol); hsBlade.material = M(bladeCol);
     armor.forEach(a => { a.visible = !!st.armadura; });
+    const tc = M(hex(st.tunic || '#7a4a2a')), scm = M(hex(st.scarf || '#c8423b'));
+    tunic.material = tc; sleeves.forEach(sl => { sl.material = tc; }); scarf.material = scm; scarfTail.material = scm;
     legs.forEach(l => { l.boot.material = M(st.botas ? 0x5a9ad8 : 0x3b2618); });
     if (st.atk >= 0) {
       const k = st.atk;
@@ -147,7 +151,6 @@ const Char3D = (() => {
   }
   // ------------------------------------------------ pessoas genéricas (NPCs)
   // app = { skin, hair, hairStyle, top, bottom, dress, apron, hat, beard, shoes, scale }
-  const hex = c => typeof c === 'number' ? c : parseInt(String(c).replace('#', ''), 16);
   function buildPerson(app) {
     const root = new T.Group(), P = {};
     const sk = hex(app.skin || '#f0c08a'), hr = hex(app.hair || '#5a3a26'), tp = hex(app.top || '#4f7fbf');
