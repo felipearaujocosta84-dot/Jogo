@@ -73,7 +73,7 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 6 | Agricultura e animais | ✅ concluída |
 | 7 | Construção livre e decoração | ✅ concluída |
 | 8 | Dia e noite, clima | ✅ concluída |
-| 9 | Interface, menus, controles | ⏳ |
+| 9 | Interface, menus, controles | ⏳ próxima |
 | 10 | Salvamento completo, otimização, testes gerais | ⏳ |
 
 Observação: a Fase 3 (rotinas) depende do relógio do jogo, então a parte básica do relógio da Fase 8
