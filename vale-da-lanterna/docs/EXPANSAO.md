@@ -71,8 +71,8 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 4 | Relacionamentos, namoro, casamento, família e filhos | ✅ concluída |
 | 5 | Empregos, profissões, economia | ✅ concluída |
 | 6 | Agricultura e animais | ✅ concluída |
-| 7 | Construção livre e decoração | ⏳ próxima |
-| 8 | Dia e noite, clima | ⏳ |
+| 7 | Construção livre e decoração | ✅ concluída |
+| 8 | Dia e noite, clima | ⏳ próxima |
 | 9 | Interface, menus, controles | ⏳ |
 | 10 | Salvamento completo, otimização, testes gerais | ⏳ |
 
@@ -191,3 +191,26 @@ será antecipada no início da Fase 3.
 - **Aba Fazenda**: estado de cada terreno, animais (fome, afeição, produto pronto), ferramentas e guia de plantio
   com as estações (o que não cresce agora fica apagado).
 - Ajustes: a loja mostra todo o estoque (inclui o que você vendeu); abas do menu cabem com o botão fechar.
+
+## Fase 7 — Construção livre e decoração (`build.js`)
+- **Botão Construir** aparece dentro de um terreno seu ou de um interior seu (Casa do Kai, casas compradas e
+  construídas). Painel próprio com categorias, itens com custo, e ações Girar, Grade (encaixe liga/desliga),
+  Mover, Remover, ✓ Colocar e ✕ Sair. O "fantasma" fica verde quando pode e vermelho com o motivo quando não pode.
+- **Catálogo modular** (`BUILD_CATALOG`): novos objetos entram com uma linha (custo, tamanho, desenho).
+  - Construções: **Casa** personalizável (parede reboco/madeira/pedra/adobe, cor do telhado, tamanho P/M/G — janelas
+    e porta acompanham —, chaminé), **Loja do Kai** e **Galpão**. Todas têm interior e porta.
+  - Cercas e caminhos: cerca e portão (girar: horizontal/vertical), caminho de pedra, estrada de terra, piso de tábuas.
+  - Decoração: poste de luz (acende à noite), banco, canteiro, árvore, arbusto, barril, caixote, feno, espantalho,
+    placa e **irrigador** (rega os canteiros num raio de 3 blocos toda manhã).
+  - Móveis: cama, mesa, sofá, estante, janela, quadro, lareira (parede), tapete, planta, luminária (acende à noite),
+    **baú** (todos os baús são ligados), **guarda-roupa** (troca de roupa), fogão, bancada.
+  - **Quarto infantil**: berço, cama infantil (os filhos usam), caixa de brinquedos (crianças sentem menos falta de
+    carinho) e tapete colorido.
+- **Regras**: só dentro de terrenos seus (o quintal é pequeno demais para construções), sem sobrepor outra
+  construção, plantação, placa ou obstáculo; móveis não bloqueiam a porta e os de parede vão na parede do fundo.
+  Custos em moedas e materiais (tábuas da carpintaria ou 2 madeiras → 1 tábua). Remover devolve os materiais.
+- **Loja do Kai**: coloque produtos na vitrine; das 8h às 18h chegam clientes a cada hora (mais variedade e
+  decoração = mais clientes), pagando 130% do valor do dia; recolha o caixa no balcão.
+- **Salvo para sempre**: `S.builds` (mundo) e `S.decor` (interiores); colisão aplicada ao mundo e à rede de caminhos
+  dos moradores (recalculada a cada construção grande).
+- Câmera sobe um pouco no modo construção para o painel não tapar o que você está colocando.

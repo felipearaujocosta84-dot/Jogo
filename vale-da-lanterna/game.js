@@ -12,7 +12,7 @@ function newSave() {
     inv: { madeira: 0, pedra: 0, fibra: 0, flor: 0, cogumelo: 0, seiva: 0, cristal: 0, tabua: 0 },
     bag: { pocao: 0, torta: 0, feixe: 0, sopa: 0, buque: 0, anel: 0, pao: 0, peixe: 0, truta: 0, carpa: 0, bota: 0 },
     tools: { vara: false, enxada: false, regador: false }, outfits: ['classico'], outfit: 'classico', job: null, shops: {}, props: { plots: { quintal: true }, houses: {} }, stats: { earned: 0, spent: 0, harvest: 0 },
-    farm: {}, animals: [], seedSel: null, plotMode: {},
+    farm: {}, animals: [], seedSel: null, plotMode: {}, builds: [], decor: {}, storage: {}, myshop: { stock: {}, till: 0, sold: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
     q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
@@ -54,6 +54,7 @@ const Q = () => QUALITY[CONFIG.quality] || QUALITY.medio;
 function setQuality(k) { CONFIG.quality = k; store('vale-da-lanterna-config', CONFIG); if (Char3D) Char3D.setDirs(Q().dirs); toast('Gráficos: ' + Q().name); }
 function save() {
   if (area !== 'world' && DYN.has(area)) { const d = DYN.get(area).door; S.pos = { area: 'world', x: d[0], y: d[1] + 40 }; }
+  else if (area.startsWith('b_')) { const d = buildDoors().find(o => o.to === area); S.pos = d ? { area: 'world', x: d.x, y: d.y + 40 } : { area: 'world', x: 3550, y: 2400 }; }
   else S.pos = { area, x: Math.round(player.x), y: Math.round(player.y) };
   store(SAVE_KEY, S);
   lastSaveAt = time;
@@ -73,6 +74,7 @@ const RECIPES = [
   { id: 'feixe', name: 'Feixe de Lenha', desc: 'Lenha boa para fogueira', need: { madeira: 4, fibra: 1 }, icon: 'feixe' },
   { id: 'sopa', name: 'Sopa de Cogumelo', desc: 'Alimenta a família · +2 corações', need: { cogumelo: 2 }, icon: 'sopa' },
   { id: 'buque', name: 'Buquê de Flores', desc: 'Para pedir alguém em namoro', need: { flor: 5, fibra: 1 }, icon: 'buque' },
+  { id: 'tabua', name: 'Tábua', desc: 'Material de construção', need: { madeira: 2 }, icon: 'tabua', give: 'tabua' },
   { id: 'racao', name: 'Ração', desc: 'Comida dos animais (2 fibras)', need: { fibra: 2 }, icon: 'racao', give: 'racao' },
   { id: 'racao2', name: 'Ração de Trigo', desc: '2 rações com 1 trigo', need: { trigo: 1 }, icon: 'racao', give: 'racao', qty: 2 },
   { id: 'adubo', name: 'Adubo', desc: 'Planta cresce mais rápido e rende o dobro', need: { seiva: 1, fibra: 2 }, icon: 'adubo', give: 'adubo', qty: 2 },
@@ -251,6 +253,7 @@ function setArea(id, x, y) {
 }
 function enterInterior(id, fromDoor) {
   if (DYN.has(id)) ensureInterior(id);
+  if (id.startsWith('b_')) ensureBuildInterior(id);
   fade = { t: 0, dur: 0.6, mid: () => {
     const I = INTERIORS[id];
     I.returnTo = fromDoor;
@@ -464,7 +467,10 @@ function interact(t) {
   else if (t.kind === 'cat') { S.cat = 'follow'; Audio.sfx('meow'); say(['Miau!', 'A Bolinha pulou pertinho de você. Leve-a de volta para o Téo, na Praça.']); save(); }
   else if (t.kind === 'furn') {
     const f = t.ref;
-    if (f.use === 'cook') {
+    if (f.use === 'storage') { menu = { tab: 'storage' }; Audio.sfx('ui'); }
+    else if (f.use === 'myshop') { menu = { tab: 'myshop' }; Audio.sfx('ui'); }
+    else if (f.use === 'wardrobe') say(['Guarda-roupa. O que vai vestir?'], null, OUTFITS.filter(o => S.outfits.includes(o.id)).slice(0, 5).map(o => ({ t: o.name, fn: () => { S.outfit = o.id; toast('Vestiu: ' + o.name); save(); } })));
+    else if (f.use === 'cook') {
       say(['Fogão de casa. O que vai cozinhar?'], null, [{ t: 'Sopa (2 cogumelos)', fn: () => { const r = RECIPES.find(r => r.id === 'sopa'); if (canCraft(r)) craft(r); else say(['Você precisa de 2 cogumelos.']); } }, { t: 'Nada' }]);
     }
     else if (f.use === 'bancada2') { menu = { tab: 'craft', station: true }; Audio.sfx('ui'); }
@@ -539,6 +545,7 @@ window.addEventListener('keydown', e => {
   if (mode === 'title' && (k === 'enter' || k === ' ')) { titleStart && titleStart(); return; }
   if (mode !== 'play') return;
   if (work) { if (k === ' ' || k === 'enter' || k === 'j' || k === 'e') { e.preventDefault(); workAction(); } return; }
+  if (build) { if (k === 'escape') closeBuild(); else if (k === 'r') build.rot = (build.rot + 1) % 4; else if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); buildConfirm(); } return; }
   if (k === 'escape') { menu = null; showMap = false; return; }
   if (k === 'i' || k === 'tab') { e.preventDefault(); menu = menu ? null : { tab: 'bag' }; return; }
   if (k === 'm') { showMap = !showMap; return; }
@@ -556,7 +563,7 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
 
-function pressAction() { if (fade) return; if (interactTarget) interact(interactTarget); else attack(); }
+function pressAction() { if (fade) return; if (build) { buildConfirm(); return; } if (interactTarget) interact(interactTarget); else attack(); }
 function readMove() {
   let x = 0, y = 0;
   const k = input.keys;
@@ -744,6 +751,7 @@ function update(dt) {
 
   updateFishing(dt, player.moving);
   updateAnimals(dt);
+  updateMyShop();
   findInteract(busy);
   saveT += dt; if (saveT > 6) { saveT = 0; save(); }
 
@@ -863,7 +871,7 @@ function updateWorld(dt, busy) {
 function findInteract(busy) {
   interactTarget = null;
   if (busy) return;
-  if (work) return;
+  if (work || build) return;
   let best = 1e9;
   const consider = (d, max, t) => { if (d < max && d < best) { best = d; interactTarget = t; } };
   for (const n of npcs) if (!n.deco) consider(Math.hypot(n.x - player.x, n.y - player.y), n.hidden ? 140 : 110, { kind: 'npc', ref: n, x: n.x, y: n.y - (n.hidden ? 90 : 120), label: 'Falar' });
@@ -875,6 +883,7 @@ function findInteract(busy) {
         consider(Math.hypot(x - player.x, y - player.y), 110, { kind: 'door', ref: d, x, y: y - 90, x0: x, y0: y, label: 'Entrar' });
       }
     }
+    for (const d of buildDoors()) consider(Math.hypot(d.x - player.x, d.y - player.y), 110, { kind: 'door', ref: d, x: d.x, y: d.y - 100, x0: d.x, y0: d.y - 14, label: 'Entrar' });
     const cc = inCity(player.x, player.y, 100);
     if (cc && cc.doors) for (const d of cc.doors) consider(Math.hypot(d.x - player.x, d.y - player.y), 110, { kind: 'door', ref: d, x: d.x, y: d.y - 100, x0: d.x, y0: d.y - 14, label: 'Entrar' });
     const T = REGIONS.torre;
@@ -886,7 +895,7 @@ function findInteract(busy) {
   } else {
     for (const f of interiorDef.furn) if (f.use && !f.use.startsWith('work_')) {
       const x = (f.x + f.w / 2) * TILE, y = (f.y + f.h) * TILE;
-      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'cook' ? 'Cozinhar' : f.use === 'bancada' || f.use === 'bancada2' ? 'Criar' : f.use === 'bed' ? ((gameHour() >= 20 || gameHour() < 5) ? 'Dormir' : 'Deitar') : 'Abrir' });
+      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'storage' ? 'Baú' : f.use === 'wardrobe' ? 'Roupas' : f.use === 'myshop' ? 'Loja' : f.use === 'cook' ? 'Cozinhar' : f.use === 'bancada' || f.use === 'bancada2' ? 'Criar' : f.use === 'bed' ? ((gameHour() >= 20 || gameHour() < 5) ? 'Dormir' : 'Deitar') : 'Abrir' });
     }
   }
   // postos de trabalho têm prioridade sobre conversar com quem está ao lado
@@ -1012,7 +1021,7 @@ function computeView() {
   view.vw = W / view.s; view.vh = H / view.s;
 }
 function camTarget() {
-  if (area === 'world') return [player.x - view.vw / 2, player.y - view.vh * 0.56];
+  if (area === 'world') return [player.x - view.vw / 2, player.y - view.vh * (build ? 0.68 : 0.56)];
   const bw = area === 'world' ? WW : interiorDef.pw, bh = area === 'world' ? WH : interiorDef.ph + 24;
   const tx = view.vw >= bw ? (bw - view.vw) / 2 : clamp(player.x - view.vw / 2, 0, bw - view.vw);
   const ty = view.vh >= bh ? (bh - view.vh) / 2 : clamp(player.y - view.vh * 0.56, 0, bh - view.vh);
@@ -1077,6 +1086,7 @@ function drawWorld() {
     const near = Math.hypot(x - player.x, y - player.y) < 420;
     if (near) label(INTERIORS[d.to].name, x, y - 70 + Math.sin(time * 3) * 3, 17, '#fff6d8', 0.85);
   }
+  for (const d of buildDoors()) if (Math.hypot(d.x - player.x, d.y - player.y) < 420) label({ casa: 'Sua casa', loja: 'Loja do Kai', galpao: 'Galpão' }[d.kind], d.x, d.y - 84 + Math.sin(time * 3) * 3, 17, '#fff6d8', 0.85);
   const cc = inCity(player.x, player.y, 200);
   if (cc && cc.doors) for (const d of cc.doors) {
     if (Math.hypot(d.x - player.x, d.y - player.y) > 420) continue;
@@ -1088,6 +1098,7 @@ function drawWorld() {
     ctx.save(); ctx.setLineDash([14, 10]); ctx.lineWidth = 4; ctx.strokeStyle = S.props.plots[pl.id] ? 'rgba(155,227,106,0.75)' : 'rgba(255,214,90,0.6)';
     ctx.strokeRect(pl.x0, pl.y0, pl.x1 - pl.x0, pl.y1 - pl.y0); ctx.restore();
   }
+  drawBuildGround(x0, y0, x1, y1);
   drawFarm(x0, y0, x1, y1);
   // entidades
   const list = [];
@@ -1103,6 +1114,7 @@ function drawWorld() {
   drawLanternGlow();
   drawFishing();
   drawLighting();
+  drawBuildGhost();
   drawFarmTasks();
   drawOverlays();
 }
@@ -1117,6 +1129,7 @@ function drawInterior() {
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(I.canvas, 0, 0);
   // brilho de fogo
+  for (const f of I.furn) if (f.t === 'lamp') addLight((f.x + 0.5) * TILE, f.y * TILE + 10, 200, '255,220,150');
   for (const f of I.furn) if (f.t === 'forge' || f.t === 'oven' || f.t === 'fireplace') {
     const x = (f.x + f.w / 2) * TILE, y = (f.y + f.h) * TILE - 20, rr = 130 + Math.sin(time * 8) * 8;
     addLight(x, y, 220, '255,170,80');
@@ -1131,6 +1144,7 @@ function drawInterior() {
   addCommon(list);
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
   drawLighting();
+  drawBuildGhost();
   // tapete de saída
   label('Sair', I.pw / 2, I.ph + 12, 15, '#fff6d8', 0.7);
   drawOverlays();
@@ -1386,6 +1400,20 @@ function drawDeco(p) {
       for (let i = 0; i < 8; i++) R(-56 + i * 14, -124, 14, 22, i % 2 ? '#fff6e6' : p.col);
       R(-56, -104, 112, 4, '#2a1a10');
       break;
+    case 'gate': case 'gateV':
+      if (p.d === 'gate') { R(-26, -36, 8, 36, '#3b2618'); R(18, -36, 8, 36, '#3b2618'); R(-18, -30, 36, 5, '#b07c46'); R(-18, -16, 36, 5, '#b07c46'); R(-2, -30, 4, 19, '#8a5a34'); }
+      else { R(-4, -48, 8, 48, '#3b2618'); R(-2, -46, 4, 44, '#b07c46'); R(-3, -88, 6, 40, '#8a5a34'); }
+      break;
+    case 'scarecrow':
+      shadow(x, y, 16, 5, 0.25); R(-3, -90, 6, 90, '#7a4a2a'); R(-28, -72, 56, 5, '#7a4a2a');
+      R(-14, -76, 28, 34, '#c8423b'); R(-14, -56, 28, 4, '#5a3418'); R(-11, -100, 22, 22, '#e8c060'); R(-16, -104, 32, 6, '#a07a30'); R(-6, -92, 3, 3, '#1d1a24'); R(3, -92, 3, 3, '#1d1a24');
+      break;
+    case 'sprinkler': {
+      shadow(x, y, 14, 4, 0.25); R(-4, -26, 8, 26, '#55555f'); R(-12, -30, 24, 6, '#4f7fbf');
+      const k = (time * 2) % 1; ctx.fillStyle = 'rgba(160,220,255,0.7)';
+      for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + time; ctx.fillRect(x + Math.cos(a) * 30 * k - 2, y - 30 + Math.sin(a) * 12 * k - k * 10, 4, 4); }
+      break;
+    }
     case 'stake':
       R(-3, -30, 6, 30, '#3b2618'); R(-2, -30, 3, 28, '#a0703e'); R(-2, -30, 8, 6, '#e05a4a');
       break;
@@ -1703,7 +1731,8 @@ function drawHUD() {
   const b = btn.action, it = interactTarget;
   ctx.fillStyle = it ? 'rgba(255,214,90,0.92)' : 'rgba(255,250,235,0.85)'; ctx.strokeStyle = '#2a2238'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); ctx.stroke();
-  if (it) { ctx.fillStyle = '#2a2238'; ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(it.label, b.x, b.y + 1); }
+  if (build) { ctx.fillStyle = '#2a2238'; ctx.font = `700 15px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(build.mode === 'remove' ? 'Remover' : build.mode === 'move' && !build.moving ? 'Pegar' : 'Colocar', b.x, b.y + 1); }
+  else if (it) { ctx.fillStyle = '#2a2238'; ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(it.label, b.x, b.y + 1); }
   else drawIcon('espada' + S.eq.espada, b.x, b.y, 44);
   hudButton(b.x - 92, b.y + 14, 28, (x, y) => {
     ctx.fillStyle = '#c99a6a'; ctx.fillRect(x - 11, y - 7, 22, 17); ctx.fillStyle = '#8a5a34'; ctx.fillRect(x - 11, y - 7, 22, 5); ctx.fillRect(x - 5, y - 12, 10, 5);
@@ -1732,7 +1761,10 @@ function drawHUD() {
     ctx.globalAlpha = a; ctx.fillStyle = 'rgba(40,30,20,0.85)'; ctx.beginPath(); ctx.roundRect((W - tw) / 2, H * 0.16, tw, 32, 10); ctx.fill();
     ctx.globalAlpha = 1; label(toastMsg.t, W / 2, H * 0.16 + 16, 16, '#ffe38a', a);
   }
-  drawFarmBar();
+  if (!build) drawFarmBar();
+  if (build) drawBuildUI();
+  else if (buildContext() && !dialog && !menu && !work) hudButton(b.x - 162, b.y + 14, 26, (x, y) => { ctx.fillStyle = '#c99a6a'; ctx.fillRect(x - 3, y - 4, 4, 14); ctx.fillStyle = '#9a9aa8'; ctx.fillRect(x - 10, y - 10, 18, 7); }, openBuild);
+  if (!build && buildContext() && !dialog && !menu && !work) label('Construir', b.x - 162, b.y + 50, 11, '#fff6d8', 0.8);
   if (dialog) drawDialog();
   if (showMap) drawBigMap();
   if (menu) drawMenu();
@@ -1824,6 +1856,8 @@ function drawMenu() {
   else if (menu.tab === 'shop') drawShopTab(cx, cy, cw, ch);
   else if (menu.tab === 'job') drawJobTab(cx, cy, cw, ch);
   else if (menu.tab === 'farm') drawFarmTab(cx, cy, cw, ch);
+  else if (menu.tab === 'storage') drawStorageTab(cx, cy, cw, ch);
+  else if (menu.tab === 'myshop') drawMyShopTab(cx, cy, cw, ch);
   else drawConfigTab(cx, cy, cw, ch);
 }
 function smallHearts(x, y, n) { for (let i = 0; i < 10; i++) heart(x + i * 12, y, 10, '#ff5a7a', i >= n); }
@@ -1954,6 +1988,28 @@ function drawShopTab(x, y, w, h) {
       if (!wear && (own || S.coins >= o.price)) addBtn(cx, cy, cw, rh, () => buyOutfit(o));
     });
   }
+}
+function drawTwoLists(x, y, w, h, titleL, titleR, leftKeys, rightKeys, countL, countR, moveL, moveR) {
+  const colW = (w - 16) / 2, cell = 44;
+  text(titleL, x, y + 8, 14, '#ffe38a', 700, colW); text(titleR, x + colW + 16, y + 8, 14, '#ffe38a', 700, colW);
+  const grid = (keys, bx, cnt, fn) => keys.slice(0, Math.floor((h - 30) / (cell + 4)) * 2).forEach((k, i) => {
+    const cx = bx + (i % 2) * (colW / 2), cy = y + 24 + Math.floor(i / 2) * (cell + 4);
+    itemCell(k, cx, cy, colW / 2 - 6, cell, (NAMES[k] || k) + ' x' + cnt(k), 'tocar: mover 1', () => fn(k));
+  });
+  grid(leftKeys, x, countL, moveL); grid(rightKeys, x + colW + 16, countR, moveR);
+}
+function drawStorageTab(x, y, w, h) {
+  const bagKeys = Object.keys(S.inv).concat(Object.keys(S.bag)).filter(k => itemCount(k) > 0 && BASE_PRICE[k] !== undefined);
+  const stKeys = Object.keys(S.storage).filter(k => S.storage[k] > 0);
+  drawTwoLists(x, y, w, h, 'Mochila → baú', 'No baú (todos os baús são ligados)', bagKeys, stKeys, itemCount, k => S.storage[k], k => storageMove(k, true), k => storageMove(k, false));
+}
+function drawMyShopTab(x, y, w, h) {
+  S.myshop = S.myshop || { stock: {}, till: 0, sold: 0 };
+  const bagKeys = Object.keys(S.inv).concat(Object.keys(S.bag)).filter(k => itemCount(k) > 0 && BASE_PRICE[k] !== undefined);
+  const stKeys = Object.keys(S.myshop.stock).filter(k => S.myshop.stock[k] > 0);
+  drawTwoLists(x, y, w, h - 46, 'Mochila → vitrine', 'À venda (clientes das 8h às 18h)', bagKeys, stKeys, itemCount, k => S.myshop.stock[k], k => myshopStock(k, true), k => myshopStock(k, false));
+  text('Caixa: ' + S.myshop.till + ' moedas · vendidos: ' + S.myshop.sold + ' · decoração e variedade atraem mais clientes · preço = 130% do valor do dia', x, y + h - 16, 11, '#cfc3a6', 600, w - 150);
+  panelButton('Recolher caixa', x + w - 140, y + h - 34, 136, 32, collectTill, S.myshop.till ? 'on' : 'off');
 }
 function drawFarmTab(x, y, w, h) {
   const colW = (w - 16) / 2, season = calOf().season;
@@ -2150,6 +2206,8 @@ function startGame(fresh) {
   player.hp = S.maxHp; player.inv = 0; dialog = null; endT = 0; menu = null; showMap = false; player.hidden = false;
   buildWorldEntities();
   socialInit();
+  applyAllBuilds();
+  buildNav();
   syncAnimals();
   snapResidents();
   if (!S.homeTold) { S.homeTold = true; setTimeout(() => toast('Você tem uma casa: a Casa do Kai, a oeste da Praça!'), 4000); }
@@ -2285,6 +2343,6 @@ document.addEventListener('visibilitychange', () => {
 })();
 
 // para testes automáticos
-window.__vale = { get work() { return work; }, startShift, workAction, workPick, openShop, shopBuy, shopSell, giveGift, socialOpen, makeKid, get npcs() { return npcs; }, RESIDENTS, sleepUntilMorning, snapResidents, get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
+window.__vale = { get build() { return build; }, openBuild, buildConfirm, closeBuild, get work() { return work; }, startShift, workAction, workPick, openShop, shopBuy, shopSell, giveGift, socialOpen, makeKid, get npcs() { return npcs; }, RESIDENTS, sleepUntilMorning, snapResidents, get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
   get enemies() { return enemies; }, get dialog() { return dialog; }, advanceDialog, choose, interact, get target() { return interactTarget; },
   openMenu(tab, station) { menu = { tab, station }; }, closeMenu() { menu = null; }, set showMap(v) { showMap = v; }, toWorld, REGIONS, INTERIORS, craft, RECIPES, props };

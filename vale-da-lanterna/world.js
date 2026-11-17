@@ -823,6 +823,40 @@ function drawFurniture(g, f, R) {
       g.fillStyle = '#8a5a34'; for (let i = 0; i < 6; i++) g.fillRect(x + 8 + i * 6, y + 34, 3, 10);
       break;
     }
+    case 'sofa': {
+      box(x + 4, y + 8, w - 8, 18, '#7b5aa6'); box(x + 4, y + 24, w - 8, 16, '#9a7ac0');
+      g.fillStyle = '#5a3f80'; g.fillRect(x + 4, y + 24, 8, 16); g.fillRect(x + w - 12, y + 24, 8, 16);
+      g.fillStyle = '#ffe066'; g.fillRect(x + 16, y + 28, 10, 8); g.fillStyle = '#ff9ec7'; g.fillRect(x + w - 28, y + 28, 10, 8);
+      break;
+    }
+    case 'painting': {
+      box(x + 8, y + 18, w - 16, 34, '#c99a3a', '#5a3a20');
+      g.fillStyle = '#9ad1ff'; g.fillRect(x + 11, y + 21, w - 22, 14); g.fillStyle = '#5fae4a'; g.fillRect(x + 11, y + 35, w - 22, 14);
+      g.fillStyle = '#ffe066'; g.fillRect(x + w - 22, y + 24, 6, 6); g.fillStyle = '#3f8a37'; g.fillRect(x + 16, y + 30, 8, 10);
+      break;
+    }
+    case 'lamp': {
+      g.fillStyle = '#2a1a10'; g.fillRect(x + 22, y + 14, 4, 30); g.fillRect(x + 16, y + 42, 16, 4);
+      box(x + 12, y + 2, 24, 16, '#ffe9a0', '#8a5a34'); g.fillStyle = '#fff8d8'; g.fillRect(x + 14, y + 4, 8, 12);
+      break;
+    }
+    case 'wardrobe': {
+      box(x + 6, y + 2, 36, 44, '#8a5a34'); g.fillStyle = '#5a3a20'; g.fillRect(x + 23, y + 4, 2, 40);
+      g.fillStyle = '#e0b040'; g.fillRect(x + 18, y + 22, 3, 4); g.fillRect(x + 27, y + 22, 3, 4);
+      break;
+    }
+    case 'toybox': {
+      box(x + 8, y + 18, 32, 24, '#e86a6a'); g.fillStyle = '#ffe066'; g.fillRect(x + 8, y + 26, 32, 4);
+      g.fillStyle = '#4f7fbf'; g.fillRect(x + 12, y + 10, 8, 9); g.fillStyle = '#5fae4a'; g.beginPath(); g.arc(x + 32, y + 14, 6, 0, 7); g.fill();
+      break;
+    }
+    case 'kidbed': {
+      box(x + 6, y + 6, 36, h - 14, '#c99a6a');
+      g.fillStyle = '#f4f1ea'; g.fillRect(x + 9, y + 9, 30, 14);
+      g.fillStyle = f.col || '#9ad1ff'; g.fillRect(x + 8, y + 26, 32, h - 36);
+      g.fillStyle = '#ffe066'; for (let i = 0; i < 3; i++) g.fillRect(x + 12 + i * 10, y + 34, 4, 4);
+      break;
+    }
     case 'catbed': {
       g.fillStyle = '#7a4a2a'; g.beginPath(); g.ellipse(x + 24, y + 30, 22, 13, 0, 0, 7); g.fill();
       g.fillStyle = '#e86a8a'; g.beginPath(); g.ellipse(x + 24, y + 28, 17, 9, 0, 0, 7); g.fill();

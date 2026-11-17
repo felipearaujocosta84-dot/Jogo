@@ -302,7 +302,7 @@ function updateFamily(dt) {
   if (!S.family || !S.family.kids.length) return;
   kidTick += dt; if (kidTick < 1) return;
   const gm = kidTick * 1440 / (dayMinutes() * 60); kidTick = 0;
-  const sp = S.romance && RES_BY_ID[S.romance.id], help = sp && sp.area === 'casaKai' ? 0.4 : 1;
+  const sp = S.romance && RES_BY_ID[S.romance.id], toys = INTERIORS.casaKai.furn.some(f => f.t === 'toybox') ? 0.7 : 1, help = (sp && sp.area === 'casaKai' ? 0.4 : 1) * toys;
   for (const k of S.family.kids) {
     const r = RES_BY_ID[k.id]; if (r && r.sleeping) continue;
     k.needs.fome = Math.max(0, k.needs.fome - gm / 60 * 6 * help);

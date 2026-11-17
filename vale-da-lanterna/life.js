@@ -135,7 +135,7 @@ function hashStr(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0
 function homeSpot(r, kind) {
   const I = INTERIORS[r.home];
   if (kind === 'crib') {
-    const cribs = I.furn.filter(f => f.t === 'crib'), b = cribs[r.bed % Math.max(1, cribs.length)];
+    const cribs = I.furn.filter(f => f.t === 'crib' || f.t === 'kidbed'), b = cribs[r.bed % Math.max(1, cribs.length)];
     if (b) return { area: r.home, x: (b.x + 0.5) * TILE, y: (b.y + 0.95) * TILE, face: [0, 1] };
     kind = 'bed';
   }

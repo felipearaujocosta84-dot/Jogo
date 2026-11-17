@@ -164,6 +164,7 @@ function farmNewDay() {
     else { f.dry++; if (f.dry > C.thirst) f.dead = true; }
     f.water = rain;
   }
+  sprinklersWater();
   const yest = S.time.day - 1;
   for (const a of S.animals) {
     const A = ANIMALS[a.kind], fed = a.fedDay === yest;
