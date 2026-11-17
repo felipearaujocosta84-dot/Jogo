@@ -21,6 +21,7 @@ function updateClock(dt) {
 function onNewDay() {
   toast('Dia ' + S.time.day + ' · ' + weekday());
   for (const r of RESIDENTS) { const m = npcMem(r.id); m.todayTalk = false; }
+  weatherNewDay();
   socialNewDay();
   farmNewDay();
 }
@@ -48,19 +49,27 @@ function lightAt(h = gameHour()) {
   }
   return { col: [255, 255, 255], night: 0 };
 }
-let frameLights = [];
+let frameLights = [], frameGlows = [];
 function addLight(x, y, r, col) { frameLights.push({ x, y, r, col }); }
 function drawLighting() {
   const L = lightAt();
   const indoor = area !== 'world';
-  const col = indoor ? L.col.map(v => Math.round(v + (255 - v) * 0.65)) : L.col;
+  const WL = weatherLight();
+  const col = (indoor ? L.col.map(v => Math.round(v + (255 - v) * 0.65)) : L.col).map((v, j) => { const d = WL.dim * (indoor ? 0.4 : 1); return Math.round(v * (1 - d) * (1 - d * 0.5 + d * 0.5 * WL.tint[j] / 212)); });
   if (col[0] < 252 || col[1] < 252 || col[2] < 252) {
     ctx.save(); ctx.globalCompositeOperation = 'multiply';
     ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
     ctx.fillRect(cam.x - 50, cam.y - 50, view.vw + 100, view.vh + 100);
     ctx.restore();
   }
-  const nk = indoor ? L.night * 0.5 : L.night;
+  const nk = Math.max(L.night, WL.lights) * (indoor ? 0.5 : 1);
+  // janelas acesas (desenhadas por cima da escuridão)
+  for (const g of frameGlows) {
+    ctx.fillStyle = `rgba(255,214,128,${0.92 * g.k})`; ctx.fillRect(g.x, g.y, g.w, g.h);
+    ctx.fillStyle = `rgba(255,244,200,${0.6 * g.k})`; ctx.fillRect(g.x, g.y, g.w * 0.4, g.h * 0.45);
+    addLight(g.x + g.w / 2, g.y + g.h, g.w * 2.4, '255,190,100');
+  }
+  frameGlows = [];
   if (nk > 0.05) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (const l of frameLights) {
@@ -156,9 +165,9 @@ function placeFor(r, name) {
   return { area: P.area, x: P.x + Math.cos(a) * d, y: P.y + Math.sin(a) * d * 0.6, face: P.face };
 }
 function currentEntry(r, h = gameHour()) {
-  const o = socialOverride(r, h); if (o) return o;
-  for (const e of r.sched) { if ((h >= e[0] && h < e[1]) || (h + 24 >= e[0] && h + 24 < e[1])) return e; }
-  return r.sched[r.sched.length - 1];
+  const o = socialOverride(r, h); if (o) return weatherShelter(r, o);
+  for (const e of r.sched) { if ((h >= e[0] && h < e[1]) || (h + 24 >= e[0] && h + 24 < e[1])) return weatherShelter(r, e); }
+  return weatherShelter(r, r.sched[r.sched.length - 1]);
 }
 function npcMem(id) { S.npcs = S.npcs || {}; return S.npcs[id] || (S.npcs[id] = { met: false, talks: 0, lastDay: 0, recent: [] }); }
 
@@ -257,7 +266,7 @@ function residentActive(r) {
   return r.area === area && (area !== 'world' || Math.hypot(r.x - player.x, r.y - player.y) < 2400);
 }
 function updateResidents(dt) {
-  const h = gameHour();
+  const h = gameHour(), wetNow = valeRaining();
   for (const r of RESIDENTS) {
     if (S.walk && S.walk.id === r.id) { followPlayer(r, dt); r.entry = WALK_ENTRY; continue; }
     const e = currentEntry(r, h);
@@ -280,13 +289,13 @@ function updateResidents(dt) {
       const walkHere = !s.warp && s.area === r.area && r.area === area && residentActive(r);
       if (!walkHere) { r.area = s.area; r.x = s.x; r.y = s.y; r.steps.shift(); continue; }
       const dx = s.x - r.x, dy = s.y - r.y, d = Math.hypot(dx, dy);
-      const sp = 80 * dt;
+      const run = wetNow && r.area === 'world', sp = (run ? 125 : 80) * dt;
       if (d <= sp) { r.x = s.x; r.y = s.y; r.steps.shift(); continue; }
       r.x += dx / d * sp; r.y += dy / d * sp; r.fx = dx / d; r.fy = dy / d; r.moving = true;
       break;
     }
     if (!r.moving && !r.steps.length && r.face) { r.fx = r.face[0]; r.fy = r.face[1]; }
-    r.anim = r.moving ? 'walk' : (e[3] === 'walk' ? 'idle' : e[3]);
+    r.anim = r.moving ? (wetNow && r.area === 'world' ? 'run' : 'walk') : (e[3] === 'walk' ? 'idle' : e[3]);
     r.sleeping = !r.moving && !r.steps.length && e[3] === 'sleep';
   }
 }
@@ -297,7 +306,8 @@ function lifeUpdate(dt) {
   checkKidParty();
   // moradores das cidades se recolhem à noite
   const h = gameHour(), night = h >= 22 || h < 6;
-  for (const n of world.npcs) if (n.v) n.hiddenNight = night && (hashStr(n.id) & 3) !== 0;
+  const wx = weatherBase().type, wet = wx === 'chuva' || wx === 'tempestade';
+  for (const n of world.npcs) if (n.v) n.hiddenNight = (night || wet) && (hashStr(n.id) & 3) !== 0;
   npcs = baseNpcs.filter(n => !n.hiddenNight).concat(RESIDENTS.filter(r => r.area === area));
 }
 
@@ -348,6 +358,7 @@ function lifeLine(id) {
   else if (h >= 12 && h < 14) pool.push('Já almoçou? Eu estou faminto' + (r.age > 0 ? '!' : '.'));
   else if (h >= 18 && h < 21) pool.push('Que pôr do sol bonito, né?', 'O dia passou voando.');
   else if (h >= 21 || h < 5) pool.push('Já está tarde... daqui a pouco vou dormir.', 'A noite no vale é tão calma.');
+  pool.push(...weatherLine(r), ...weatherLine(r));
   if (weekday() === 'Domingo') pool.push('Domingo é dia de descansar... ou quase.');
   if (S.done) pool.push('A Lanterna voltou a brilhar! Você é o orgulho do vale.');
   else if (relicCount() > 0) pool.push('Dizem que você já tem ' + relicCount() + ' relíquia' + (relicCount() > 1 ? 's' : '') + '. Que coragem!');
@@ -374,12 +385,13 @@ function lifeTalk(n) {
 // desenho do relógio no topo da tela
 function drawClockHUD(T) {
   const c = calOf(), hol = holidayToday();
-  const t = c.dom + ' ' + SEASONS[c.season] + ' · ' + weekday().slice(0, 3) + ' · ' + clockText() + ' · ' + (hol ? hol.name : periodName());
+  const t = c.dom + ' ' + SEASONS[c.season] + ' · ' + weekday().slice(0, 3) + ' · ' + clockText() + ' · ' + (hol ? hol.name : periodName()) + ' · ' + weatherName();
   ctx.font = `700 13px ${FONT}`;
-  const w = ctx.measureText(t).width + 26, x = W / 2 - w / 2, y = T;
+  const w = ctx.measureText(t).width + 48, x = W / 2 - w / 2, y = T;
   ctx.fillStyle = 'rgba(20,24,20,0.62)'; ctx.beginPath(); ctx.roundRect(x, y, w, 24, 10); ctx.fill();
   const h = gameHour(), sun = h >= 6 && h < 19;
   ctx.fillStyle = sun ? '#ffd84a' : '#cfe0ff'; ctx.beginPath(); ctx.arc(x + 13, y + 12, 5, 0, 7); ctx.fill();
   if (!sun) { ctx.fillStyle = 'rgba(20,24,20,0.9)'; ctx.beginPath(); ctx.arc(x + 15, y + 10, 4, 0, 7); ctx.fill(); }
   ctx.fillStyle = '#fff6d8'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x + 22, y + 12.5);
+  drawWeatherIcon(weatherHere().type, x + w - 14, y + 11);
 }

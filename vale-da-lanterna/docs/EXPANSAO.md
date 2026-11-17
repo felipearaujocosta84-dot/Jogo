@@ -72,7 +72,7 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 5 | Empregos, profissões, economia | ✅ concluída |
 | 6 | Agricultura e animais | ✅ concluída |
 | 7 | Construção livre e decoração | ✅ concluída |
-| 8 | Dia e noite, clima | ⏳ próxima |
+| 8 | Dia e noite, clima | ✅ concluída |
 | 9 | Interface, menus, controles | ⏳ |
 | 10 | Salvamento completo, otimização, testes gerais | ⏳ |
 
@@ -214,3 +214,25 @@ será antecipada no início da Fase 3.
 - **Salvo para sempre**: `S.builds` (mundo) e `S.decor` (interiores); colisão aplicada ao mundo e à rede de caminhos
   dos moradores (recalculada a cada construção grande).
 - Câmera sobe um pouco no modo construção para o painel não tapar o que você está colocando.
+
+## Fase 8 — Dia, noite e clima (`weather.js`)
+- **Ciclo do dia** (já existente, mantido): dia de 1 hora real por padrão, ajustável em Ajustes (30 min, 1 h, 2 h);
+  dormir na cama à noite pula para as 6h; lojas abrem e fecham nos seus horários.
+- **Previsão por dia**, sorteada a partir de uma semente guardada no save (`S.weather.seed`), então o tempo de cada dia
+  é sempre o mesmo para aquele jogo. Chances por estação: primavera e outono mais chuvosos, verão com tempestades,
+  outono com neblina, inverno com neve. Feriados sempre com céu limpo. Previsão aparece ao amanhecer e em Ajustes
+  (hoje e amanhã); o nome e o ícone do tempo ficam no relógio do topo.
+- **Tipos**: céu limpo, nublado, chuva, tempestade (raios com clarão e trovão atrasado), neblina pela manhã e neve.
+  Deserto não tem chuva; nas montanhas geladas a chuva vira neve.
+- **Efeitos**: nuvens escurecem a cena, postes e janelas acendem em dias escuros; gotas inclinadas pelo vento,
+  respingos, **poças** que enchem na chuva e secam aos poucos (com ondinhas e respingos ao andar nelas),
+  neblina em camadas que se movem, neve caindo.
+- **Som**: chuva contínua (abafada dentro de casa) e trovões gerados na hora (sem arquivos de áudio).
+- **Moradores se abrigam**: na chuva quem estava ao ar livre vai para casa (ou para a padaria conversar);
+  andam correndo enquanto chove; o guarda Léo faz a ronda na chuva, mas não na tempestade. Moradores das cidades
+  somem das ruas na chuva. Falas novas sobre o tempo.
+- **Chuva rega as plantações** (canteiros ficam molhados no momento em que a chuva engrossa; chuva de madrugada
+  já conta na virada do dia).
+- **Janelas acesas** à noite em todas as casas (do vale, das cidades e as construídas), cada casa apagando a luz
+  num horário diferente (entre 21h30 e 23h30).
+- Saves antigos recebem o clima automaticamente (`deepDefaults`).

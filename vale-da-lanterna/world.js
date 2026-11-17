@@ -152,6 +152,7 @@ const ROOFS = {
   orange: ['#4a2410', '#a0522a', '#c86a34', '#e8944e'], pink: ['#4a1a2a', '#a04a6a', '#d06a90', '#f09ab8']
 };
 const FLOWER_COLS = ['#ff9ec7', '#ffe066', '#ffffff', '#ff7a5a', '#b59cff'];
+const cv2wins = [];
 function makeHouse(o, seed) {
   const W = o.w, roofH = o.roofH || 30, wallH = o.wallH || 25, top = 10, H = top + roofH + wallH + 3;
   const P = ROOFS[o.roof];
@@ -180,9 +181,10 @@ function makeHouse(o, seed) {
     // janelas
     const dw = 10, dh = 15, dx = Math.floor(W / 2 - dw / 2), dy = wy0 + wallH - dh;
     const nWin = W >= 62 ? 2 : 1;
+    cv2wins.length = 0;
     for (const s of [-1, 1]) for (let k = 0; k < nWin; k++) {
       const x = Math.round(W / 2 + s * (dw / 2 + 7 + k * 13) - 4), y = wy0 + 6;
-      rect(x - 1, y - 1, 10, 9, '#2a1d16'); rect(x, y, 8, 7, '#8fcfe8'); rect(x, y, 3, 3, '#d8f2ff');
+      rect(x - 1, y - 1, 10, 9, '#2a1d16'); rect(x, y, 8, 7, '#8fcfe8'); rect(x, y, 3, 3, '#d8f2ff'); cv2wins.push([x, y, 8, 7]);
       rect(x + 3, y, 1, 7, '#5a3a22'); rect(x, y + 3, 8, 1, '#5a3a22');
       if (o.flowers !== false) {
         rect(x - 1, y + 8, 10, 3, '#6b4426');
@@ -225,7 +227,7 @@ function makeHouse(o, seed) {
     if (W >= 62) {   // água-furtada
       const cx = Math.floor(W / 2) - 6, cy = top + 7;
       rect(cx - 1, cy + 3, 14, 11, '#2a1d16'); rect(cx, cy + 4, 12, 9, '#efe4c8');
-      rect(cx + 3, cy + 6, 6, 5, '#8fcfe8'); rect(cx + 5, cy + 6, 1, 5, '#5a3a22');
+      rect(cx + 3, cy + 6, 6, 5, '#8fcfe8'); rect(cx + 5, cy + 6, 1, 5, '#5a3a22'); cv2wins.push([cx + 3, cy + 6, 6, 5]);
       for (let k = 0; k < 7; k++) { rect(cx - 1 + k, cy + 3 - Math.floor(k / 2), 1, 1, P[0]); rect(cx + 12 - k, cy + 3 - Math.floor(k / 2), 1, 1, P[0]); }
       rect(cx + 1, cy + 1, 10, 3, P[2]);
     }
@@ -237,6 +239,7 @@ function makeHouse(o, seed) {
       o.chimneyPos = [cx + 3, 1];
     }
   });
+  cv2.wins = cv2wins.slice();
   return { img: cv2, w: W, h: H, foot: (wallH + roofH * 0.55) };
 }
 function makeTower() {

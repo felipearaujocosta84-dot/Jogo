@@ -14,7 +14,7 @@ function newSave() {
     tools: { vara: false, enxada: false, regador: false }, outfits: ['classico'], outfit: 'classico', job: null, shops: {}, props: { plots: { quintal: true }, houses: {} }, stats: { earned: 0, spent: 0, harvest: 0 },
     farm: {}, animals: [], seedSel: null, plotMode: {}, builds: [], decor: {}, storage: {}, myshop: { stock: {}, till: 0, sold: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
-    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
+    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, weather: { seed: Math.floor(Math.random() * 1e9), wet: 0, rainedDay: 0 }, npcs: {}, romance: null, walk: null, family: { kids: [], babyDue: 0 }, homeTold: false, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
 }
 let S = newSave();
@@ -700,6 +700,7 @@ function update(dt) {
   }
   if (mode !== 'play' || rotateNeeded()) return;
   lifeUpdate(dt);
+  weatherUpdate(dt);
   if (work) { updateWork(dt); return; }
   if (menu || showMap) return;
 
@@ -1099,6 +1100,7 @@ function drawWorld() {
     ctx.strokeRect(pl.x0, pl.y0, pl.x1 - pl.x0, pl.y1 - pl.y0); ctx.restore();
   }
   drawBuildGround(x0, y0, x1, y1);
+  drawPuddles(x0, y0, x1, y1);
   drawFarm(x0, y0, x1, y1);
   // entidades
   const list = [];
@@ -1114,6 +1116,7 @@ function drawWorld() {
   drawLanternGlow();
   drawFishing();
   drawLighting();
+  drawWeatherFX();
   drawBuildGhost();
   drawFarmTasks();
   drawOverlays();
@@ -1144,6 +1147,7 @@ function drawInterior() {
   addCommon(list);
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
   drawLighting();
+  drawWeatherFX();
   drawBuildGhost();
   // tapete de saída
   label('Sair', I.pw / 2, I.ph + 12, 15, '#fff6d8', 0.7);
@@ -1223,6 +1227,7 @@ function drawProp(p) {
     if (behind) ctx.globalAlpha = 0.55;
     ctx.drawImage(b.img, x, y, b.pw, b.ph);
     ctx.globalAlpha = 1;
+    if (b.img.wins && !behind) { const k = windowsLit(b), s = b.pw / b.img.width; if (k) for (const [wx, wy, ww, wh] of b.img.wins) frameGlows.push({ x: x + wx * s, y: y + wy * s, w: ww * s, h: wh * s, k }); }
     if (b.kind === 'fountain') {
       for (let i = 0; i < 6; i++) {
         const k = ((time * 1.2 + i / 6) % 1), a = i / 6 * 6.283;
@@ -2082,6 +2087,7 @@ function drawConfigTab(x, y, w, h) {
   text('NPCs ' + (q.npc3d ? 'em 3D (' + q.dirs + ' direções)' : 'em 2D') + ' · efeitos ' + Math.round(q.fx * 100) + '%', x, y + 78, 13, '#cfc3a6', 500, w);
   text('Duração de um dia', x + 520, y + 10, 15, '#ffe38a', 700);
   [[30, '30 min'], [60, '1 hora'], [120, '2 horas']].forEach(([m, t], i) => panelButton(t, x + 520 + i * 92, y + 26, 84, 36, () => { CONFIG.dayMinutes = m; store('vale-da-lanterna-config', CONFIG); toast('Um dia agora dura ' + t); }, dayMinutes() === m ? 'on' : null));
+  text('Hoje: ' + forecastText() + ' · Amanhã: ' + forecastText(S.time.day + 1), x + 520, y + 78, 12, '#cfc3a6', 500, w - 520);
   text('Jogo', x, y + 112, 15, '#ffe38a', 700);
   panelButton('Salvar agora', x, y + 128, 170, 38, () => { save(); Audio.sfx('pick'); toast('Jogo salvo!'); });
   panelButton(Audio.muted ? 'Som: desligado' : 'Som: ligado', x + 184, y + 128, 170, 38, () => Audio.setMuted(!Audio.muted));
