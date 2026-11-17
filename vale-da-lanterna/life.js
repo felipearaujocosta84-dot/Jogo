@@ -170,8 +170,9 @@ function placeFor(r, name) {
 }
 function currentEntry(r, h = gameHour()) {
   const o = footballOverride(r, h) || socialOverride(r, h); if (o) return weatherShelter(r, o);
-  for (const e of r.sched) { if ((h >= e[0] && h < e[1]) || (h + 24 >= e[0] && h + 24 < e[1])) return weatherShelter(r, e); }
-  return weatherShelter(r, r.sched[r.sched.length - 1]);
+  const sched = schedFor(r);
+  for (const e of sched) { if ((h >= e[0] && h < e[1]) || (h + 24 >= e[0] && h + 24 < e[1])) return weatherShelter(r, e); }
+  return weatherShelter(r, sched[sched.length - 1]);
 }
 function npcMem(id) { S.npcs = S.npcs || {}; return S.npcs[id] || (S.npcs[id] = { met: false, talks: 0, lastDay: 0, recent: [] }); }
 
@@ -197,6 +198,7 @@ function buildNav() {
     for (const [x, y] of t) { const p = add(clamp(x, 160, WW - 160), clamp(y, 160, WH - 160)); if (prev && prev !== p) { prev.e.push(p); p.e.push(prev); } prev = p; }
   }
   for (const P of Object.values(PLACES)) if (P.area === 'world') add(P.x, P.y);
+  for (const [x, y] of EXTRA_NAV) add(x, y);
   for (const r of REGION_LIST) for (const d of r.doors) add(d.x, d.y + 36);
   for (const [x, y] of [[3550, 2420], [3550, 1700], [3250, 2000], [3850, 2000], [3550, 2700], [1900, 1300], [1900, 950], [2200, 1600], [2350, 1300], [2050, 1500],
     [4990, 1320], [5100, 1300], [5550, 2290], [5300, 2300], [4945, 2290], [4300, 900], [4400, 700], [1590, 1000], [1750, 960], [3330, 2010], [4100, 2200], [4700, 2300], [4945, 2300], [1700, 2100], [1800, 1760], [2260, 1000], [2300, 1180]]) add(x, y);

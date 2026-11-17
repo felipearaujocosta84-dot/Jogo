@@ -322,3 +322,28 @@ amizade 0–1000 (`social.js`), clima determinístico por dia (`weather.js`), ca
   molha o campo; recusa + longe → resultado calculado; amistoso pela conversa e convites aleatórios; desarme do Kai;
   desistência sem penalidade; toque real nos botões; Android emulado (Pixel 5, CPU 4× mais lenta): a partida custa cerca
   de +4–6 ms por quadro em relação à mesma cena sem futebol (+0,7 ms com CPU normal).
+
+## Vila maior, crianças e adolescentes, namoro melhorado (`village.js`, `romance.js`)
+- **4 construções novas**, colocadas depois da geração do mapa (o resto do mundo não muda; só árvores/pedras do terreno
+  delas e dos caminhos saem): **Escola do Vale** (entre a vila e a praça, carteiras e quadro-negro), **Casa da Dona Cida**
+  (ao norte da escola), **Casa do Seu Zeca** (noroeste da vila) e **Casa da Marta** (sudoeste). Cada uma com interior,
+  janelas acesas à noite e trilha de terra até a trilha mais próxima (pontos novos na rede de caminhos dos moradores).
+- **10 moradores novos:** adultos Dona Cida (professora), Seu Zeca (barqueiro) e Marta (curandeira); adolescentes
+  Pedro (16), Duda (14) e Rafa (15); crianças Lia (8), Bento (7), Malu (10) e Nico (6). Bonecos 3D em tamanho de criança/
+  adolescente, aparência própria, aniversários, presentes favoritos e falas.
+- **Rotina:** de segunda a sexta, aula das 8h às 12h (professora no quadro, alunos nas carteiras); à tarde crianças
+  brincam, Pedro treina no campo, Duda pesca com o pai, Rafa ajuda na serraria. **Fim de semana** com rotina própria
+  (`schedFor`). Chuva manda todos para casa. Adolescentes entram no futebol de sexta; crianças torcem.
+- **Namoro:** pontos de **romance** (0–100) separados da amizade (conversas, presentes favoritos, passeios, encontros);
+  **Encontro** a partir de 4♥ em 4 lugares/horários (piquenique no rio, bola no campo, pôr do sol na praça, estrelas no
+  campo) com uma cena e três respostas: a que combina com a personalidade rende mais; cada pessoa **valoriza algo**
+  (Mel: presentes favoritos; Bruno: ter emprego; Rosa: 2 encontros; Iara: explorar; Davi: 10 dias de conversa; Nina:
+  encontro sob as estrelas; Joca: jogar bola junto). **Pedir em namoro** mostra a lista do que falta e a dica; com tudo
+  pronto e o buquê, a pessoa aceita; sem tudo, ela explica com carinho e pede 2 dias para pensar. Quem gosta muito do Kai
+  pode **se declarar** primeiro (aceitar ou ficar só na amizade, sem briga). Dá para **terminar** o namoro/noivado.
+  Crianças e adolescentes **nunca** têm opção de romance (`canRomance` exige adulto elegível); adultos casados/não
+  interessados respondem com respeito.
+- **Testes:** portas acessíveis e rotas de todos os moradores novos sem bloqueio; escola cheia na segunda às 9h;
+  fim de semana; nenhuma opção romântica para os 7 menores (com 9,5♥ e romance 100); pedido com lista, "não" respeitoso,
+  encontro com cena e resposta certa (+18 romance), aceite, término, declaração da Iara, save/recarregar; fluxo antigo de
+  noivado, casamento e filhos; regressões de todas as fases e do futebol.

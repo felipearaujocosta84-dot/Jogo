@@ -206,6 +206,7 @@ function makeHouse(o, seed) {
       if (o.sign === 'heart') { rect(sx + 2, sy + 5, 2, 2, '#e05a6a'); rect(sx + 5, sy + 5, 2, 2, '#e05a6a'); rect(sx + 2, sy + 6, 5, 2, '#e05a6a'); rect(sx + 3, sy + 8, 3, 1, '#e05a6a'); }
       if (o.sign === 'bag') { rect(sx + 2, sy + 5, 4, 4, '#e0b040'); rect(sx + 3, sy + 4, 2, 1, '#a07a20'); }
       if (o.sign === 'inn') { rect(sx + 2, sy + 5, 4, 4, '#e8e0c8'); rect(sx + 6, sy + 6, 1, 2, '#e8e0c8'); rect(sx + 2, sy + 5, 4, 1, '#ffffff'); }
+      if (o.sign === 'book') { rect(sx + 1, sy + 5, 3, 4, '#f4f1ea'); rect(sx + 4, sy + 5, 3, 4, '#e8e0c8'); rect(sx + 4, sy + 5, 1, 4, '#8a5a34'); }
       if (o.sign === 'bread') { rect(sx + 1, sy + 6, 6, 3, '#a0602a'); rect(sx + 2, sy + 5, 4, 1, '#d9a05a'); }
     }
     // telhado
@@ -814,6 +815,19 @@ function drawFurniture(g, f, R) {
     case 'loom': {
       box(x + 6, y + 4, w - 12, 36, '#8a5a34');
       for (let i = 0; i < 14; i++) { g.fillStyle = ['#ff9ec7', '#ffe066', '#9ad1ff'][i % 3]; g.fillRect(x + 12 + i * 5, y + 8, 3, 28); }
+      break;
+    }
+    case 'desk': {   // carteira escolar com cadeira
+      box(x + 6, y + 4, 36, 18, '#c99a6a'); g.fillStyle = '#f4f1ea'; g.fillRect(x + 12, y + 8, 12, 9); g.fillStyle = '#4f7fbf'; g.fillRect(x + 28, y + 9, 8, 2);
+      g.fillStyle = '#8a5a34'; g.fillRect(x + 9, y + 22, 4, 12); g.fillRect(x + 35, y + 22, 4, 12);
+      box(x + 14, y + 34, 20, 8, '#a87446');
+      break;
+    }
+    case 'board': {   // quadro-negro com giz
+      box(x + 4, y + 10, w - 8, h - 26, '#2f4a3a', '#6b4626'); g.fillStyle = '#c99a6a'; g.fillRect(x + 4, y + h - 18, w - 8, 5);
+      g.fillStyle = '#e8eee4'; g.font = '700 18px monospace'; g.textBaseline = 'top'; g.fillText('A B C   1 + 2 = 3', x + 18, y + 22);
+      g.fillRect(x + 18, y + 50, 70, 2); g.fillRect(x + 100, y + 48, 40, 2);
+      g.fillStyle = '#f4f1ea'; g.fillRect(x + w - 40, y + h - 22, 10, 4);
       break;
     }
     case 'chest': {

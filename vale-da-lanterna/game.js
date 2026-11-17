@@ -1110,6 +1110,7 @@ function drawWorld() {
     ctx.strokeRect(pl.x0, pl.y0, pl.x1 - pl.x0, pl.y1 - pl.y0); ctx.restore();
   }
   drawBuildGround(x0, y0, x1, y1);
+  drawVillagePaths(x0, y0, x1, y1);
   drawFootballGround(x0, y0, x1, y1);
   drawPuddles(x0, y0, x1, y1);
   drawFarm(x0, y0, x1, y1);
@@ -1528,7 +1529,7 @@ function drawNpc(n) {
     drawn = Char3D.drawPerson(ctx, n.atlasKey || n.id, app, anim, time + (n.x % 7), fx, fy, n.x, n.y + 3 - (n.hopZ || 0), KAI3D_SIZE);
   }
   if (!drawn) {
-    const sc = n.kid ? 6 * (KID_SCALE[n.stage] || 0.6) : n.id === 'teo' ? 5 : 6;
+    const sc = n.kid ? 6 * (KID_SCALE[n.stage] || 0.6) : n.id === 'teo' ? 5 : n.app && n.app.scale ? 6 * n.app.scale : 6;
     if (n.sleeping) { spr(NPC[n.id], n.x, n.y - 10, sc * 0.9, false, false); ctx.fillStyle = '#5a4a6a'; ctx.fillRect(n.x - 26, n.y - 50, 52, 44); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(n.x - 26, n.y - 50, 52, 5); }
     else spr(NPC[n.id], n.x, n.y - (n.hopZ || 0) + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
   }
@@ -1873,7 +1874,7 @@ function drawPeopleTab(x, y, w, h) {
     text((partnerOf(r.id) ? '♥ ' : '') + r.name + ', ' + r.age + ' anos', cx + 8, cy + 13, 14, '#fff6e6', 700, colW * 0.55);
     text(r.prof, cx + colW * 0.58, cy + 13, 12, '#cfc3a6', 600, colW * 0.4);
     smallHearts(cx + 14, cy + 32, hearts(r.id));
-    text(statusText(r.id) + (m.upset ? ' · chateado(a)' : ''), cx + 136, cy + 32, 12, m.upset ? '#ff9a8a' : '#ffd6e6', 600, colW - 144);
+    text(statusText(r.id) + romanceTag(r.id) + (m.upset ? ' · chateado(a)' : ''), cx + 136, cy + 32, 12, m.upset ? '#ff9a8a' : '#ffd6e6', 600, colW - 144);
     const b = info.bday;
     let line3 = b ? 'Aniversário: ' + dateText(b[0], b[1]) : '';
     if (m.likesKnown && m.likesKnown.length) line3 += ' · gosta de ' + m.likesKnown.map(k => NAMES[k].toLowerCase()).join(', ');
@@ -1887,9 +1888,9 @@ function drawFamilyTab(x, y, w, h) {
   text('Família', x, y + 8, 15, '#ffe38a', 700);
   let yy = y + 28;
   if (!R) {
-    ['Você ainda não tem um par.', '1. Converse todo dia e dê presentes que a pessoa gosta (aba Pessoas).', '2. Com 3 corações, convide para passear.',
-      '3. Com 7 corações e um Buquê de Flores (Criar: 5 flores + 1 fibra), peça em namoro.', '4. Namorando há 3 dias, com 9 corações e um Anel de Cristal (bancada), peça em casamento.',
-      'Só moradores adultos e solteiros aceitam namorar, e cada um decide por si.'].forEach((l, i) => text(l, x, yy + i * 20, 12, i ? '#e8dcc0' : '#fff6e6', 600, colW));
+    ['Você ainda não tem um par.', '1. Converse todo dia e dê presentes (amizade ♥ e romance sobem).', '2. Com 4 corações, chame para um Encontro (rio, campo, pôr do sol, estrelas).',
+      '3. Cada pessoa valoriza algo: "Pedir em namoro" mostra o que falta e a dica.', '4. Com tudo pronto e um Buquê (5 flores + 1 fibra), peça. Se gostar muito de você, a pessoa pode se declarar!',
+      '5. Namorando há 3 dias, com 9 ♥ e um Anel de Cristal (bancada), peça em casamento.', 'Só adultos solteiros namoram; crianças e adolescentes nunca. Cada um decide por si.'].forEach((l, i) => text(l, x, yy + i * 20, 12, i ? '#e8dcc0' : '#fff6e6', 600, colW));
   } else {
     const p = RES_BY_ID[R.id], m = sm(R.id);
     ctx.fillStyle = 'rgba(255,122,166,0.14)'; ctx.beginPath(); ctx.roundRect(x, yy, colW, 92, 9); ctx.fill();
@@ -2365,6 +2366,7 @@ document.addEventListener('visibilitychange', () => {
   placeTownDecor();
   placeProps();
   footballInitWorld();
+  villageInitWorld();
   for (const id of Object.keys(INTERIORS)) buildInterior(id);
   grid = worldGrid;
   makeResidentObjects();

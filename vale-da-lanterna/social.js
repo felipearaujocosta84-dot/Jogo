@@ -70,12 +70,13 @@ function followPlayer(r, dt) {
 // passeio: termina sozinho depois de 2 horas do jogo
 function updateWalk() {
   if (!S.walk) return;
+  updateDate();
   const now = S.time.day * 1440 + S.time.min, r = RES_BY_ID[S.walk.id];
   if (!r) { S.walk = null; return; }
   if (now - S.walk.tick >= 10) { S.walk.tick = now; addFriend(r.id, partnerOf(r.id) ? 9 : 6); }
   if (now >= S.walk.end) {
     S.walk = null;
-    addFriend(r.id, 20); remember(r.id, 'Passeamos juntos pelo vale.');
+    addFriend(r.id, 20); romanceGain(r.id, 3); remember(r.id, 'Passeamos juntos pelo vale.');
     talkPid = r.id; talkFace = r;
     say([r.name + ': ' + (partnerOf(r.id) ? 'Que passeio lindo. Adoro estar com você.' : 'Foi muito bom passear com você, Kai! Até mais!')]);
     r.entry = null;
@@ -86,6 +87,7 @@ function updateWalk() {
 function socialOpen(n, questTalk) {
   const r = RES_BY_ID[n.id], m = sm(n.id), info = SOCIAL[n.id] || {};
   if (r.kid) return kidOpen(r);
+  if (romanceConfess(n)) return;
   const first = !m.met;
   const ch = [];
   ch.push({ t: 'Conversar', fn: () => { if (questTalk) questTalk(); else lifeTalk(n); dailyTalk(n.id); } });
@@ -94,8 +96,7 @@ function socialOpen(n, questTalk) {
   else if (!S.walk && !info.child && m.met) ch.push({ t: 'Passear', fn: () => inviteWalk(n) });
   ch.push(...economyChoices(n));
   ch.push(...footballChoices(n));
-  const rom = romanceOption(n);
-  if (rom) ch.push(rom);
+  ch.push(...romanceOptions(n));
   ch.push({ t: 'Tchau' });
   const greet = isBirthday(n.id) ? 'Hoje é meu aniversário!' : holidayToday() ? holidayToday().line : partnerOf(n.id) ? partnerGreet(n.id) : first ? 'Oi! Acho que ainda não nos conhecemos.' : m.upset ? 'Hmm... oi.' : 'Oi, Kai! O que manda?';
   say([n.name + ': ' + greet], null, ch);
@@ -109,7 +110,7 @@ function partnerGreet(id) {
 }
 function dailyTalk(id) {
   const m = sm(id);
-  if (m.talkDay !== S.time.day) { m.talkDay = S.time.day; addFriend(id, partnerOf(id) ? 25 : 18); if (m.upset && partnerOf(id)) { m.upsetDays = Math.max(0, m.upsetDays - 1); } }
+  if (m.talkDay !== S.time.day) { m.talkDay = S.time.day; m.talkDays = (m.talkDays || 0) + 1; romanceGain(id, partnerOf(id) ? 2 : 1); addFriend(id, partnerOf(id) ? 25 : 18); if (m.upset && partnerOf(id)) { m.upsetDays = Math.max(0, m.upsetDays - 1); } }
 }
 function inviteWalk(n) {
   const r = RES_BY_ID[n.id], h = hearts(n.id), e = r.entry || currentEntry(r);
@@ -143,6 +144,8 @@ function giveGift(id, item) {
   if (holidayToday() && v > 0) v = Math.round(v * 1.5);
   addFriend(id, v);
   if (liked && !m.likesKnown.includes(item)) m.likesKnown.push(item);
+  if (liked) m.likedGifts = (m.likedGifts || 0) + 1;
+  romanceGain(id, liked ? 4 : disliked ? -2 : 1);
   if (bday) m.bdayGift = S.time.day;
   if (v > 0 && m.upset) { m.upset = false; m.upsetDays = 0; remember(id, 'Fizemos as pazes com um presente.'); }
   remember(id, 'Ganhei ' + NAMES[item].toLowerCase() + ' do Kai' + (bday ? ' no meu aniversário' : '') + '.');
@@ -165,12 +168,11 @@ function romanceOption(n) {
     if (R.status === 'casados' && !S.family.babyDue && S.family.kids.length < 2) return { t: 'Aumentar a família?', fn: () => askBaby(id) };
     return null;
   }
-  if (!R && (S.bag.buque || 0) > 0 && !info.child && m.met) return { t: 'Pedir em namoro', fn: () => askDate(id) };
   return null;
 }
 function askDate(id) {
   const r = RES_BY_ID[id], info = SOCIAL[id], h = hearts(id);
-  if (!info.eligible) { say([r.name + ': ' + (info.no || 'Você é muito querido(a), mas não sinto isso por você.')]); return; }
+  if (!canRomance(id) || !(S.bag.buque > 0)) { say([r.name + ': ' + (info.no || 'Você é muito querido(a), mas não sinto isso por você.')]); return; }
   const need = r.pers === 'timido' ? 8 : 7;
   if (h < need) {
     addFriend(id, -10);
@@ -235,7 +237,7 @@ function apologize(id) {
 }
 
 // ---------------------------------------------------------------- filhos
-const KID_NAMES = ['Lumi', 'Bento', 'Aurora Jr.', 'Pipo', 'Clara', 'Tito', 'Maia', 'Nico', 'Lis', 'Davizinho'];
+const KID_NAMES = ['Lumi', 'Ravi', 'Aurora Jr.', 'Pipo', 'Clara', 'Tito', 'Maia', 'Joaquim', 'Lis', 'Davizinho'];
 function askBaby(id) {
   const r = RES_BY_ID[id], married = S.time.day - (S.romance.married || S.time.day);
   if (married < 3 || hearts(id) < 9) { say([r.name + ': Eu adoraria... mas vamos curtir mais um pouquinho a vida de casados primeiro?']); return; }
