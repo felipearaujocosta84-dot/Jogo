@@ -33,7 +33,7 @@ function migrateV1(o) {
     maxHp: o.maxHp || 5, chest: !!o.chest, bossDead: !!o.bossDead, done: !!o.done, moved: true };
 }
 function loadSave() {
-  let raw = load(SAVE_KEY);
+  let raw = loadMainRaw();
   if (!raw) { const v1 = load('vale-da-lanterna-v1'); if (v1) { store('vale-da-lanterna-backup-v1', v1); raw = migrateV1(v1); } }
   if (!raw) return null;
   const ver = raw.version || 2;
@@ -56,7 +56,7 @@ function save() {
   if (area !== 'world' && DYN.has(area)) { const d = DYN.get(area).door; S.pos = { area: 'world', x: d[0], y: d[1] + 40 }; }
   else if (area.startsWith('b_')) { const d = buildDoors().find(o => o.to === area); S.pos = d ? { area: 'world', x: d.x, y: d.y + 40 } : { area: 'world', x: 3550, y: 2400 }; }
   else S.pos = { area, x: Math.round(player.x), y: Math.round(player.y) };
-  store(SAVE_KEY, S);
+  if (storeChecked(SAVE_KEY, S)) saveWarned = false;
   lastSaveAt = time;
 }
 const relicCount = () => (S.relics.petala ? 1 : 0) + (S.relics.orvalho ? 1 : 0) + (S.relics.brasa ? 1 : 0);
@@ -702,6 +702,7 @@ function update(dt) {
   if (mode !== 'play' || rotateNeeded()) return;
   lifeUpdate(dt);
   weatherUpdate(dt);
+  updateLOD();
   if (work) { updateWork(dt); return; }
   if (menu || showMap) return;
 
@@ -1504,7 +1505,7 @@ function drawNpc(n) {
   shadow(n.x, n.y, 22, 8);
   const app = npcApp(n);
   let drawn = false;
-  if (Char3D && Q().npc3d && app) {
+  if (Char3D && Q().npc3d && app && !n.lod2d) {
     const talking = dialog && dialog.pid === n.id;
     let anim = n.moving ? 'walk' : n.resident ? n.anim : (NPC_IDLE[n.id] || (n.role === 'ferreiro' ? 'work' : 'idle'));
     let fx = n.fx || 0, fy = n.fy == null ? 1 : n.fy;
@@ -1773,6 +1774,7 @@ function drawHUD() {
   if (!build && buildContext() && !dialog && !menu && !work) label('Construir', b.x - 162 * HS(), b.y + 50, 11, '#fff6d8', 0.8);
   if (dialog) drawDialog();
   if (showMap) drawBigMap();
+  drawPerfHUD();
   if (menu) drawMenu();
   if (work) drawWork();
   if (flash > 0) { ctx.fillStyle = `rgba(255,245,210,${Math.min(0.7, flash)})`; ctx.fillRect(0, 0, W, H); }
@@ -2051,27 +2053,54 @@ function drawJobTab(x, y, w, h) {
   }
 }
 function drawConfigTab(x, y, w, h) {
+  const page = menu.cfg || 'geral';
+  panelButton('Geral', x + w - 230, y - 6, 110, 28, () => { menu.cfg = 'geral'; menu.confirm = null; }, page === 'geral' ? 'on' : null);
+  panelButton('Salvamentos', x + w - 114, y - 6, 110, 28, () => { menu.cfg = 'save'; menu.confirm = null; }, page === 'save' ? 'on' : null);
+  if (page === 'save') { drawSaveSlots(x, y + 30, w, h - 30); return; }
   const half = w >= 560, colW = half ? (w - 20) / 2 : w;
-  text('Qualidade gráfica', x, y + 10, 15, '#ffe38a', 700);
+  text('Qualidade gráfica', x, y + 10, 15, '#ffe38a', 700, w - 240);
   const ks = Object.keys(QUALITY), bw = Math.min(110, (colW - 18) / 4);
   ks.forEach((k, i) => panelButton(QUALITY[k].name, x + i * (bw + 6), y + 26, bw, 36, () => setQuality(k), CONFIG.quality === k ? 'on' : null));
-  const q = Q();
-  text('NPCs ' + (q.npc3d ? 'em 3D (' + q.dirs + ' direções)' : 'em 2D') + ' · efeitos ' + Math.round(q.fx * 100) + '%', x, y + 76, 12, '#cfc3a6', 500, colW);
-  const dx = half ? x + colW + 20 : x, dy = half ? y : y + 92;
+  const q = Q(), lod = LOD[CONFIG.quality] || LOD.medio;
+  text('NPCs ' + (q.npc3d ? 'em 3D (' + q.dirs + ' direções, até ' + lod[1] + ' perto)' : 'em 2D') + ' · efeitos ' + Math.round(q.fx * 100) + '%', x, y + 76, 12, '#cfc3a6', 500, colW);
+  const dx = half ? x + colW + 20 : x, dy = half ? y + 30 : y + 92;
   text('Duração de um dia', dx, dy + 10, 15, '#ffe38a', 700);
   const dw = Math.min(84, (colW - 18) / 4);
   [[20, '20 min'], [30, '30 min'], [60, '1 hora'], [120, '2 horas']].forEach(([m, t], i) => panelButton(t, dx + i * (dw + 6), dy + 26, dw, 36, () => { CONFIG.dayMinutes = m; store('vale-da-lanterna-config', CONFIG); toast('Um dia agora dura ' + t); }, dayMinutes() === m ? 'on' : null));
   text('Hoje: ' + forecastText() + ' · Amanhã: ' + forecastText(S.time.day + 1), dx, dy + 76, 12, '#cfc3a6', 500, colW);
-  const gy = half ? y + 100 : y + 180;
+  const gy = half ? y + 120 : y + 180, gb = Math.min(160, (w - 24) / 4);
   text('Jogo', x, gy + 10, 15, '#ffe38a', 700);
-  const gb = Math.min(170, (w - 24) / 3);
-  panelButton('Salvar agora', x, gy + 26, gb, 38, () => { save(); Audio.sfx('pick'); toast('Jogo salvo!'); });
-  panelButton(Audio.muted ? 'Som: desligado' : 'Som: ligado', x + gb + 10, gy + 26, gb, 38, () => Audio.setMuted(!Audio.muted));
-  panelButton(CONFIG.leftHand ? 'Botões: esquerda' : 'Botões: direita', x + (gb + 10) * 2, gy + 26, gb, 38, () => { CONFIG.leftHand = !CONFIG.leftHand; store('vale-da-lanterna-config', CONFIG); });
+  const cfgSet = (k, v) => { CONFIG[k] = v; store('vale-da-lanterna-config', CONFIG); };
+  [['Salvar agora', () => { save(); Audio.sfx('pick'); toast('Jogo salvo!'); }, null],
+   [Audio.muted ? 'Som: desligado' : 'Som: ligado', () => Audio.setMuted(!Audio.muted), null],
+   [CONFIG.leftHand ? 'Botões: esquerda' : 'Botões: direita', () => cfgSet('leftHand', !CONFIG.leftHand), null],
+   [CONFIG.autoQ === false ? 'Auto-ajuste: não' : 'Auto-ajuste: sim', () => cfgSet('autoQ', CONFIG.autoQ === false), CONFIG.autoQ === false ? null : 'on'],
+   [CONFIG.showFps ? 'Mostrar FPS: sim' : 'Mostrar FPS: não', () => cfgSet('showFps', !CONFIG.showFps), CONFIG.showFps ? 'on' : null]
+  ].forEach(([t, fn, st], i) => { const per = Math.floor((w + 8) / (gb + 8)); panelButton(t, x + (i % per) * (gb + 8), gy + 24 + Math.floor(i / per) * 42, gb, 36, fn, st); });
+  const ly = gy + 24 + Math.ceil(5 / Math.floor((w + 8) / (gb + 8))) * 42 + 8;
   const ago = Math.max(0, Math.round(time - lastSaveAt));
-  text('Salvamento automático a cada 6 segundos · último há ' + ago + ' s', x, gy + 76, 12, '#cfc3a6', 500, w);
-  text('Versão do save: ' + S.version + ' · cópia de segurança guardada antes de cada migração', x, gy + 92, 12, '#cfc3a6', 500, w);
-  text('Teclado: WASD/setas andam · Espaço/E age · I abre o menu · M mapa · Q usa poção · R gira na construção', x, gy + 108, 11, '#b8ad94', 500, w);
+  text('Salvamento automático a cada 6 s (último há ' + ago + ' s) e ao sair do app · auto-ajuste baixa a qualidade se o jogo ficar lento', x, ly, 11, '#cfc3a6', 500, w);
+  text('Teclado: WASD/setas andam · Espaço/E age · I abre o menu · M mapa · Q usa poção · R gira na construção', x, ly + 16, 11, '#b8ad94', 500, w);
+}
+function drawSaveSlots(x, y, w, h) {
+  const rh = Math.min(58, (h - 70) / SLOTS - 6), bw = Math.min(100, w * 0.15);
+  const ask = (key, label, fn) => menu.confirm === key ? ['Confirmar?', () => { menu.confirm = null; fn(); }, 'on'] : [label, () => { menu.confirm = key; }, null];
+  for (let i = 1; i <= SLOTS; i++) {
+    const m = slotMeta(i), ry = y + (i - 1) * (rh + 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.roundRect(x, ry, w, rh, 9); ctx.fill();
+    text('Espaço ' + i, x + 10, ry + rh * 0.3, 14, '#ffe38a', 700);
+    text(m ? 'Dia ' + m.day + ' · ' + m.date + ' · ' + m.hour + ' · ' + m.place + ' · ' + m.coins + ' moedas' : 'Vazio', x + 10, ry + rh * 0.7, 11, m ? '#e8dcc0' : '#8a8070', 600, w - 3 * (bw + 6) - 20);
+    const bx = x + w - 3 * (bw + 6), by = ry + (rh - 34) / 2;
+    const sv = m ? ask('s' + i, 'Salvar', () => saveSlot(i)) : ['Salvar', () => saveSlot(i), null];
+    panelButton(sv[0], bx, by, bw, 34, sv[1], sv[2]);
+    const ld = ask('l' + i, 'Carregar', () => loadSlot(i)); panelButton(ld[0], bx + bw + 6, by, bw, 34, ld[1], m ? ld[2] : 'off');
+    const cl = ask('c' + i, 'Apagar', () => clearSlot(i)); panelButton(cl[0], bx + 2 * (bw + 6), by, bw, 34, cl[1], m ? cl[2] : 'off');
+  }
+  const iy = y + SLOTS * (rh + 6) + 8;
+  const hasUndo = !!(() => { try { return localStorage.getItem('vale-da-lanterna-antes-de-carregar'); } catch (e) { return null; } })();
+  panelButton('Desfazer carregamento', x, iy, 200, 32, undoLoad, hasUndo ? null : 'off');
+  text('Save principal: ' + saveSizeKB() + ' KB · versão ' + S.version + ' · cópia automática no início de cada dia e antes de cada migração.', x + 212, iy + 9, 11, '#cfc3a6', 500, w - 212);
+  text('Toque duas vezes para confirmar ações que substituem um jogo salvo.', x + 212, iy + 25, 11, '#b8ad94', 500, w - 212);
 }
 function text(t, x, y, size, col, weight = 600, maxW) { ctx.font = `${weight} ${size}px ${FONT}`; ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y, maxW); }
 function drawBagTab(x, y, w, h) {
@@ -2278,7 +2307,8 @@ function drawEnd() {
 // ---------------------------------------------------------------- laço principal
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const realDt = (now - last) / 1000, dt = Math.min(0.05, realDt); last = now;
+  const t0 = performance.now();
   frameNo++;
   if (Char3D) Char3D.tick(Q().bake);
   try {
@@ -2299,6 +2329,7 @@ function frame(now) {
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = `rgba(12,16,12,${clamp(a, 0, 1)})`; ctx.fillRect(0, 0, W, H);
     }
   } catch (err) { console.error(err); }
+  perfFrame(realDt, performance.now() - t0);
   requestAnimationFrame(frame);
 }
 document.addEventListener('visibilitychange', () => {

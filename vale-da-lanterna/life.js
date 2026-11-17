@@ -19,6 +19,7 @@ function updateClock(dt) {
   if (S.time.min >= 1440) { S.time.min -= 1440; S.time.day++; onNewDay(); }
 }
 function onNewDay() {
+  dailyBackup();
   toast('Dia ' + S.time.day + ' · ' + weekday());
   for (const r of RESIDENTS) { const m = npcMem(r.id); m.todayTalk = false; }
   weatherNewDay();

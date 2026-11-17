@@ -74,7 +74,7 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 7 | Construção livre e decoração | ✅ concluída |
 | 8 | Dia e noite, clima | ✅ concluída |
 | 9 | Interface, menus, controles | ✅ concluída |
-| 10 | Salvamento completo, otimização, testes gerais | ⏳ próxima |
+| 10 | Salvamento completo, otimização, testes gerais | ✅ concluída |
 
 Observação: a Fase 3 (rotinas) depende do relógio do jogo, então a parte básica do relógio da Fase 8
 será antecipada no início da Fase 3.
@@ -255,3 +255,22 @@ será antecipada no início da Fase 3.
   chefe e local.
 - **Ajustes**: dia de 20 min, 30 min, 1 h ou 2 h; **modo canhoto** (botão de ação, Mochila e Construir à esquerda;
   joystick do lado direito); lista de atalhos de teclado; layout se adapta a telas estreitas.
+
+## Fase 10 — Salvamento, otimização e testes (`system.js`)
+- **Salvamento automático** a cada 6 s e também quando o app vai para segundo plano ou é fechado (`pagehide`,
+  `visibilitychange` — antes só salvava se o som tivesse sido iniciado).
+- **Cópia diária** (`vale-da-lanterna-diario`) no início de cada dia. Se o save principal estiver danificado, o jogo
+  guarda o texto danificado à parte e **recupera a cópia do dia**, avisando o jogador.
+- **Armazenamento cheio/bloqueado**: o jogo não trava e avisa uma vez.
+- **3 espaços de salvamento manual** (Ajustes → Salvamentos): salvar, carregar e apagar, com dia, data, hora,
+  lugar e moedas; ações que substituem um jogo pedem dois toques; **Desfazer carregamento** volta ao jogo de antes.
+- **Migração** (já existente, mantida): v1 → v2/v3 com cópia `vale-da-lanterna-backup-v<n>`; campos novos chegam por
+  `deepDefaults` sem apagar nada.
+- **Desempenho**: medição de FPS e tempo de trabalho por quadro; **Mostrar FPS** opcional; **auto-ajuste** de qualidade
+  (abaixo de 38 fps por 5 s seguidos baixa um nível e avisa; pode ser desligado).
+- **LOD dos NPCs**: só os mais próximos usam o boneco 3D (Médio 10 até 900 px, Alto 18 até 1400 px, Ultra 40 até
+  2600 px; Baixo tudo em 2D); os outros usam o desenho 2D. **Limite de partículas** por qualidade.
+- **Testes gerais** (Playwright, Chromium): espaços de salvamento e desfazer; save corrompido → recuperado;
+  armazenamento cheio; auto-ajuste; limite de partículas; cidade com 28 NPCs nas 4 qualidades (60 fps estável depois
+  de preparar os bonecos); **60 dias simulados** com casamento, filho, animais, canteiros, clima e interiores sem
+  nenhum erro, save de 3 KB, recarregado intacto; regressões das fases anteriores.
