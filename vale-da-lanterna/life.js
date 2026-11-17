@@ -243,6 +243,7 @@ function makeResidentObjects() {
   for (const r of RESIDENTS) {
     RES_BY_ID[r.id] = r;
     r.app = r.app || NPC_APP[r.id];
+    if (r.app && SOCIAL[r.id]) r.app.fem = SOCIAL[r.id].gender === 'f';
     if (!NPC[r.id]) NPC[r.id] = spriteFromApp(r.app, hashStr(r.id));
     Object.assign(r, { area: r.home, x: 0, y: 0, steps: [], anim: 'idle', fx: 0, fy: 1, moving: false, entry: null, resident: true });
   }

@@ -1523,7 +1523,7 @@ const NPC_APP = {
   rosa: { skin: '#f0c08a', hair: '#d0542e', hairStyle: 'short', top: '#f2efe6', dress: true, apron: '#fbfbf4', hat: 'chef' },
   teo: { skin: '#f0c08a', hair: '#8a5a2b', hairStyle: 'spiky', top: '#f2c94c', bottom: '#4a6fa5', scale: 0.74 },
   rui: { skin: '#c98f5e', hair: '#23232e', hairStyle: 'short', top: '#2f4f7a', bottom: '#2a2a35', beard: '#23232e' },
-  lina: { skin: '#f0c08a', hair: '#5a3a26', hairStyle: 'pony', top: '#e6dccb', bottom: '#6b5a4a' }
+  lina: { skin: '#f0c08a', hair: '#5a3a26', hairStyle: 'pony', top: '#e6dccb', bottom: '#6b5a4a', fem: true }
 };
 const NPC_IDLE = { tome: 'farm', bruno: 'work', rui: 'rest', lina: 'rest' };
 function npcApp(n) { return n.app || NPC_APP[n.id] || (NPC[n.id] && NPC[n.id].app) || null; }

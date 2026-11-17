@@ -132,33 +132,19 @@ function whereIs(r) {
   return names[e && e[2]] || 'andando pelo vale';
 }
 // resposta com contexto ao que o Kai escreveu
-function npcReply(id, text) {
-  const r = RES_BY_ID[id], m = sm(id), low = text.toLowerCase(), P = PERS[r.pers] || PERS.gentil;
-  const hi = P.hi[Math.floor(Math.random() * P.hi.length)];
-  if (m.chatDay !== S.time.day) { m.chatDay = S.time.day; addFriend(id, partnerOf(id) ? 6 : 3); }
-  const love = partnerOf(id), st = S.romance && S.romance.status;
-  if (/te amo|amor|saudade|beijo/.test(low)) return love ? ['Também te amo! ❤', 'Saudade de você também...', 'Vem logo me ver! 😘'][S.time.day % 3] : hearts(id) >= 5 ? 'Haha, também gosto muito de você, amigo(a)!' : 'Hã? 😅';
-  if (/filh|bebê|bebe|crian/.test(low) && st === 'casados') { const k = S.family.kids[0]; return k ? (k.needs.fome < 40 ? k.name + ' está com fome... traz uma sopa?' : k.name + ' está bem! Brincou o dia todo.') : 'Ainda não temos filhos... quem sabe um dia?'; }
-  if (/onde|cad[eê]/.test(low)) return 'Tô ' + whereIs(r) + '.';
-  if (/futebol|bola|jogo|partida/.test(low)) { for (let d = S.time.day; d < S.time.day + 8; d++) { const e = fbEvent(d, false); if (e && !fbDone(e)) return 'Tem futebol ' + (d === S.time.day ? 'hoje' : weekday(d).toLowerCase()) + ' às ' + e.start + 'h no campo! ' + (FB_ATTR[id] ? 'Bora!' : 'Vou torcer!'); } return 'Sexta tem futebol no campo, como sempre!'; }
-  if (/festa|anivers/.test(low)) { for (let d = S.time.day; d < S.time.day + 30; d++) { const ev = dayEvents(d).find(e => e.k === 'festa' || e.k === 'niver'); if (ev) return 'Próxima: ' + ev.t + (d === S.time.day ? ' (hoje!)' : ', ' + dateText(calOf(d).m, calOf(d).d)) + '.'; } return 'Não sei de nenhuma festa por agora.'; }
-  if (/passe|volta|sair|encontr|vamos/.test(low)) { if (hearts(id) >= 3 || love) { m.walkPromise = S.time.day; return 'Bora! Me encontra ' + whereIs(r) + ' que a gente sai.'; } return 'Hmm, quem sabe outro dia...'; }
-  if (/obrigad|valeu/.test(low)) return 'De nada! 😊';
-  if (/tempo|chuva|sol|frio|calor/.test(low)) return 'Hoje: ' + forecastText().toLowerCase() + '.';
-  if (/trabalh|emprego/.test(low)) return (PROF_LINES[r.prof] || ['Muito trabalho por aqui!'])[S.time.day % (PROF_LINES[r.prof] || [1]).length];
-  if (/^(oi|olá|ola|e ?a[ií]|bom dia|boa tarde|boa noite|opa)/.test(low)) return hi + ' Tô ' + whereIs(r) + '. E você?';
-  return lifeLine(id).replace(/^.*?! /, '');
-}
+function npcReply(id, text) { return dlgReply(id, text, 'phone').join(' '); }
 function sendMsg(chatId, text, extra) {
   pushMsg(chatId, 'kai', text, extra);
   const c = chatOf(chatId);
   const replyFrom = c.group ? c.members.filter(id => RES_BY_ID[id]).sort(() => Math.random() - 0.5).slice(0, 2) : [chatId];
   replyFrom.forEach((id, i) => {
     const r = RES_BY_ID[id]; if (!r) return;
-    let ans = extra && extra.photo ? ['Que foto linda!', 'Uau, ficou ótima! 📷', 'Adorei!'][hashStr(id + S.time.min) & 1] : extra && extra.vid != null ? 'Hahaha, esse vídeo é muito bom!' : npcReply(id, text);
+    const ans = extra && extra.photo ? [['Que foto linda!', 'Uau, ficou ótima! 📷', 'Adorei! Onde foi isso?'][hashStr(id + S.time.min) % 3]] : extra && extra.vid != null ? ['Hahaha, esse vídeo é muito bom!'] : dlgReply(id, text, 'phone');
     if (extra && (extra.photo || extra.vid != null)) addFriend(id, 2);
-    if (r.sleeping) { phS().plan.push({ at: (S.time.day + (gameHour() >= 6 ? 1 : 0)) * 1440 + 7 * 60 + 10 + i * 5, chat: chatId, from: id, text: 'Desculpa, eu tava dormindo! ' + ans }); return; }
-    npcMsg(chatId, id, ans, null, 1.5 + i * 1.8 + Math.random() * 1.5);
+    if (r.sleeping) { phS().plan.push({ at: (S.time.day + (gameHour() >= 6 ? 1 : 0)) * 1440 + 7 * 60 + 10 + i * 5, chat: chatId, from: id, text: 'Desculpa, eu tava dormindo! ' + ans.join(' ') }); return; }
+    // cada frase chega num balão, com tempo de "digitando" proporcional ao tamanho
+    let wait = 1.2 + i * 2.2 + Math.random();
+    for (const a of ans) { npcMsg(chatId, id, a, null, wait); wait += 0.8 + Math.min(2.5, a.length / 30); }
   });
   save();
 }
@@ -330,6 +316,9 @@ function phoneNewDay() {
     const txt = { alegre: 'Kaiii! Bora dar uma volta hoje? 🌸', brincalhao: 'E aí, herói! Partiu rolê mais tarde?', aventureira: 'Bora explorar um pouco hoje?', timido: 'Oi Kai... se quiser passear mais tarde, eu topo.', serio: 'Kai. Se estiver livre, podemos dar uma volta.', gentil: 'Querido, passa aqui mais tarde pra uma volta?', sonhadora: 'O céu tá lindo hoje... bora passear?', trabalhador: 'Depois do trabalho, uma volta?' }[r.pers] || 'Bora passear mais tarde?';
     plan(14 + (hashStr(id + d) & 3), id, id, txt, { cat: 'invite', opts: [{ t: 'Bora!', act: 'walk:' + id, yes: true }, { t: 'Hoje não dá', act: 'walk:' + id }] });
   }
+  // um amigo puxa assunto (sobre algo que você contou, novidades do vale ou a vida dele)
+  const chatty = P.contacts.filter(id => RES_BY_ID[id] && hearts(id) >= 2 && !partnerOf(id));
+  if (chatty.length && Math.random() < 0.4) { const id = chatty[(hashStr('st' + d) >>> 0) % chatty.length]; plan(12 + (hashStr(id + d) & 3), id, id, chatSmallTalk(id)); }
   // aniversário de contato: convite para a festa
   const host = typeof partyHostToday === 'function' ? partyHostToday() : null;
   if (host && isContact(host.id)) plan(9, host.id, host.id, 'Hoje é meu aniversário! 🎂 Festa lá em casa às 18h. Você vem?', { cat: 'bday', opts: [{ t: 'Vou sim! Parabéns!', act: 'party:' + host.id, yes: true }, { t: 'Parabéns! 🎉', act: 'party:' + host.id }] });
@@ -561,7 +550,9 @@ function drawChat(x, y, w, h, st) {
     // opções de resposta para convites
     if (m.opts && !mine) bub.push(m);
   }
-  if (msgs.length > 6) pbtn('Mais antigas', x + w / 2 - 50, y + 4, 100, 20, () => { st.off = Math.min(c.msgs.length - 3, st.off + 4); }, 'ghost', 10);
+  const typingNow = phS().pending.filter(q => q.chat === c.id);
+  if (typingNow.length && !st.off) { const who = RES_BY_ID[typingNow[0].from]; ctx.fillStyle = '#e9e6f2'; ctx.beginPath(); ctx.roundRect(x + 10, y + area - 28, 150, 22, 11); ctx.fill(); ptext((who ? who.name : '') + ' está digitando' + '.'.repeat(1 + Math.floor(PH.rt * 3) % 3), x + 20, y + area - 17, 11, '#6a6478', 600, 140); }
+  if (msgs.length > 6) pbtn('Mais antigas', x + w / 2 - 50, y + 4, 100, 20, () => { st.off = Math.min(c.msgs.length - 3, st.off + 4); }, null, 10);
   if (st.off) pbtn('Recentes ▼', x + w / 2 - 50, y + area - 24, 100, 20, () => { st.off = Math.max(0, st.off - 4); }, 'on', 10);
   // área de resposta
   const iy = y + area;
@@ -569,9 +560,9 @@ function drawChat(x, y, w, h, st) {
   const pend = c.msgs.slice().reverse().find(m => m.opts && m.f !== 'kai');
   let opts;
   if (pend) opts = pend.opts.map(o => ({ t: o.t, fn: () => { pend.chat = c.id; phoneAct(pend, o); } }));
-  else if (c.group) opts = [{ t: 'Oi, pessoal!' }, { t: 'Vai ter futebol?' }, { t: 'Bora pra praça?' }].map(o => ({ t: o.t, fn: () => sendMsg(c.id, o.t) }));
+  else if (c.group) opts = [{ t: 'Oi, pessoal!' }, { t: 'Vai ter futebol?' }, { t: 'Alguma novidade?' }].map(o => ({ t: o.t, fn: () => sendMsg(c.id, o.t) }));
   else {
-    const q = ['Oi! Tudo bem?', 'Onde você está?', 'Bora passear?', 'Vai ter futebol?'];
+    const q = ['Oi! Tudo bem?', 'O que tá fazendo?', 'Bora sair mais tarde?', 'Alguma novidade?'];
     if (partnerOf(c.id)) q.splice(1, 0, 'Saudade de você ❤'); if (partnerOf(c.id) && S.family.kids.length) q.splice(2, 0, 'Como estão as crianças?');
     opts = q.slice(0, 4).map(t => ({ t, fn: () => sendMsg(c.id, t) }));
   }

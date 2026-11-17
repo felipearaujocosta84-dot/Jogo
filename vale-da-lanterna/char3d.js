@@ -209,15 +209,32 @@ const Char3D = (() => {
       return p;
     });
     P.torso = pivot(P.body, 0, 0.6, 0);
-    box(P.torso, 0.5, 0.54, 0.3, tp, 0, 0.27, 0);
+    const F = !!app.fem, kidF = F && (app.scale || 1) < 0.86;
+    if (F) {   // silhueta feminina: ombros estreitos, cintura e quadril
+      box(P.torso, 0.42, 0.3, 0.27, tp, 0, 0.38, 0);
+      box(P.torso, 0.36, 0.14, 0.25, tp, 0, 0.17, 0, false);
+      box(P.torso, 0.46, 0.14, 0.3, app.dress ? tp : bt, 0, 0.05, 0);
+    } else box(P.torso, 0.54, 0.54, 0.31, tp, 0, 0.27, 0);
     if (app.dress) { const d = new T.Mesh(new T.CylinderGeometry(0.24, 0.36, 0.5, 8), M(tp)); d.position.set(0, -0.12, 0); const o = new T.Mesh(d.geometry, OUT); o.scale.set(1.06, 1.04, 1.06); d.add(o); P.torso.add(d); }
     if (app.apron) box(P.torso, 0.4, app.dress ? 0.8 : 0.5, 0.04, hex(app.apron), 0, app.dress ? 0.05 : 0.2, 0.17, false);
-    box(P.torso, 0.54, 0.08, 0.33, hex(app.collar || app.top || '#4f7fbf') , 0, 0.53, 0, false);
+    box(P.torso, F ? 0.44 : 0.56, 0.08, F ? 0.29 : 0.33, hex(app.collar || app.top || '#4f7fbf'), 0, 0.53, 0, false);
     P.head = pivot(P.torso, 0, 0.6, 0);
-    box(P.head, 0.42, 0.4, 0.4, sk, 0, 0.2, 0);
-    for (const x of [-0.1, 0.1]) box(P.head, 0.06, 0.08, 0.02, 0x2a2238, x, 0.2, 0.205, false);
-    box(P.head, 0.07, 0.03, 0.02, 0x9e5a4a, 0, 0.1, 0.205, false);
-    const st = app.hairStyle || 'short';
+    box(P.head, F ? 0.4 : 0.42, 0.4, 0.4, sk, 0, 0.2, 0);
+    if (F) {
+      // olhos maiores com brilho e cílios, bochechas coradas, lábios rosados
+      for (const x of [-0.1, 0.1]) {
+        box(P.head, 0.07, 0.1, 0.02, 0x2a2238, x, 0.2, 0.205, false);
+        box(P.head, 0.025, 0.03, 0.01, 0xffffff, x + 0.018, 0.23, 0.216, false);
+        box(P.head, 0.1, 0.025, 0.02, 0x1a1420, x + (x < 0 ? -0.01 : 0.01), 0.265, 0.207, false);
+        box(P.head, 0.07, 0.04, 0.01, 0xf29aa8, x + (x < 0 ? -0.04 : 0.04), 0.13, 0.206, false);
+      }
+      box(P.head, 0.09, 0.035, 0.02, 0xd9506e, 0, 0.09, 0.205, false);
+    } else {
+      for (const x of [-0.1, 0.1]) { box(P.head, 0.06, 0.08, 0.02, 0x2a2238, x, 0.2, 0.205, false); box(P.head, 0.1, 0.035, 0.02, hex(app.beard || app.hair || '#3a2a20'), x, 0.265, 0.206, false); }
+      box(P.head, 0.09, 0.03, 0.02, 0x8a4a3a, 0, 0.1, 0.205, false);
+    }
+    let st = app.hairStyle || 'short';
+    if (F && (st === 'short' || st === 'bald' || st === 'spiky')) st = 'bob';
     if (st !== 'bald') {
       box(P.head, 0.46, 0.12, 0.44, hr, 0, 0.44, -0.01);
       box(P.head, 0.46, 0.3, 0.1, hr, 0, 0.28, -0.19);
@@ -226,15 +243,27 @@ const Char3D = (() => {
     if (st === 'long') { box(P.head, 0.48, 0.5, 0.12, hr, 0, 0.12, -0.2); box(P.head, 0.07, 0.36, 0.3, hr, -0.24, 0.2, -0.04, false); box(P.head, 0.07, 0.36, 0.3, hr, 0.24, 0.2, -0.04, false); }
     if (st === 'bun') { const b = new T.Mesh(new T.SphereGeometry(0.13, 8, 6), M(hr)); b.position.set(0, 0.55, -0.12); P.head.add(b); }
     if (st === 'pony') box(P.head, 0.12, 0.34, 0.12, hr, 0, 0.22, -0.3);
+    if (F) {
+      // mechas emoldurando o rosto (todas as meninas e mulheres)
+      const lh = kidF ? 0.32 : 0.46, ly = kidF ? 0.22 : 0.14;
+      box(P.head, 0.08, lh, 0.18, hr, -0.24, ly, 0.09, false);
+      box(P.head, 0.08, lh, 0.18, hr, 0.24, ly, 0.09, false);
+      if (st === 'bob') box(P.head, 0.48, 0.22, 0.12, hr, 0, 0.18, -0.2);
+      if (!app.hat) {
+        if (kidF) { box(P.head, 0.1, 0.08, 0.06, 0xff5a8a, -0.1, 0.48, 0.12, false); box(P.head, 0.1, 0.08, 0.06, 0xff5a8a, 0.06, 0.48, 0.12, false); box(P.head, 0.05, 0.06, 0.07, 0xd83a6a, -0.02, 0.48, 0.12, false); }
+        else { box(P.head, 0.13, 0.12, 0.08, hex(app.flower || '#ff7aa6'), 0.15, 0.47, 0.17, false); box(P.head, 0.05, 0.05, 0.09, 0xffe066, 0.15, 0.47, 0.18, false); }
+      }
+      if (!kidF) for (const x of [-0.215, 0.215]) box(P.head, 0.03, 0.05, 0.03, 0xe2b84a, x, 0.1, 0.02, false);
+    }
     if (st === 'spiky') [[-0.12, 0.52, 0.4], [0.06, 0.54, -0.3], [0.18, 0.5, -0.7]].forEach(([x, y, r]) => { const s = box(P.head, 0.12, 0.15, 0.12, hr, x, y, 0); s.rotation.z = r; });
     if (app.beard) box(P.head, 0.4, 0.14, 0.08, hex(app.beard), 0, 0.05, 0.2, false);
     if (app.hat === 'straw') { box(P.head, 0.72, 0.04, 0.72, 0xe9c46a, 0, 0.47, 0); box(P.head, 0.42, 0.14, 0.42, 0xd8b058, 0, 0.55, 0); }
     if (app.hat === 'chef') { box(P.head, 0.44, 0.08, 0.44, 0xfbfbf4, 0, 0.46, 0); const c = new T.Mesh(new T.SphereGeometry(0.2, 8, 6), M(0xfbfbf4)); c.position.set(0, 0.6, 0); P.head.add(c); }
     if (app.hat === 'cap') { box(P.head, 0.46, 0.1, 0.44, hex(app.hatCol || '#c8423b'), 0, 0.46, 0); box(P.head, 0.3, 0.03, 0.18, hex(app.hatCol || '#c8423b'), 0, 0.42, 0.27, false); }
-    P.arms = [-0.32, 0.32].map(x => {
+    P.arms = (F ? [-0.27, 0.27] : [-0.34, 0.34]).map(x => {
       const p = pivot(P.torso, x, 0.5, 0);
-      box(p, 0.14, 0.36, 0.16, tp, 0, -0.17, 0);
-      box(p, 0.12, 0.11, 0.14, sk, 0, -0.4, 0);
+      box(p, F ? 0.11 : 0.15, 0.36, F ? 0.13 : 0.17, tp, 0, -0.17, 0);
+      box(p, F ? 0.1 : 0.12, 0.11, F ? 0.12 : 0.14, sk, 0, -0.4, 0);
       return p;
     });
     // ferramentas na mão direita

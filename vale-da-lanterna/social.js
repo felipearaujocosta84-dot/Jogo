@@ -136,7 +136,8 @@ function socialOpen(n, questTalk) {
   if (romanceConfess(n)) return;
   const first = !m.met;
   const ch = [];
-  ch.push({ t: 'Conversar', fn: () => { if (questTalk) questTalk(); else lifeTalk(n); dailyTalk(n.id); } });
+  ch.push({ t: 'Conversar', fn: () => { if (questTalk) questTalk(); else if (!m.met || r.sleeping) lifeTalk(n); else { noteTalk(n.id); talkConverse(n); } dailyTalk(n.id); } });
+  if (questTalk && m.met) ch.push({ t: 'Bater papo', fn: () => { noteTalk(n.id); talkConverse(n); dailyTalk(n.id); } });
   if (m.giftDay !== S.time.day) ch.push({ t: 'Presente', fn: () => { menu = { tab: 'gift', npc: n.id }; } });
   if (S.walk && S.walk.id === n.id) ch.push({ t: 'Encerrar passeio', fn: () => { S.walk.end = 0; updateWalk(); } });
   else if (!S.walk && !info.child && m.met) ch.push({ t: 'Passear', fn: () => inviteWalk(n) });
@@ -309,7 +310,8 @@ function kidResident(k) {
     RESIDENTS.push(r); RES_BY_ID[k.id] = r;
   }
   r.name = k.name; r.age = S.time.day - k.born; r.stage = stage; r.sched = kidSched(stage); r.entry = null;
-  r.app = Object.assign({}, k.app, { scale: KID_SCALE[stage] });
+  if (!k.gender) k.gender = (hashStr(k.id + k.name) & 1) ? 'f' : 'm';
+  r.app = Object.assign({}, k.app, { scale: KID_SCALE[stage], fem: k.gender === 'f' });
   r.atlasKey = k.id + '_' + stage;
   NPC[k.id] = spriteFromApp(r.app);
   return r;
