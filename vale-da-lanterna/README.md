@@ -4,9 +4,24 @@ Aventura em mundo aberto para celular **na horizontal** (HTML5 + canvas, sem dep
 Kai, o garoto de cabelo branco e mochila azul, e o cachorrinho Floco precisam reacender a
 Lanterna da Torre reunindo três relíquias pelo vale.
 
-## O mundo
-Um mapa contínuo de 7600 × 4500 px, todo desenhado em código (pixel art gerada, sem imagens):
-campos, florestas, trilhas, rio com ponte, mar, praia, lago, clareiras, casas, torre e fazenda.
+## O mundo (infinito)
+O Vale da Lanterna (7600 × 4500 px, feito à mão) é a região inicial. Em volta dele o mundo é
+**gerado sem fim**, em pedaços de 512 px, conforme você anda — tudo em pixel art gerada por código.
+
+- **Biomas:** Campos Abertos, Mata Fechada, Floresta Outonal, Deserto de Âmbar (cactos, palmeiras,
+  oásis), Tundra Gelada (lagos congelados, pinheiros com neve), Pântano Sombrio e Bosque das Cerejeiras.
+  Cada um tem chão, árvores, rochas, clima (neve, areia, folhas, pétalas, vaga-lumes) e Musgos próprios.
+  Quanto mais longe do Vale, mais fortes os Musgos e mais moedas eles deixam.
+- **Cidades grandes:** a cada 9000 px há uma cidade com muralha e portões, ruas de pedra em grade,
+  praça com chafariz, dezenas de casas no estilo do bioma, feiras, parques, torre do relógio e moradores
+  andando pelas ruas. Toda cidade tem **Mercado** (compra de comida e materiais), **Estalagem**
+  (descansar e ouvir boatos), **Ferreiro** (bancada livre para criar equipamentos) e casas para visitar.
+- **Estradas** ligam todas as cidades e saem do Vale pelos quatro lados.
+
+## Personagens em 3D
+Kai e Floco são modelos 3D (three.js, em `lib/`) com animação de andar, ataque com a espada e
+equipamentos visíveis. Eles são renderizados em baixa resolução, com contorno, pela mesma câmera
+de cima do jogo, para combinar com a pixel art. Sem WebGL, o jogo volta aos sprites 2D.
 
 | Região | O que tem |
 |---|---|
@@ -28,7 +43,7 @@ Armadura de Folhas, Botas de Vento e Coleira do Floco.
 
 ## Missões
 Principal: A Lanterna Apagada (3 relíquias + chefe).
-Extras: Ferro e Fogo, Aprendiz de Artesão, Torta de Cogumelos, Cadê a Bolinha? e Caça aos Musgos.
+Extras: Ferro e Fogo, Aprendiz de Artesão, Torta de Cogumelos, Cadê a Bolinha?, Caça aos Musgos e Grande Viajante (visite 3 cidades).
 
 ## Controles
 - **Celular:** arraste no lado esquerdo para andar; botão redondo = atacar / falar / entrar / criar;
@@ -38,7 +53,7 @@ Extras: Ferro e Fogo, Aprendiz de Artesão, Torta de Cogumelos, Cadê a Bolinha?
 O progresso é salvo automaticamente no navegador.
 
 ## Arquivos
-`core.js` (tela, áudio, sprites), `world.js` (mundo, terreno, interiores), `game.js` (lógica e interface).
+`core.js` (tela, áudio, sprites), `world.js` (o Vale, terreno, interiores), `infinite.js` (mundo infinito, biomas, cidades), `char3d.js` (Kai e Floco em 3D), `game.js` (lógica e interface), `lib/three.min.js` (three.js r128, licença MIT).
 
 ## Como rodar
 ```bash

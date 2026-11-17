@@ -45,7 +45,9 @@ const TRAILS = [
   [[5800, 2620], [5800, 1300], [6050, 1000], [6750, 900]],                         // bosque norte
   [[3550, 3350], [3550, 4000], [2750, 4000]],                                      // praia
   [[800, 2150], [800, 950]],                                                       // clareira
-  [[4600, 700], [4600, 1400], [5650, 1400]]                                        // corredor da horta
+  [[4600, 700], [4600, 1400], [5650, 1400]],                                       // corredor da horta
+  [[800, 2150], [0, 2150]], [[7600, 2150], [7150, 2150], [6990, 2330]],            // saídas para o mundo
+  [[4700, 700], [4700, 0]], [[4700, 3350], [4700, 4500]]
 ];
 const RIVER = [[2500, 120], [2480, 700], [2400, 1100], [2450, 1500], [2350, 1900], [2250, 2300], [2200, 2700]];
 const WATER = [
@@ -64,7 +66,7 @@ const CAT_SPOT = [6800, 860];
 
 // ---------------------------------------------------------------- terreno
 // 0 grama, 1 trilha, 2 água, 3 areia, 4 calçamento, 5 terra arada, 6 rocha do penhasco, 7 ponte
-let terrain = null;
+let valeTer = null;
 function buildTerrain() {
   const c = document.createElement('canvas'); c.width = GC; c.height = GR;
   const g = c.getContext('2d');
@@ -88,15 +90,15 @@ function buildTerrain() {
   const trail = layer(() => { for (const t of TRAILS) { path(t); g.lineWidth = 76 / CELL; g.stroke(); } });
   const plaza = layer(() => { for (const [x, y, rx, ry] of PLAZAS) { g.beginPath(); g.ellipse(x / CELL, y / CELL, rx / CELL, ry / CELL, 0, 0, 7); g.fill(); } });
   const field = layer(() => { for (const [x, y, w, h] of FIELDS) g.fillRect(x / CELL, y / CELL, w / CELL, h / CELL); });
-  terrain = new Uint8Array(GC * GR);
-  for (let i = 0; i < terrain.length; i++) {
-    terrain[i] = trail[i] && water[i] ? 7 : field[i] ? 5 : plaza[i] ? 4 : trail[i] ? 1 : cliff[i] ? 6 : water[i] ? 2 : sand[i] ? 3 : 0;
+  valeTer = new Uint8Array(GC * GR);
+  for (let i = 0; i < valeTer.length; i++) {
+    valeTer[i] = trail[i] && water[i] ? 7 : field[i] ? 5 : plaza[i] ? 4 : trail[i] ? 1 : cliff[i] ? 6 : water[i] ? 2 : sand[i] ? 3 : 0;
   }
 }
 function terrainAt(x, y) {
-  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
-  if (cx < 0 || cy < 0 || cx >= GC || cy >= GR) return 0;
-  return terrain[cy * GC + cx];
+  if (x >= 0 && y >= 0 && x < WW && y < WH) return valeTer[Math.floor(y / CELL) * GC + Math.floor(x / CELL)];
+  const cx = Math.floor(x / CK), cy = Math.floor(y / CK), d = getCD(cx, cy);
+  return d.ter[Math.floor((y - cy * CK) / CELL) * CCELLS + Math.floor((x - cx * CK) / CELL)];
 }
 function regionAt(x, y, pad = 0) {
   for (const r of REGION_LIST) if (x >= r.ox - pad && y >= r.oy - pad && x < r.ox + r.iw + pad && y < r.oy + r.ih + pad) return r;
@@ -104,17 +106,19 @@ function regionAt(x, y, pad = 0) {
 }
 
 // ---------------------------------------------------------------- grade andável
-let worldGrid = null;
+let valeGrid = null;
+const worldGrid = { facade: true, cell: CELL };   // grade do mundo infinito (vale + pedaços gerados)
 function buildWorldGrid() {
   const m = new Uint8Array(GC * GR);
-  for (let cy = 0; cy < GR; cy++) for (let cx = 0; cx < GC; cx++) {
-    const x = (cx + 0.5) * CELL, y = (cy + 0.5) * CELL, t = terrain[cy * GC + cx];
-    m[cy * GC + cx] = (x < 150 || y < 150 || x > WW - 150 || y > WH - 150 || t === 2 || t === 6) ? 0 : 1;
-  }
-  worldGrid = { cols: GC, rows: GR, cell: CELL, m };
+  for (let i = 0; i < m.length; i++) { const t = valeTer[i]; m[i] = (t === 2 || t === 6) ? 0 : 1; }
+  valeGrid = { cols: GC, rows: GR, cell: CELL, m };
 }
 function stampGrid(grid, x, y, rad, v) {
   const c = grid.cell, r = Math.ceil(rad / c);
+  if (grid.facade) {
+    for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) if ((i * c) ** 2 + (j * c * 1.6) ** 2 <= rad * rad) worldSetCell(x + i * c, y + j * c, v);
+    return;
+  }
   const gx = Math.floor(x / c), gy = Math.floor(y / c);
   for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) {
     const cx = gx + i, cy = gy + j;
@@ -123,6 +127,7 @@ function stampGrid(grid, x, y, rad, v) {
   }
 }
 function stampRect(grid, x0, y0, x1, y1, v) {
+  if (grid.facade) { for (let y = y0; y < y1; y += CELL) for (let x = x0; x < x1; x += CELL) worldSetCell(x, y, v); return; }
   for (let y = y0; y < y1; y += grid.cell) for (let x = x0; x < x1; x += grid.cell) {
     const cx = Math.floor(x / grid.cell), cy = Math.floor(y / grid.cell);
     if (cx >= 0 && cy >= 0 && cx < grid.cols && cy < grid.rows) grid.m[cy * grid.cols + cx] = v;
@@ -135,7 +140,7 @@ const ROOFS = {
   red: ['#4a1812', '#8e3a2a', '#b5523a', '#d8784e'], slate: ['#161b28', '#2c3448', '#424c66', '#647090'],
   blue: ['#15233f', '#2b4a7a', '#3b62a0', '#6a92cc'], teal: ['#0f3533', '#1f6a66', '#2f8a84', '#5cc0b4'],
   brown: ['#2e1c10', '#5e3a20', '#7e5230', '#a87446'], purple: ['#24163a', '#4a2f66', '#6a4a8e', '#9a7ac0'],
-  orange: ['#4a2410', '#a0522a', '#c86a34', '#e8944e']
+  orange: ['#4a2410', '#a0522a', '#c86a34', '#e8944e'], pink: ['#4a1a2a', '#a04a6a', '#d06a90', '#f09ab8']
 };
 const FLOWER_COLS = ['#ff9ec7', '#ffe066', '#ffffff', '#ff7a5a', '#b59cff'];
 function makeHouse(o, seed) {
@@ -150,7 +155,8 @@ function makeHouse(o, seed) {
       if (o.wall === 'stone') {
         const row = Math.floor((y - wy0) / 4), off = (row % 2) * 3;
         c = ((x + off) % 6 === 0 || (y - wy0) % 4 === 0) ? '#5f5c57' : ['#a29e96', '#8f8b83', '#b4b0a8'][Math.floor(hash2(Math.floor((x + off) / 6), row + seed) * 3)];
-      } else if (o.wall === 'wood') c = x % 4 === 0 ? '#5e3a20' : (hash2(x >> 2, seed) < 0.5 ? '#9a6a3e' : '#a87646');
+      } else if (o.wall === 'adobe') c = hash2(x + seed, y) < 0.08 ? '#c8a06a' : (y - wy0) % 9 === 0 && hash2(x >> 3, y) < 0.4 ? '#d4ae78' : '#e6c690';
+      else if (o.wall === 'wood') c = x % 4 === 0 ? '#5e3a20' : (hash2(x >> 2, seed) < 0.5 ? '#9a6a3e' : '#a87646');
       else c = hash2(x + seed, y) < 0.07 ? '#ddd0b0' : '#efe4c8';
       rect(x, y, 1, 1, c);
     }
@@ -186,6 +192,8 @@ function makeHouse(o, seed) {
       rect(sx, sy, 8, 1, '#2a1d16'); rect(sx + 1, sy + 1, 1, 2, '#2a1d16'); rect(sx + 6, sy + 1, 1, 2, '#2a1d16');
       rect(sx - 1, sy + 3, 10, 8, '#2a1d16'); rect(sx, sy + 4, 8, 6, '#c99a6a');
       if (o.sign === 'anvil') { rect(sx + 1, sy + 5, 6, 2, '#4f4c48'); rect(sx + 3, sy + 7, 2, 2, '#4f4c48'); }
+      if (o.sign === 'bag') { rect(sx + 2, sy + 5, 4, 4, '#e0b040'); rect(sx + 3, sy + 4, 2, 1, '#a07a20'); }
+      if (o.sign === 'inn') { rect(sx + 2, sy + 5, 4, 4, '#e8e0c8'); rect(sx + 6, sy + 6, 1, 2, '#e8e0c8'); rect(sx + 2, sy + 5, 4, 1, '#ffffff'); }
       if (o.sign === 'bread') { rect(sx + 1, sy + 6, 6, 3, '#a0602a'); rect(sx + 2, sy + 5, 4, 1, '#d9a05a'); }
     }
     // telhado
@@ -196,6 +204,7 @@ function makeHouse(o, seed) {
         let c = P[2];
         if ((x + off) % 6 === 0 || t % 4 === 3) c = P[1];
         else if (t % 4 === 0 && hash2(x + seed, row) < 0.35) c = P[3];
+        if (o.snow && (t < 4 || (t < 9 && hash2(x + seed, t) < 0.55))) c = t < 2 ? '#ffffff' : '#e4eef6';
         if (x === inset || x === W - inset - 1) c = P[0];
         rect(x, y, 1, 1, c);
       }
@@ -365,12 +374,12 @@ function buildBuildings() {
     if (b.chimneyPos) b.smoke = [b.x - b.pw / 2 + b.chimneyPos[0] * b.sc, b.y - b.ph + 4];
     // colisão
     const hw = b.pw / 2;
-    if (b.kind === 'house' || b.kind === 'barn') stampRect(worldGrid, b.x - hw + 16, b.y - (s.foot ? s.foot * b.sc : b.ph * 0.6), b.x + hw - 16, b.y - 10, 0);
-    else if (b.kind === 'tower') stampRect(worldGrid, b.x - b.pw * 0.36, b.y - b.ph * 0.3, b.x + b.pw * 0.36, b.y - 8, 0);
-    else if (b.kind === 'fountain') { for (let a = 0; a < 6.28; a += 0.2) stampGrid(worldGrid, b.x + Math.cos(a) * 80, b.y - 44 + Math.sin(a) * 26, 34, 0); stampGrid(worldGrid, b.x, b.y - 44, 60, 0); }
-    else if (b.kind === 'well') stampRect(worldGrid, b.x - 56, b.y - 70, b.x + 56, b.y - 6, 0);
-    else if (b.kind === 'van') stampRect(worldGrid, b.x - 118, b.y - 100, b.x + 118, b.y - 8, 0);
-    else if (b.kind === 'tent') stampRect(worldGrid, b.x - 76, b.y - 90, b.x + 76, b.y - 8, 0);
+    if (b.kind === 'house' || b.kind === 'barn') stampRect(valeGrid, b.x - hw + 16, b.y - (s.foot ? s.foot * b.sc : b.ph * 0.6), b.x + hw - 16, b.y - 10, 0);
+    else if (b.kind === 'tower') stampRect(valeGrid, b.x - b.pw * 0.36, b.y - b.ph * 0.3, b.x + b.pw * 0.36, b.y - 8, 0);
+    else if (b.kind === 'fountain') { for (let a = 0; a < 6.28; a += 0.2) stampGrid(valeGrid, b.x + Math.cos(a) * 80, b.y - 44 + Math.sin(a) * 26, 34, 0); stampGrid(valeGrid, b.x, b.y - 44, 60, 0); }
+    else if (b.kind === 'well') stampRect(valeGrid, b.x - 56, b.y - 70, b.x + 56, b.y - 6, 0);
+    else if (b.kind === 'van') stampRect(valeGrid, b.x - 118, b.y - 100, b.x + 118, b.y - 8, 0);
+    else if (b.kind === 'tent') stampRect(valeGrid, b.x - 76, b.y - 90, b.x + 76, b.y - 8, 0);
     if (b.to) { const r = regionAt(b.x, b.y); r.doors.push({ x: b.x, y: b.y + 14, to: b.to }); }
     addProp({ t: 'bld', x: b.x, y: b.y, b });
   });
@@ -410,7 +419,7 @@ function placeTownDecor() {
     const kinds = ['cabbage', 'carrot', 'beans', 'pumpkin'], kd = kinds[(fx + fy) % 4 === 0 ? 0 : Math.floor(hash2(fx, fy) * 4)];
     for (let y = fy + 50; y < fy + fh - 10; y += 64) for (let x = fx + 34; x < fx + fw - 20; x += 56) deco(kd, x, y);
   }
-  for (const [x, y] of [[5640, 900], [5680, 960], [4700, 820]]) deco('hay', x, y, { block: 30 });
+  for (const [x, y] of [[5640, 900], [5680, 960]]) deco('hay', x, y, { block: 30 });
   deco('crate', 5560, 1460, { block: 18 }); deco('barrel', 5720, 1460, { block: 18 });
   // torre: ruínas e baú
   for (const [x, y] of [[6520, 2420], [6980, 2420], [6600, 2160], [6920, 2170], [6450, 2620], [7050, 2620]]) deco('pillar', x, y, { block: 22 });
@@ -422,9 +431,9 @@ function placeTownDecor() {
   deco('crate', 1080, 3140, { block: 18 }); deco('chair', 1000, 3240);
   // placas nas entradas
   for (const [x, y, t] of [[3110, 1890, 'Praça das Telhas'], [2700, 1540, 'Vila do Rio'], [5040, 640, 'Horta'], [6480, 2700, 'Torre'], [860, 2960, 'Penhasco'], [5740, 1260, 'Bosque Norte']]) deco('sign', x, y, { text: t, block: 8 });
-  for (const p of props) if (p.t === 'deco' && p.block) stampGrid(worldGrid, p.x, p.y - 6, p.block, 0);
-  for (const p of props) if (p.t === 'deco' && (p.d === 'fenceH')) stampRect(worldGrid, p.x - 24, p.y - 12, p.x + 24, p.y, 0);
-  for (const p of props) if (p.t === 'deco' && (p.d === 'fenceV')) stampRect(worldGrid, p.x - 6, p.y - 46, p.x + 6, p.y, 0);
+  for (const p of props) if (p.t === 'deco' && p.block) stampGrid(valeGrid, p.x, p.y - 6, p.block, 0);
+  for (const p of props) if (p.t === 'deco' && (p.d === 'fenceH')) stampRect(valeGrid, p.x - 24, p.y - 12, p.x + 24, p.y, 0);
+  for (const p of props) if (p.t === 'deco' && (p.d === 'fenceV')) stampRect(valeGrid, p.x - 6, p.y - 46, p.x + 6, p.y, 0);
 }
 function placeProps() {
   const R = mulberry(20261116);
@@ -475,8 +484,8 @@ function placeProps() {
     addProp({ t: 'mush', x, y, gone: 0 });
   }
   for (const p of props) {
-    if (p.t === 'tree') stampGrid(worldGrid, p.x, p.y - 6, 20, 0);
-    if (p.t === 'rock') stampGrid(worldGrid, p.x, p.y - 8, 30, 0);
+    if (p.t === 'tree') stampGrid(valeGrid, p.x, p.y - 6, 20, 0);
+    if (p.t === 'rock') stampGrid(valeGrid, p.x, p.y - 8, 30, 0);
   }
   buckets = Array.from({ length: BC * BR }, () => []);
   for (const p of props) {
@@ -486,6 +495,11 @@ function placeProps() {
 }
 function propsNear(x0, y0, x1, y1) {
   const out = [];
+  for (let cy = Math.floor(y0 / CK); cy <= Math.floor(y1 / CK); cy++) for (let cx = Math.floor(x0 / CK); cx <= Math.floor(x1 / CK); cx++) {
+    if (cx >= 0 && cy >= 0 && (cx + 1) * CK <= WW && (cy + 1) * CK <= WH) continue;
+    for (const p of chunkProps(cx, cy)) if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1) out.push(p);
+  }
+  if (x1 < 0 || y1 < 0 || x0 > WW || y0 > WH) return out;
   const bx0 = clamp(Math.floor(x0 / BUCKET), 0, BC - 1), bx1 = clamp(Math.floor(x1 / BUCKET), 0, BC - 1);
   const by0 = clamp(Math.floor(y0 / BUCKET), 0, BR - 1), by1 = clamp(Math.floor(y1 / BUCKET), 0, BR - 1);
   for (let by = by0; by <= by1; by++) for (let bx = bx0; bx <= bx1; bx++) for (const p of buckets[by * BC + bx]) {
@@ -497,38 +511,61 @@ function propsNear(x0, y0, x1, y1) {
 // ---------------------------------------------------------------- chão em pedaços (cache)
 const CH = 512, CHR = 2;
 const chunkCache = new Map();
+const mod = (a, n) => ((a % n) + n) % n;
 function groundRGB(wx, wy) {
   const jx = (vnoise(wx * 0.02, wy * 0.02) - 0.5) * 26, jy = (vnoise(wx * 0.02 + 50, wy * 0.02) - 0.5) * 26;
   const t = terrainAt(wx + jx, wy + jy);
   const n = vnoise(wx * 0.005, wy * 0.005) * 0.65 + vnoise(wx * 0.03, wy * 0.03) * 0.35;
   const h = hash2(wx >> 2, wy >> 2);
   const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+  const bio = (wx >= 0 && wy >= 0 && wx < WW && wy < WH) ? 'campo' : biomeAt(wx, wy);
   if (t === 7) {
-    const tx = terrainAt(wx, wy);
-    if (tx !== 7) return [90, 58, 32];
-    return (wx % 16 < 3 || wy % 16 < 2) ? [90, 58, 32] : h < 0.5 ? [160, 112, 62] : [176, 124, 70];
+    if (terrainAt(wx, wy) !== 7) return [90, 58, 32];
+    return (mod(wx, 16) < 3 || mod(wy, 16) < 2) ? [90, 58, 32] : h < 0.5 ? [160, 112, 62] : [176, 124, 70];
   }
-  if (t === 2) { if (h < 0.015) return [170, 222, 245]; return mix([40, 118, 176], [64, 158, 210], n); }
+  if (t === 2) {
+    if (bio === 'pantano') return h < 0.02 ? [110, 130, 70] : mix([44, 60, 36], [70, 92, 52], n);
+    if (h < 0.015) return [170, 222, 245]; return mix([40, 118, 176], [64, 158, 210], n);
+  }
+  if (t === 9) return h < 0.03 ? [150, 190, 215] : mix([186, 222, 240], [214, 238, 250], n);
   if (t === 6) {
     if (h < 0.06) return [62, 60, 58];
     const k = vnoise(wx * 0.04, wy * 0.04);
+    if (bio === 'neve') return k > 0.5 ? [244, 248, 252] : k > 0.3 ? [200, 212, 226] : [130, 138, 152];
+    if (bio === 'deserto') return k < 0.35 ? [150, 90, 60] : k < 0.65 ? [180, 112, 74] : [206, 142, 98];
     return k < 0.35 ? [95, 92, 87] : k < 0.65 ? [125, 122, 116] : [154, 151, 143];
   }
   if (t === 3) return h < 0.05 ? [200, 180, 120] : mix([214, 192, 132], [232, 214, 158], n);
-  if (t === 4) {
-    const row = Math.floor(wy / 14), off = (row % 2) * 10, bx = Math.floor((wx + off) / 20);
-    if ((wx + off) % 20 < 3 || wy % 14 < 3) return [128, 118, 100];
+  if (t === 4 || t === 14) {
+    const row = Math.floor(wy / 14), off = mod(row, 2) * 10, bx = Math.floor((wx + off) / 20);
+    if (t === 14) { if (mod(wx + off, 20) < 3 || mod(wy, 14) < 3) return [58, 54, 50]; return hash2(bx, row) < 0.5 ? [120, 114, 104] : [140, 134, 122]; }
+    if (mod(wx + off, 20) < 3 || mod(wy, 14) < 3) return [128, 118, 100];
     const k = hash2(bx, row);
     return k < 0.33 ? [200, 190, 166] : k < 0.66 ? [184, 173, 148] : [214, 204, 180];
   }
   if (t === 5) {
-    if (wy % 32 < 7) return [86, 56, 32];
+    if (mod(wy, 32) < 7) return [86, 56, 32];
     return h < 0.06 ? [140, 98, 60] : mix([112, 74, 44], [128, 86, 52], n);
   }
   if (t === 1) {
     if (h < 0.05) return [150, 118, 78];
-    const e = [[14, 0], [-14, 0], [0, 14], [0, -14]].some(([a, b]) => { const q = terrainAt(wx + jx + a, wy + jy + b); return q === 0 || q === 3; });
+    const e = [[14, 0], [-14, 0], [0, 14], [0, -14]].some(([a, b]) => { const q = terrainAt(wx + jx + a, wy + jy + b); return q === 0 || q === 3 || q === 13; });
+    if (bio === 'neve') return e ? [170, 160, 150] : mix([190, 180, 168], [214, 206, 196], n);
     return e ? [160, 126, 80] : mix([178, 140, 88], [204, 168, 112], n);
+  }
+  if (t === 13) {
+    if (bio === 'deserto') return h < 0.05 ? [200, 170, 110] : mix([222, 196, 140], [236, 214, 160], n);
+    if (bio === 'neve') return h < 0.04 ? [200, 214, 230] : mix([226, 234, 242], [246, 250, 252], n);
+    if (h > 0.99) return [[255, 236, 120], [255, 255, 255], [255, 170, 205]][Math.floor(h * 1000) % 3];
+    return h < 0.05 ? [100, 168, 70] : mix([92, 156, 62], [124, 190, 80], n);
+  }
+  switch (bio) {
+    case 'floresta': if (h < 0.05) return [30, 70, 30]; return mix([40, 92, 36], [80, 142, 56], n);
+    case 'outono': if (h > 0.965) return [[220, 110, 40], [200, 60, 40], [230, 190, 60]][Math.floor(h * 1000) % 3]; return mix([128, 118, 52], [170, 150, 72], n);
+    case 'deserto': { const rip = Math.sin(wx * 0.018 + wy * 0.006 + n * 7) * 0.5 + 0.5; if (h < 0.015) return [170, 130, 80]; return mix([214, 178, 116], [238, 208, 148], rip * 0.6 + n * 0.4); }
+    case 'neve': if (h < 0.03) return [186, 204, 224]; return mix([212, 224, 236], [246, 250, 253], n);
+    case 'pantano': if (vnoise(wx * 0.012, wy * 0.012) > 0.64) return h < 0.1 ? [60, 50, 32] : [80, 66, 42]; if (h < 0.05) return [96, 120, 56]; return mix([44, 72, 38], [76, 104, 52], n);
+    case 'cerejeiras': if (h > 0.97) return [255, 190, 215]; break;
   }
   if (h < 0.045) return [150, 212, 92];
   if (h > 0.992) return [[255, 236, 120], [255, 255, 255], [255, 170, 205]][Math.floor(h * 1000) % 3];

@@ -11,12 +11,16 @@ function newSave() {
     inv: { madeira: 0, pedra: 0, fibra: 0, flor: 0, cogumelo: 0, seiva: 0, cristal: 0 },
     bag: { pocao: 0, torta: 0, feixe: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
-    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0 }, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
+    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
 }
 let S = newSave();
 const hasSave = () => { const s = load(SAVE_KEY); return !!(s && (s.stage > 0 || s.coins > 0 || s.moved)); };
-function save() { S.pos = { area, x: Math.round(player.x), y: Math.round(player.y) }; store(SAVE_KEY, S); }
+function save() {
+  if (area !== 'world' && DYN.has(area)) { const d = DYN.get(area).door; S.pos = { area: 'world', x: d[0], y: d[1] + 40 }; }
+  else S.pos = { area, x: Math.round(player.x), y: Math.round(player.y) };
+  store(SAVE_KEY, S);
+}
 const relicCount = () => (S.relics.petala ? 1 : 0) + (S.relics.orvalho ? 1 : 0) + (S.relics.brasa ? 1 : 0);
 const florlumeCount = () => Object.keys(S.got).filter(k => k.startsWith('flor')).length;
 const hortaKills = () => REGIONS.horta.foes.filter(f => S.kills[f.id]).length;
@@ -77,7 +81,8 @@ function questList() {
     { id: 'artesao', title: 'Aprendiz de Artesão', giver: 'Bruno — Oficina, Praça', st: S.q.artesao, prog: 'Itens diferentes ' + Math.min(3, Object.keys(S.crafted).length) + '/3', desc: 'Crie 3 itens diferentes.' },
     { id: 'torta', title: 'Torta de Cogumelos', giver: 'Rosa — Padaria, Vila do Rio', st: S.q.torta, prog: 'Cogumelos ' + Math.min(S.inv.cogumelo, 3) + '/3', desc: 'Cogumelos crescem perto das árvores.' },
     { id: 'gato', title: 'Cadê a Bolinha?', giver: 'Téo — Casa do Téo, Praça', st: S.q.gato, prog: S.cat === 'follow' ? 'Leve a Bolinha pra casa' : 'Procure no Bosque Norte', desc: 'A gatinha fugiu para o norte da Torre.' },
-    { id: 'caca', title: 'Caça aos Musgos', giver: 'Vó Aurora — Praça', st: S.q.caca, prog: 'Musgos ' + Math.min(S.mkills, 20) + '/20', desc: 'Derrote 20 Musgos pelo vale.' }
+    { id: 'caca', title: 'Caça aos Musgos', giver: 'Vó Aurora — Praça', st: S.q.caca, prog: 'Musgos ' + Math.min(S.mkills, 20) + '/20', desc: 'Derrote 20 Musgos pelo vale.' },
+    { id: 'viajante', title: 'Grande Viajante', giver: 'Qualquer cidade grande', st: S.q.viajante, prog: 'Cidades ' + Math.min(3, Object.keys(S.cities).length) + '/3', desc: 'Siga as estradas para fora do Vale.' }
   ];
   return { main, side };
 }
@@ -111,6 +116,11 @@ function questTargets() {
   if (S.q.torta === 1) side.push(doorPos('padaria'));
   if (S.cat === 'lost') side.push(CAT_SPOT);
   if (S.cat === 'follow') side.push(doorPos('casaTeo'));
+  if (S.q.viajante !== 2) {
+    const [ci, cj] = cellOf(player.x, player.y); let best = null, bd = 1e12;
+    for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) { const c = cityAt(i, j); if (c && !S.cities[c.key]) { const d = Math.hypot(c.x - player.x, c.y - player.y); if (d < bd) { bd = d; best = c; } } }
+    if (best) side.push([best.x, best.y]);
+  }
   return { main: T.filter(Boolean), side: side.filter(Boolean) };
 }
 
@@ -126,11 +136,13 @@ const dog = { x: 0, y: 0, flip: false, anim: 0, cd: 0, moving: false, target: nu
 const cat = { x: 0, y: 0, flip: false, anim: 0 };
 let particles = [], floaters = [];
 let dialog = null, fade = null, banner = null, shake = 0, interactTarget = null, menu = null, showMap = false;
+let curBiome = null, miniLayer = null, miniNext = null, bigLayer = null;
 let time = 0, bossRef = null, flash = 0, curRegion = null, spawnT = 0, saveT = 0, regrowT = 0, allowPortrait = false;
 let cam = { x: 0, y: 0 }, view = { s: 1, vw: 0, vh: 0 };
 
 function walkable(x, y) {
-  const g = grid; const cx = Math.floor(x / g.cell), cy = Math.floor(y / g.cell);
+  const g = grid;
+  if (g.facade) return worldWalk(x, y); const cx = Math.floor(x / g.cell), cy = Math.floor(y / g.cell);
   if (cx < 0 || cy < 0 || cx >= g.cols || cy >= g.rows) return false;
   return g.m[cy * g.cols + cx] === 1;
 }
@@ -149,7 +161,7 @@ function moveBody(b, dx, dy, test = walkable) {
   if (dy && test(b.x, fy)) { b.y = fy; return true; }
   return false;
 }
-const inSafe = (x, y) => { const r = regionAt(x, y); return !!(r && r.safe); };
+const inSafe = (x, y) => { if (!inVale(x, y)) return !!inCity(x, y, 60); const r = regionAt(x, y); return !!(r && r.safe); };
 const enemyWalk = (x, y) => walkable(x, y) && !inSafe(x, y);
 
 function buildWorldEntities() {
@@ -186,6 +198,7 @@ function setArea(id, x, y) {
   save();
 }
 function enterInterior(id, fromDoor) {
+  if (DYN.has(id)) ensureInterior(id);
   fade = { t: 0, dur: 0.6, mid: () => {
     const I = INTERIORS[id];
     I.returnTo = fromDoor;
@@ -199,20 +212,23 @@ function exitInterior() {
   Audio.sfx('door');
 }
 function makeMusgo(x, y, id, kind) {
-  const boss = kind === 'boss', azul = kind === 'azul';
-  return { x, y, id: id || null, boss, azul, wild: kind === 'wild' || azul, hp: boss ? 30 : azul ? 5 : 3, maxHp: boss ? 30 : azul ? 5 : 3,
-    r: boss ? 56 : 24, kx: 0, ky: 0, t: rand(0, 3), wander: rand(0, 6.28), wt: 0, hurt: 0, speed: boss ? 62 : rand(48, 66) * (azul ? 1.15 : 1),
+  const boss = kind === 'boss', azul = kind === 'azul', variant = MUSGO_VAR[kind] ? kind : null;
+  const lvl = boss ? 0 : Math.min(8, Math.floor(valeDist(x, y) / 6000));
+  const hp = (boss ? 30 : azul ? 5 : variant ? 4 : 3) + lvl;
+  return { x, y, id: id || null, boss, azul, variant, lvl, wild: kind === 'wild' || azul || !!variant, hp, maxHp: hp,
+    r: boss ? 56 : 24, kx: 0, ky: 0, t: rand(0, 3), wander: rand(0, 6.28), wt: 0, hurt: 0, speed: boss ? 62 : rand(48, 66) * (azul || variant ? 1.15 : 1) * (1 + lvl * 0.04),
     state: 'chase', st: boss ? 2.5 : 0, spawnT: 6, z: 0, tx: 0, ty: 0, born: boss ? 1.2 : 0 };
 }
 function spawnEnemy(e) { enemies.push(e); return e; }
 
 // ---------------------------------------------------------------- diálogos
+let talkPid = null;
 const PORTRAIT = { 'Vó Aurora': 'aurora', 'Mel': 'mel', 'Seu Tomé': 'tome', 'Lina': 'lina', 'Rui': 'rui', 'Kai': 'kai', 'Bruno': 'bruno', 'Rosa': 'rosa', 'Téo': 'teo' };
 function say(lines, done, choices) {
   dialog = { lines: lines.map(l => {
     const m = /^([^:]{2,14}):\s(.*)$/.exec(l);
     return m ? { who: m[1], text: m[2] } : { who: '', text: l };
-  }), i: 0, shown: 0, done, choices };
+  }), i: 0, shown: 0, done, choices, pid: talkPid };
 }
 function advanceDialog() {
   const l = dialog.lines[dialog.i];
@@ -227,7 +243,50 @@ function giveRelic(key, name) {
   floaters.push({ x: player.x, y: player.y - 120, text: name + '!', t: 2.2, col: '#ffe38a' });
   save();
 }
+const RUMORS = ['Quanto mais longe do Vale, mais fortes ficam os Musgos... e mais moedas eles carregam.',
+  'No pântano os Musgos são roxos. Dizem que mordem feito cobra!', 'Lá na tundra os lagos viram gelo e dá pra andar por cima.',
+  'Os Musgos de areia do deserto escondem cristais.', 'O ferreiro deixa qualquer viajante usar a bancada.',
+  'As estradas ligam todas as cidades. É só seguir a estrada!', 'Já viu o bosque das cerejeiras? Chove pétala o ano inteiro.',
+  'Cogumelos crescem perto das árvores, ainda mais no pântano e na floresta.'];
+function cityRumor(c) {
+  const dirs = [[1, 0, 'leste'], [-1, 0, 'oeste'], [0, 1, 'sul'], [0, -1, 'norte']].filter(([a, b]) => cityAt(c.i + a, c.j + b) || (c.i + a === 0 && c.j + b === 0));
+  if (dirs.length && Math.random() < 0.6) {
+    const [a, b, dn] = dirs[Math.floor(Math.random() * dirs.length)];
+    if (c.i + a === 0 && c.j + b === 0) return 'Seguindo a estrada para o ' + dn + ' você chega ao Vale da Lanterna.';
+    const o = cityAt(c.i + a, c.j + b);
+    return 'Pela estrada do ' + dn + ' fica ' + o.name + ', terra de ' + BIOME_NAMES[o.biome].toLowerCase() + '.';
+  }
+  return RUMORS[Math.floor(Math.random() * RUMORS.length)];
+}
+function buy(item, price, n, who) {
+  return () => {
+    if (S.coins < price) { say([who + ': Faltam moedas, viajante.']); return; }
+    S.coins -= price;
+    if (item in S.inv) S.inv[item] += n; else S.bag[item] += n;
+    Audio.sfx('coin'); say([who + ': Obrigado! (' + n + ' ' + NAMES[item] + ')']); save();
+  };
+}
+function talkRole(n) {
+  const c = DYN.get(area) && DYN.get(area).city, who = n.name;
+  if (n.role === 'loja') {
+    const food = () => say([who + ': Comida e remédio pra viagem.'], null, [{ t: 'Poção (8)', fn: buy('pocao', 8, 1, who) }, { t: 'Torta (6)', fn: buy('torta', 6, 1, who) }, { t: 'Voltar', fn: () => talkRole(n) }]);
+    const mats = () => say([who + ': Material de primeira!'], null, [{ t: '5 Madeira (6)', fn: buy('madeira', 6, 5, who) }, { t: '5 Pedra (6)', fn: buy('pedra', 6, 5, who) }, { t: 'Cristal (15)', fn: buy('cristal', 15, 1, who) }, { t: 'Voltar', fn: () => talkRole(n) }]);
+    say([who + ': Bem-vindo ao mercado de ' + c.name + '! O que vai levar?'], null, [{ t: 'Comida', fn: food }, { t: 'Materiais', fn: mats }, { t: 'Tchau' }]);
+  } else if (n.role === 'estalagem') {
+    say([who + ': Bem-vindo à estalagem de ' + c.name + '!'], null, [
+      { t: 'Descansar (5)', fn: () => { if (S.coins < 5) { say([who + ': Ih, faltam moedas.']); return; } S.coins -= 5; fade = { t: 0, dur: 1.2, mid: () => { player.hp = S.maxHp; save(); } }; Audio.sfx('sleep'); toast('Você descansou. Vida cheia e jogo salvo.'); } },
+      { t: 'Ouvir um boato', fn: () => say([who + ': ' + cityRumor(c)]) }, { t: 'Tchau' }]);
+  } else if (n.role === 'ferreiro') say([who + ': Forja quente, bancada livre! Use à vontade, viajante.', who + ': ' + cityRumor(c)]);
+  else say([who + ': Que bom receber visita! ' + cityRumor(c)]);
+}
 function talkTo(n) {
+  talkPid = n.id;
+  if (n.role) return talkRole(n);
+  if (n.v) {
+    const c = n.city, lines = ['Bem-vindo a ' + c.name + '!', cityRumor(c), 'Dizem que a Lanterna do Vale voltou a brilhar' + (S.done ? '... foi você? Obrigado!' : '? Ainda não, né...'), 'O mercado fica pertinho da praça.', 'A estalagem tem cama quentinha.'];
+    say([n.name + ': ' + lines[Math.floor(Math.random() * lines.length)]]);
+    return;
+  }
   const id = n.id;
   if (id === 'aurora') {
     player.hp = S.maxHp;
@@ -330,7 +389,8 @@ function interact(t) {
   else if (t.kind === 'cat') { S.cat = 'follow'; Audio.sfx('meow'); say(['Miau!', 'A Bolinha pulou pertinho de você. Leve-a de volta para o Téo, na Praça.']); save(); }
   else if (t.kind === 'furn') {
     const f = t.ref;
-    if (f.use === 'bancada') {
+    if (f.use === 'bancada2') { menu = { tab: 'craft', station: true }; Audio.sfx('ui'); }
+    else if (f.use === 'bancada') {
       if (S.q.ferro < 2) say(['Bruno: Ei! Essa bancada é minha. Me ajuda primeiro e eu deixo você usar.']);
       else { menu = { tab: 'craft', station: true }; Audio.sfx('ui'); }
     } else if (f.use === 'bed') {
@@ -491,7 +551,8 @@ function killEnemy(e) {
   const drop = (k, n = 1) => { for (let i = 0; i < n; i++) items.push({ id: null, k, x: e.x + rand(-34, 34), y: e.y + rand(-20, 20), t: 0, drop: 0.35 }); };
   drop('moeda', e.boss ? 20 : 1 + Math.floor(Math.random() * 3));
   if (Math.random() < 0.6 || e.boss) drop('seiva', e.boss ? 4 : 1);
-  if (Math.random() < (e.azul ? 0.45 : 0.08) || e.boss) drop('cristal', e.boss ? 3 : 1);
+  if (Math.random() < (e.azul ? 0.45 : (e.variant === 'gelo' || e.variant === 'areia') ? 0.25 : 0.08) || e.boss) drop('cristal', e.boss ? 3 : 1);
+  if (e.lvl > 0) drop('moeda', e.lvl);
   if (!e.boss && Math.random() < 0.18) drop('coracao');
   if (e.boss) {
     S.bossDead = true; bossRef = null; flash = 1; shake = 14;
@@ -606,13 +667,64 @@ function update(dt) {
   ambient(dt);
   updateCamera(dt);
 }
-function updateWorld(dt, busy) {
-  // região atual e nomes
-  const r = regionAt(player.x, player.y);
-  if (r !== curRegion) {
-    curRegion = r;
-    if (r) banner = { text: r.name, t: 2.4 };
+function visitCity(c) {
+  if (S.cities[c.key]) return;
+  S.cities[c.key] = c.name;
+  if (S.q.viajante === 0) { S.q.viajante = 1; toast('Nova missão: Grande Viajante'); }
+  if (S.q.viajante === 1 && Object.keys(S.cities).length >= 3) {
+    S.q.viajante = 2; S.coins += 40; S.inv.cristal += 3; Audio.sfx('relic');
+    setTimeout(() => toast('Grande Viajante concluída! +40 moedas e 3 cristais'), 2600);
   }
+  save();
+}
+let curPlace = '', populated = [];
+const STREET_NAMES = ['Lúcia', 'Davi', 'Nina', 'Caio', 'Bia', 'Joca', 'Tainá', 'Raul', 'Iara', 'Otto', 'Clara', 'Benê', 'Zé', 'Lia', 'Ravi', 'Maya'];
+function populateCity(c) {
+  cityLayout(c);
+  c.populated = true; populated.push(c);
+  const R = mulberry(c.i * 991 + c.j * 313 + 5), n = 8 + Math.floor(c.R / 180);
+  for (let k = 0; k < n; k++) {
+    const [x, y] = c.streets[Math.floor(R() * c.streets.length)], id = 'v_' + c.key + '_' + k;
+    NPC[id] = makePerson(c.i * 1000 + c.j * 100 + k + 77);
+    world.npcs.push({ id, x: x + (R() - 0.5) * 30, y: y + (R() - 0.5) * 30, name: STREET_NAMES[Math.floor(R() * STREET_NAMES.length)], v: true, city: c, tx: x, ty: y, wait: R() * 3 });
+  }
+}
+function updateVillagers(dt) {
+  for (const c of populated.slice()) if (Math.hypot(c.x - player.x, c.y - player.y) > c.R + 4500) {
+    c.populated = false; populated.splice(populated.indexOf(c), 1);
+    for (let i = world.npcs.length - 1; i >= 0; i--) if (world.npcs[i].city === c) world.npcs.splice(i, 1);
+  }
+  const c = nearestCity(player.x, player.y);
+  if (c && !c.populated && Math.hypot(c.x - player.x, c.y - player.y) < c.R + 1600) populateCity(c);
+  for (const n of world.npcs) {
+    if (!n.v) continue;
+    if (dialog && interactTarget && interactTarget.ref === n) continue;
+    const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy);
+    if (d < 4) {
+      n.wait -= dt;
+      if (n.wait <= 0) {
+        const opts = [[400, 0], [-400, 0], [0, 400], [0, -400]].map(([a, b]) => [n.tx + a, n.ty + b]).filter(([x, y]) => Math.hypot(x - n.city.x, y - n.city.y) < n.city.R - 160);
+        if (opts.length) { const o = opts[Math.floor(Math.random() * opts.length)]; n.tx = o[0] + rand(-24, 24); n.ty = o[1] + rand(-24, 24); }
+        n.wait = rand(0.5, 4);
+      }
+    } else { const v = Math.min(d, 70 * dt); n.x += dx / d * v; n.y += dy / d * v; n.flip = dx < 0; }
+  }
+}
+function updateWorld(dt, busy) {
+  // região, cidade ou bioma atual
+  const r = inVale(player.x, player.y) ? regionAt(player.x, player.y) : null;
+  curRegion = r;
+  const city = !r ? inCity(player.x, player.y, 0) : null;
+  const bio = (!r && !city && !inVale(player.x, player.y)) ? biomeAt(player.x, player.y) : null;
+  curBiome = inVale(player.x, player.y) ? null : biomeAt(player.x, player.y);
+  const place = r ? 'r' + r.id : city ? 'c' + city.key : bio ? 'b' + bio : 'v';
+  if (place !== curPlace) {
+    curPlace = place;
+    if (r) banner = { text: r.name, t: 2.4 };
+    else if (city) { banner = { text: city.name, t: 2.8, sub: 'Cidade · ' + BIOME_NAMES[city.biome] }; visitCity(city); }
+    else if (bio) banner = { text: BIOME_NAMES[bio], t: 2.4 };
+  }
+  updateVillagers(dt);
   if (!r) for (const lm of LANDMARKS) {
     const d = Math.hypot(lm.x - player.x, lm.y - player.y);
     if (d < 450 && !lm.seen) { lm.seen = true; banner = { text: lm.name, t: 2.4 }; }
@@ -629,7 +741,8 @@ function updateWorld(dt, busy) {
   }
   regrowT += dt;
   if (regrowT > 0.5) {
-    for (const p of props) {
+    const near = propsNear(player.x - 1800, player.y - 1300, player.x + 1800, player.y + 1300).filter(p => !inVale(p.x, p.y));
+    for (const p of props.concat(near)) {
       if (p.gone > 0) p.gone -= regrowT;
       if (p.regrow > 0) { p.regrow -= regrowT; if (p.regrow <= 0) { p.stock = p.t === 'rock' ? (p.crystal ? 2 : 3) : 3; if (p.t === 'rock') stampGrid(worldGrid, p.x, p.y - 8, 30, 0); } }
     }
@@ -643,8 +756,11 @@ function updateWorld(dt, busy) {
     for (let tries = 0; tries < 6; tries++) {
       const a = rand(0, 6.28), d = rand(800, 1250);
       const x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
-      if (!enemyWalk(x, y) || regionAt(x, y)) continue;
-      spawnEnemy(makeMusgo(x, y, null, (x > 5500 || y < 1200) && Math.random() < 0.55 ? 'azul' : 'wild'));
+      if (!enemyWalk(x, y) || (inVale(x, y) && regionAt(x, y)) || inCity(x, y, 300)) continue;
+      const b = inVale(x, y) ? null : biomeAt(x, y);
+      let kind = { deserto: 'areia', neve: 'gelo', pantano: 'pantano', outono: 'outono' }[b] || 'wild';
+      if (kind === 'wild' && ((inVale(x, y) && (x > 5500 || y < 1200)) || b === 'floresta') && Math.random() < 0.5) kind = 'azul';
+      spawnEnemy(makeMusgo(x, y, null, kind));
       break;
     }
   }
@@ -670,6 +786,8 @@ function findInteract(busy) {
         consider(Math.hypot(x - player.x, y - player.y), 110, { kind: 'door', ref: d, x, y: y - 90, x0: x, y0: y, label: 'Entrar' });
       }
     }
+    const cc = inCity(player.x, player.y, 100);
+    if (cc && cc.doors) for (const d of cc.doors) consider(Math.hypot(d.x - player.x, d.y - player.y), 110, { kind: 'door', ref: d, x: d.x, y: d.y - 100, x0: d.x, y0: d.y - 14, label: 'Entrar' });
     const T = REGIONS.torre;
     const [dx, dy] = toWorld(T, T.door.x, T.door.y);
     consider(Math.hypot(dx - player.x, dy - player.y), 120, { kind: 'tdoor', x: dx, y: dy - 160, label: 'Porta' });
@@ -679,7 +797,7 @@ function findInteract(busy) {
   } else {
     for (const f of interiorDef.furn) if (f.use) {
       const x = (f.x + f.w / 2) * TILE, y = (f.y + f.h) * TILE;
-      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'bancada' ? 'Criar' : f.use === 'bed' ? 'Dormir' : 'Abrir' });
+      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'bancada' || f.use === 'bancada2' ? 'Criar' : f.use === 'bed' ? 'Dormir' : 'Abrir' });
     }
   }
 }
@@ -706,6 +824,7 @@ function updateDog(dt) {
     const v = Math.min(spd * (d > 140 ? 1.4 : 1), d * 6) * dt;
     moveBody(dog, dx / d * v, dy / d * v);
     if (Math.abs(dx) > 3) dog.flip = dx < 0;
+    if (d > 20) { dog.fx = dx / d; dog.fy = dy / d; }
     dog.anim += dt * 12;
   }
   if (dist(dog, player) > 360) { [dog.x, dog.y] = nearestWalkable(player.x - 50, player.y + 10); burst(dog.x, dog.y - 10, '#ffffff', 6, 80); }
@@ -765,7 +884,10 @@ function updateBoss(e, dt, dx, dy, d) {
 }
 function ambient(dt) {
   const vw = view.vw, vh = view.vh;
-  const a = area === 'world' ? (curRegion ? curRegion.amb : 'meadow') : 'none';
+  const a = area === 'world' ? (curRegion ? curRegion.amb : ({ neve: 'snow', deserto: 'dust', outono: 'leaves', pantano: 'fireflies', cerejeiras: 'petals', floresta: 'butterflies' }[curBiome] || 'meadow')) : 'none';
+  if (a === 'snow' && Math.random() < dt * 22) particles.push({ x: cam.x + rand(-100, vw + 100), y: cam.y - 10, vx: 0, vy: rand(50, 95), g: 0, t: 9, max: 9, col: '#ffffff', s: rand(4, 7), sway: rand(0, 6), snow: 1 });
+  if (a === 'dust' && Math.random() < dt * 8) particles.push({ x: cam.x - 20, y: cam.y + rand(0, vh), vx: rand(160, 260), vy: rand(-10, 10), g: 0, t: 7, max: 7, col: 'rgba(230,200,140,0.7)', s: rand(3, 6) });
+  if (a === 'leaves' && Math.random() < dt * 5) particles.push({ x: cam.x + rand(0, vw), y: cam.y - 10, vx: rand(10, 40), vy: rand(35, 60), g: 0, t: 8, max: 8, col: ['#e8902e', '#c83a2a', '#f0c040'][Math.floor(rand(0, 3))], s: 6, sway: rand(0, 6), amb: 1 });
   if (a === 'petals' && Math.random() < dt * 4) particles.push({ x: cam.x + rand(0, vw), y: cam.y - 10, vx: rand(10, 40), vy: rand(30, 60), g: 0, t: 8, max: 8, col: Math.random() < 0.5 ? '#ffb7d0' : '#fff2c9', s: 5, sway: rand(0, 6), amb: 1 });
   if ((a === 'butterflies' || a === 'meadow') && particles.filter(p => p.bf).length < 6 && Math.random() < dt) particles.push({ x: cam.x + rand(0, vw), y: cam.y + rand(0, vh), vx: 0, vy: 0, g: 0, t: 12, max: 12, col: ['#ffe066', '#ffffff', '#ff9ec7', '#9ad1ff'][Math.floor(rand(0, 4))], s: 6, bf: 1, ph: rand(0, 6) });
   if (a === 'fireflies' && particles.filter(p => p.ff).length < 26 && Math.random() < dt * 6) particles.push({ x: cam.x + rand(0, vw), y: cam.y + rand(0, vh), vx: rand(-12, 12), vy: rand(-12, 12), g: 0, t: rand(4, 8), max: 8, col: '#f5ff9a', s: 4, ff: 1, ph: rand(0, 6) });
@@ -782,6 +904,7 @@ function ambient(dt) {
   }
   for (const p of particles) {
     if (p.amb) { p.sway += dt * 2; p.vx = 25 + Math.sin(p.sway) * 30; }
+    if (p.snow) { p.sway += dt * 1.5; p.vx = Math.sin(p.sway) * 22; }
     if (p.bf) { p.ph += dt; p.vx = Math.cos(p.ph * 0.7) * 60; p.vy = Math.sin(p.ph * 1.1) * 45; }
     if (p.ff) { p.ph += dt * 2; p.vx += Math.sin(p.ph) * 4; }
   }
@@ -794,6 +917,7 @@ function computeView() {
   view.vw = W / view.s; view.vh = H / view.s;
 }
 function camTarget() {
+  if (area === 'world') return [player.x - view.vw / 2, player.y - view.vh * 0.56];
   const bw = area === 'world' ? WW : interiorDef.pw, bh = area === 'world' ? WH : interiorDef.ph + 24;
   const tx = view.vw >= bw ? (bw - view.vw) / 2 : clamp(player.x - view.vw / 2, 0, bw - view.vw);
   const ty = view.vh >= bh ? (bh - view.vh) / 2 : clamp(player.y - view.vh * 0.56, 0, bh - view.vh);
@@ -830,11 +954,10 @@ function drawWorld() {
   // chão
   ctx.imageSmoothingEnabled = false;
   chunkBudget = 2;
-  for (let cy = Math.max(0, Math.floor(y0 / CH)); cy <= Math.floor(y1 / CH); cy++) for (let cx = Math.max(0, Math.floor(x0 / CH)); cx <= Math.floor(x1 / CH); cx++) {
-    if (cx * CH >= WW || cy * CH >= WH) continue;
+  for (let cy = Math.floor(y0 / CH); cy <= Math.floor(y1 / CH); cy++) for (let cx = Math.floor(x0 / CH); cx <= Math.floor(x1 / CH); cx++) {
     const c = getChunk(cx, cy, false) || (chunkBudget-- > 0 ? getChunk(cx, cy, true) : null);
     if (c) ctx.drawImage(c, cx * CH, cy * CH, CH + 1, CH + 1);
-    else { ctx.fillStyle = '#5c9a3e'; ctx.fillRect(cx * CH, cy * CH, CH + 1, CH + 1); }
+    else { const [r, g, b] = groundRGB(cx * CH + 256, cy * CH + 256); ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; ctx.fillRect(cx * CH, cy * CH, CH + 1, CH + 1); }
   }
   // fogueira do penhasco
   const P = REGIONS.penhasco, [fx, fy] = toWorld(P, P.fire.x, P.fire.y);
@@ -858,6 +981,12 @@ function drawWorld() {
     if (x < x0 - 100 || x > x1 + 100 || y < y0 - 100 || y > y1 + 100) continue;
     const near = Math.hypot(x - player.x, y - player.y) < 420;
     if (near) label(INTERIORS[d.to].name, x, y - 70 + Math.sin(time * 3) * 3, 17, '#fff6d8', 0.85);
+  }
+  const cc = inCity(player.x, player.y, 200);
+  if (cc && cc.doors) for (const d of cc.doors) {
+    if (Math.hypot(d.x - player.x, d.y - player.y) > 420) continue;
+    const k = DYN.get(d.to).kind;
+    label({ loja: 'Mercado', estalagem: 'Estalagem', ferreiro: 'Ferreiro', casa: 'Casa' }[k], d.x, d.y - 84 + Math.sin(time * 3) * 3, 17, '#fff6d8', 0.85);
   }
   // entidades
   const list = [];
@@ -996,9 +1125,9 @@ function drawProp(p) {
   } else if (p.t === 'tuft') {
     if (p.gone > 0) return;
     const sw = Math.sin(time * 2 + p.ph) * 3;
-    ctx.fillStyle = '#2f6b2a';
+    ctx.fillStyle = p.tc ? p.tc[0] : '#2f6b2a';
     for (let i = -3; i <= 3; i++) ctx.fillRect(p.x + i * 6 + sw * (i % 2 ? 1 : 0.5), p.y - 26 + Math.abs(i) * 4, 4, 26 - Math.abs(i) * 4);
-    ctx.fillStyle = '#8fd36a';
+    ctx.fillStyle = p.tc ? p.tc[1] : '#8fd36a';
     for (let i = -2; i <= 2; i += 2) ctx.fillRect(p.x + i * 6 + 1 + sw, p.y - 24 + Math.abs(i) * 4, 2, 10);
   } else if (p.t === 'flower') {
     if (p.gone > 0) return;
@@ -1140,6 +1269,14 @@ function drawDeco(p) {
     case 'chair':
       shadow(x, y, 18, 5, 0.25); R(-16, -34, 32, 18, '#2a2238'); R(-14, -32, 28, 14, '#c8423b'); R(-16, -18, 4, 18, '#2a2238'); R(12, -18, 4, 18, '#2a2238');
       break;
+    case 'stall':
+      shadow(x, y, 50, 8, 0.25);
+      R(-48, -40, 96, 36, '#2a1a10'); R(-46, -38, 92, 32, '#a0703e'); R(-46, -38, 92, 6, '#c99a6a');
+      for (let i = 0; i < 6; i++) { ctx.fillStyle = ['#e07a2a', '#d83a3a', '#7fc46a', '#ffe066', '#c48440', '#b59cff'][(i + p.seed) % 6]; ctx.beginPath(); ctx.arc(x - 36 + i * 14, y - 40, 6, 0, 7); ctx.fill(); }
+      R(-48, -110, 6, 74, '#3b2618'); R(42, -110, 6, 74, '#3b2618');
+      for (let i = 0; i < 8; i++) R(-56 + i * 14, -124, 14, 22, i % 2 ? '#fff6e6' : p.col);
+      R(-56, -104, 112, 4, '#2a1a10');
+      break;
     case 'sign':
       shadow(x, y, 14, 4, 0.25); R(-4, -70, 8, 70, '#3b2618'); R(-2, -70, 3, 70, '#8a5a34');
       ctx.font = `700 15px ${FONT}`; { const tw = ctx.measureText(p.text).width + 20;
@@ -1148,13 +1285,22 @@ function drawDeco(p) {
       break;
   }
 }
+function lerpAngle(a, b, k) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; }
+const KAI3D_SIZE = 172;
 function drawPlayer() {
-  const [sp, flip] = heroSprite();
+  if (player.hidden) return;
   shadow(player.x, player.y, 26, 9);
   if (player.inv > 0 && Math.floor(player.inv * 14) % 2 === 0) return;
   const bob = player.moving ? Math.abs(Math.sin(player.anim * Math.PI / 2)) * -2 : Math.sin(time * 2) * 0.6;
-  spr(sp, player.x, player.y + bob, 6, flip, false);
-  if (S.eq.armadura) { ctx.fillStyle = 'rgba(95,166,74,0.55)'; ctx.fillRect(player.x - 22, player.y - 52 + bob, 44, 8); }
+  if (Char3D) {
+    player.yaw = lerpAngle(player.yaw || 0, Math.atan2(player.fx, player.fy), 0.25);
+    Char3D.draw(ctx, 'kai', { yaw: player.yaw, phase: player.anim, moving: player.moving, t: time, atk: player.atk > 0 ? 1 - player.atk / 0.24 : -1,
+      espada: S.eq.espada, armadura: S.eq.armadura, botas: S.eq.botas }, player.x, player.y + 4, KAI3D_SIZE);
+  } else {
+    const [sp, flip] = heroSprite();
+    spr(sp, player.x, player.y + bob, 6, flip, false);
+    if (S.eq.armadura) { ctx.fillStyle = 'rgba(95,166,74,0.55)'; ctx.fillRect(player.x - 22, player.y - 52 + bob, 44, 8); }
+  }
   if (player.atk > 0) {
     const k = 1 - player.atk / 0.24, fa = Math.atan2(player.fy, player.fx);
     const cx = player.x, cy = player.y - 44, R = 72;
@@ -1166,6 +1312,7 @@ function drawPlayer() {
       ctx.strokeStyle = S.eq.espada >= 3 ? `rgba(160,220,255,${0.9 - i * 0.15})` : `rgba(255,255,255,${0.9 - i * 0.15})`; ctx.lineWidth = 13 - i * 1.7;
       ctx.beginPath(); ctx.arc(cx, cy, R, a - 0.16, a); ctx.stroke();
     }
+    if (Char3D) return;
     ctx.strokeStyle = bladeCol; ctx.lineWidth = 7;
     ctx.beginPath(); ctx.moveTo(cx + Math.cos(a0) * 14, cy + Math.sin(a0) * 14); ctx.lineTo(cx + Math.cos(a0) * (R + 8), cy + Math.sin(a0) * (R + 8)); ctx.stroke();
     ctx.strokeStyle = '#c99a3a'; ctx.lineWidth = 8;
@@ -1173,11 +1320,17 @@ function drawPlayer() {
   }
 }
 function drawDog() {
+  if (player.hidden) return;
   shadow(dog.x, dog.y, 20, 6);
   const f = dog.moving ? 1 + (Math.floor(dog.anim) % 2) : 0;
   const hop = dog.moving ? -Math.abs(Math.sin(dog.anim * Math.PI / 2)) * 4 : 0;
-  spr(DOG[f], dog.x, dog.y + hop, 5, dog.flip, false);
-  if (S.eq.coleira) { ctx.fillStyle = '#e0a020'; ctx.fillRect(dog.x + (dog.flip ? -12 : 4), dog.y - 26 + hop, 8, 5); }
+  if (Char3D) {
+    dog.yaw = lerpAngle(dog.yaw || 0, Math.atan2(dog.fx || 0, dog.fy || 1), 0.2);
+    Char3D.draw(ctx, 'dog', { yaw: dog.yaw, phase: dog.anim * 0.5, moving: dog.moving, t: time, bark: dog.bark > 0, coleira: S.eq.coleira }, dog.x, dog.y + 3, KAI3D_SIZE);
+  } else {
+    spr(DOG[f], dog.x, dog.y + hop, 5, dog.flip, false);
+    if (S.eq.coleira) { ctx.fillStyle = '#e0a020'; ctx.fillRect(dog.x + (dog.flip ? -12 : 4), dog.y - 26 + hop, 8, 5); }
+  }
   if (dog.bark > 0) label('Au!', dog.x + (dog.flip ? -28 : 28), dog.y - 50 - (0.5 - dog.bark) * 30, 18, '#fff', Math.min(1, dog.bark * 3));
 }
 function drawCatAt(x, y, flip, lost, sleeping) {
@@ -1195,7 +1348,7 @@ function drawNpc(n) {
   label(n.name, n.x, n.y + 22, 15, '#fff6d8', 0.9);
 }
 function drawEnemy(e) {
-  const SP = e.boss ? MUSGO_BOSS : e.azul ? MUSGO_AZUL : MUSGO;
+  const SP = e.boss ? MUSGO_BOSS : e.azul ? MUSGO_AZUL : e.variant ? MUSGO_VAR[e.variant] : MUSGO;
   const sc = e.boss ? 13 : e.azul ? 5.5 : 5;
   if (e.born > 0) {
     const k = 1 - e.born / (e.boss ? 1.2 : 0.5);
@@ -1286,51 +1439,45 @@ function relicIcon(key, x, y, s, on) {
 }
 
 // ---------------------------------------------------------------- minimapa
-function buildMinimap() {
-  const k = 16, w = Math.ceil(WW / k), h = Math.ceil(WH / k);
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const g = c.getContext('2d'), id = g.createImageData(w, h), d = id.data;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const t = terrainAt(x * k + 8, y * k + 8), i = (y * w + x) * 4;
-    const col = t === 2 ? [58, 140, 196] : t === 1 ? [205, 170, 112] : t === 3 ? [226, 207, 150] : [88, 150, 60];
-    d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+function updateMaps() {
+  const px = area === 'world' ? player.x : (interiorDef.returnTo || [player.x])[0], py = area === 'world' ? player.y : (interiorDef.returnTo || [0, player.y])[1];
+  if (!miniNext && (!miniLayer || Math.hypot(px - miniLayer.cx, py - miniLayer.cy) > 900)) miniNext = makeMapLayer(px, py, 7200, 4050, 40);
+  if (miniNext) { stepMapLayer(miniNext, 10); if (miniNext.done) { miniLayer = miniNext; miniNext = null; } }
+  if (showMap) {
+    if (!bigLayer || Math.hypot(px - bigLayer.cx, py - bigLayer.cy) > 4000) bigLayer = makeMapLayer(px, py, 48000, 27000, 180);
+    stepMapLayer(bigLayer, 24);
   }
-  g.putImageData(id, 0, 0);
-  g.fillStyle = 'rgba(25,70,30,0.85)';
-  for (const p of props) if (p.t === 'tree') g.fillRect(p.x / k - 2, p.y / k - 4, 4, 4);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const t = terrainAt(x * k + 8, y * k + 8);
-    if (t === 4) { g.fillStyle = '#c9bfa8'; g.fillRect(x, y, 1, 1); } else if (t === 5) { g.fillStyle = '#7a5232'; g.fillRect(x, y, 1, 1); }
-    else if (t === 6) { g.fillStyle = '#7d7a74'; g.fillRect(x, y, 1, 1); } else if (t === 7) { g.fillStyle = '#a0703e'; g.fillRect(x, y, 1, 1); }
-  }
-  for (const b of BUILDINGS) { g.fillStyle = b.kind === 'house' ? ROOFS[b.roof][2] : b.kind === 'barn' ? '#a8402e' : b.kind === 'tower' ? '#9a9488' : '#d8d0b8'; g.fillRect((b.x - b.pw / 2) / k, (b.y - b.ph * 0.8) / k, b.pw / k, b.ph * 0.8 / k); }
-  g.strokeStyle = 'rgba(20,20,20,0.6)'; g.lineWidth = 1;
-  MINI = c;
 }
 function drawMap(x, y, w, h, full) {
+  const L = full ? bigLayer : miniLayer;
   ctx.save();
   ctx.fillStyle = '#1b2a1f'; ctx.strokeStyle = '#e8d6a8'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.roundRect(x - 3, y - 3, w + 6, h + 6, 8); ctx.fill(); ctx.stroke();
   ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
-  const k = w / WW;
-  ctx.imageSmoothingEnabled = true;
-  if (MINI) ctx.drawImage(MINI, x, y, w, h);
+  if (!L) { ctx.restore(); return; }
+  const k = w / L.spanW, ox = L.cx - L.spanW / 2, oy = L.cy - L.spanH / 2;
+  const P = (wx, wy) => [x + (wx - ox) * k, y + (wy - oy) * k];
+  ctx.imageSmoothingEnabled = !full;
+  ctx.drawImage(L.canvas, x, y, w, L.h * L.res * k);
+  for (const c of citiesIn(ox, oy, ox + L.spanW, oy + L.spanH)) {
+    const [cx, cy] = P(c.x, c.y), r = Math.max(3, c.R * k);
+    ctx.fillStyle = 'rgba(200,190,166,0.85)'; ctx.strokeStyle = '#3a3a44'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); ctx.stroke();
+    if (full) label(S.cities[c.key] ? c.name : '???', cx, cy - r - 9, 12, S.cities[c.key] ? '#fff6d8' : '#b8ad94');
+  }
   if (full) {
-    for (const r of REGION_LIST) label(r.name, x + (r.ox + r.iw * IS / 2) * k, y + (r.oy + r.ih * IS * 0.5) * k, 14, '#fff6d8');
-    for (const lm of LANDMARKS) label(lm.name, x + lm.x * k, y + lm.y * k, 12, '#cfe6c0', 0.9);
+    for (const r of REGION_LIST) { const [lx, ly] = P(r.ox + r.iw / 2, r.oy + r.ih / 2); label(r.name, lx, ly, 11, '#fff6d8', 0.9); }
+    const [vx, vy] = P(WW / 2, -300); label('Vale da Lanterna', vx, vy, 14, '#ffe38a');
   }
   const tg = questTargets();
   const pulse = 0.7 + Math.sin(time * 5) * 0.3;
-  for (const [tx, ty] of tg.side) { ctx.fillStyle = `rgba(120,200,255,${pulse})`; ctx.beginPath(); ctx.arc(x + tx * k, y + ty * k, full ? 7 : 4, 0, 7); ctx.fill(); }
-  for (const [tx, ty] of tg.main) { ctx.fillStyle = `rgba(255,214,90,${pulse})`; ctx.strokeStyle = '#2a2238'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x + tx * k, y + ty * k, full ? 8 : 4.5, 0, 7); ctx.fill(); ctx.stroke(); }
+  const dot = (wx, wy, col, r) => { let [mx, my] = P(wx, wy); mx = clamp(mx, x + 5, x + w - 5); my = clamp(my, y + 5, y + h - 5); ctx.fillStyle = col; ctx.strokeStyle = '#2a2238'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(mx, my, r, 0, 7); ctx.fill(); ctx.stroke(); };
+  for (const [tx, ty] of tg.side) dot(tx, ty, `rgba(120,200,255,${pulse})`, full ? 6 : 4);
+  for (const [tx, ty] of tg.main) dot(tx, ty, `rgba(255,214,90,${pulse})`, full ? 7 : 4.5);
   let px = player.x, py = player.y;
   if (area !== 'world' && interiorDef.returnTo) [px, py] = interiorDef.returnTo;
-  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#c8423b'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(x + px * k, y + py * k, full ? 7 : 4, 0, 7); ctx.fill(); ctx.stroke();
-  if (!full) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
-    if (area === 'world') ctx.strokeRect(x + cam.x * k, y + cam.y * k, view.vw * k, view.vh * k);
-  }
+  dot(px, py, '#ffffff', full ? 6 : 4);
+  if (!full && area === 'world') { ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; const [a1, b1] = P(cam.x, cam.y); ctx.strokeRect(a1, b1, view.vw * k, view.vh * k); }
   ctx.restore();
 }
 
@@ -1358,7 +1505,7 @@ function drawHUD() {
   ctx.fillStyle = '#ffe38a'; ctx.fillRect(L + 9, oy + 9, 6, 8);
   ctx.fillStyle = '#fff6d8'; ctx.textAlign = 'left'; ctx.fillText(ob, L + 20, oy + 14, ow - 26);
   // minimapa
-  const mw = Math.min(170, W * 0.22), mh = mw * WH / WW, mx = W - SAFE.r - 12 - mw, my = T + 2;
+  const mw = Math.min(170, W * 0.22), mh = mw * 4050 / 7200, mx = W - SAFE.r - 12 - mw, my = T + 2;
   if (area === 'world' || true) { drawMap(mx, my, mw, mh, false); addBtn(mx, my, mw, mh, () => { showMap = true; Audio.sfx('ui'); }); }
   label('MAPA', mx + mw / 2, my + mh + 11, 11, '#fff6d8', 0.75);
   // som
@@ -1406,7 +1553,8 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(20,24,20,0.5)'; ctx.fillRect(0, by - 24, W, 48);
     ctx.fillStyle = '#ffe38a'; ctx.fillRect(0, by - 24, W, 2); ctx.fillRect(0, by + 22, W, 2);
     ctx.globalAlpha = 1;
-    label(banner.text, W / 2, by, 26, '#fff6d8', Math.max(0, a));
+    label(banner.text, W / 2, by - (banner.sub ? 6 : 0), 26, '#fff6d8', Math.max(0, a));
+    if (banner.sub) label(banner.sub, W / 2, by + 16, 13, '#cfe6c0', Math.max(0, a));
   }
   if (toastMsg) {
     const a = Math.min(1, toastMsg.life * 2);
@@ -1430,7 +1578,7 @@ function drawDialog() {
   ctx.fillStyle = 'rgba(28,24,34,0.94)'; ctx.strokeStyle = '#e8d6a8'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
   let tx = bx + pad;
-  const pk = PORTRAIT[l.who];
+  const pk = PORTRAIT[l.who] || (l.who && dialog.pid && NPC[dialog.pid] ? dialog.pid : null);
   if (pk) {
     ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.roundRect(bx + 10, by + 10, 70, 80, 10); ctx.fill();
     ctx.imageSmoothingEnabled = false;
@@ -1461,11 +1609,11 @@ function drawDialog() {
 function drawBigMap() {
   ctx.fillStyle = 'rgba(10,14,10,0.8)'; ctx.fillRect(0, 0, W, H);
   const pad = 20, aw = W - pad * 2 - SAFE.l - SAFE.r, ah = H - pad * 2 - 30 - SAFE.t - SAFE.b;
-  const w = Math.min(aw, ah * WW / WH), h = w * WH / WW;
+  const w = Math.min(aw, ah * 48000 / 27000), h = w * 27000 / 48000;
   const x = (W - w) / 2, y = SAFE.t + pad + 22;
-  label('Mapa do Vale', W / 2, y - 14, 18, '#ffe38a');
+  label('Mapa do Mundo', W / 2, y - 14, 18, '#ffe38a');
   drawMap(x, y, w, h, true);
-  label('● você    ● missão principal    ● missões extras    (toque para fechar)', W / 2, y + h + 14, 12, '#cfe6c0', 0.9);
+  label('● você    ● missão principal    ● missões extras    ○ cidades    (toque para fechar)', W / 2, y + h + 14, 12, '#cfe6c0', 0.9);
   addBtn(0, 0, W, H, () => { showMap = false; });
 }
 function panelButton(text, x, y, w, h, fn, style) {
@@ -1602,7 +1750,7 @@ function startGame(fresh) {
   goLandscape();
   if (fresh) { wipe(SAVE_KEY); S = newSave(); }
   else { const L = load(SAVE_KEY) || {}; S = Object.assign(newSave(), L); for (const k of ['inv', 'bag', 'eq', 'q', 'relics']) S[k] = Object.assign(newSave()[k], L[k] || {}); }
-  player.hp = S.maxHp; player.inv = 0; dialog = null; endT = 0; menu = null; showMap = false;
+  player.hp = S.maxHp; player.inv = 0; dialog = null; endT = 0; menu = null; showMap = false; player.hidden = false;
   buildWorldEntities();
   mode = 'play';
   fade = { t: 0.35, dur: 0.7, mid: null };
@@ -1621,6 +1769,7 @@ function drawTitle() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   uiButtons = [];
   player.x = 3470; player.y = 2330; player.dir = 'down'; player.moving = false; dog.x = 3400; dog.y = 2345; dog.moving = false;
+  player.hidden = true;
   backdrop(3600, 2050, 0.9);
   const g = ctx.createLinearGradient(0, 0, W, 0);
   g.addColorStop(0, 'rgba(10,20,15,0.85)'); g.addColorStop(0.55, 'rgba(10,20,15,0.35)'); g.addColorStop(1, 'rgba(10,20,15,0.6)');
@@ -1633,8 +1782,14 @@ function drawTitle() {
   ctx.imageSmoothingEnabled = false;
   const cy = land ? H * 0.78 : H * 0.55, f = Math.floor(time * 6) % 4;
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(lx - 10, cy + 4, 90, 14, 0, 0, 7); ctx.fill();
-  spr(HERO.down[[1, 0, 2, 0][f]], lx + 20, cy, Math.min(8, H / 60), false, false);
-  spr(DOG[1 + (Math.floor(time * 8) % 2)], lx - 66, cy + Math.abs(Math.sin(time * 8)) * -6, Math.min(6, H / 75), false, false);
+  if (Char3D) {
+    const sz = Math.min(H * 0.62, 300);
+    Char3D.draw(ctx, 'kai', { yaw: Math.sin(time * 0.8) * 0.6, phase: time * 6, moving: true, t: time, atk: -1, espada: 1 }, lx + 30, cy + 6, sz);
+    Char3D.draw(ctx, 'dog', { yaw: 0.9 + Math.sin(time) * 0.2, phase: time * 6, moving: true, t: time, bark: Math.sin(time * 2) > 0.8 }, lx - 70, cy + 6, sz);
+  } else {
+    spr(HERO.down[[1, 0, 2, 0][f]], lx + 20, cy, Math.min(8, H / 60), false, false);
+    spr(DOG[1 + (Math.floor(time * 8) % 2)], lx - 66, cy + Math.abs(Math.sin(time * 8)) * -6, Math.min(6, H / 75), false, false);
+  }
   const bw = Math.min(260, W * 0.36), bx = land ? W * 0.72 - bw / 2 : (W - bw) / 2;
   let by = land ? H * 0.4 : H * 0.7;
   if (hasSave()) {
@@ -1669,16 +1824,21 @@ function drawEnd() {
   label('de novo sobre o vale!', W / 2, H * 0.32 + 40, Math.min(26, W / 20), '#fff6d8', k);
   const sideDone = Object.values(S.q).filter(v => v === 2).length;
   label('Moedas: ' + S.coins + '   Corações: ' + S.maxHp + '   Missões extras: ' + sideDone + '/5   Musgos: ' + S.mkills, W / 2, H * 0.32 + 84, 15, '#e9ffd0', k);
-  if (endT > 1.5) bigButton('Jogar de novo', W / 2 - 130, H * 0.8, 260, 50, () => { wipe(SAVE_KEY); mode = 'title'; });
+  if (endT > 1.5) {
+    bigButton('Continuar explorando', W / 2 - 280, H * 0.8, 260, 50, () => { mode = 'play'; area = 'world'; grid = worldGrid; player.hidden = false; toast('O mundo é infinito: siga as estradas!'); }, true);
+    bigButton('Jogar de novo', W / 2 + 20, H * 0.8, 260, 50, () => { wipe(SAVE_KEY); mode = 'title'; });
+  }
 }
 
 // ---------------------------------------------------------------- laço principal
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  frameNo++;
   try {
     if (mode === 'play') {
       update(dt);
+      updateMaps();
       uiButtons = [];
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#14201a'; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -1711,7 +1871,6 @@ document.addEventListener('visibilitychange', () => {
   placeTownDecor();
   placeProps();
   for (const id of Object.keys(INTERIORS)) buildInterior(id);
-  buildMinimap();
   grid = worldGrid;
   document.getElementById('loading').remove();
   mode = 'title';

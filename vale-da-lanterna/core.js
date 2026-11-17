@@ -195,6 +195,12 @@ Object.assign(NPC, {
 });
 const CAT = bake(['O.....O.....', 'OO...OO.....', 'OYYOOYYO....', 'OYEYYEYO..OO', 'OYYyyYYO..OY', '.OYYYYYYOOYO', '.OYYyYYyYYO.', '.OYYYYYYYYO.', '..OYO..OYO..', '..OO....OO..'],
   pal({ Y: '#f0a050', y: '#fbe0b8', E: '#2a2238' }));
+const MUSGO_VAR = {
+  areia: bake(MUSGO_ROWS, pal({ M: '#d8b46a', m: '#a88440', h: '#f4dca0', g: '#7fae4a', E: '#1d1a24' })),
+  gelo: bake(MUSGO_ROWS, pal({ M: '#cfeaff', m: '#8ab8e0', h: '#ffffff', g: '#9ad8ff', E: '#1d3a5a' })),
+  pantano: bake(MUSGO_ROWS, pal({ M: '#7a5aa6', m: '#523a7a', h: '#b49ad8', g: '#6ab36a', E: '#f2e14b' })),
+  outono: bake(MUSGO_ROWS, pal({ M: '#d8782e', m: '#a0501a', h: '#f8b060', g: '#c83a2a', E: '#1d1a24' }))
+};
 const MUSGO_AZUL = bake(MUSGO_ROWS, pal({ M: '#4a8fd0', m: '#2f66a8', h: '#9fd0ff', g: '#c8f0ff', E: '#1d1a24' }));
 
 // ---------------------------------------------------------------- ruído e aleatório com semente
@@ -218,7 +224,12 @@ function makeTree(seed, kind) {
     oak: ['#1f3d1f', '#2f6b2a', '#3f8a37', '#5fae4a', '#8fd36a'],
     lime: ['#1f3d1f', '#3a7a2a', '#5a9e34', '#7fc144', '#b5e070'],
     deep: ['#132b1a', '#1f4f2c', '#2b6b3a', '#3d8a4a', '#6ab36a'],
-    bloom: ['#1f3d1f', '#2f6b2a', '#3f8a37', '#5fae4a', '#8fd36a']
+    bloom: ['#1f3d1f', '#2f6b2a', '#3f8a37', '#5fae4a', '#8fd36a'],
+    autumnO: ['#3a1e0a', '#8a3a12', '#c8601e', '#e8902e', '#f8c060'],
+    autumnR: ['#3a0e0a', '#7a1e16', '#b03024', '#d8503a', '#f08a6a'],
+    autumnY: ['#3a2a0a', '#8a6a12', '#c8a020', '#e8c840', '#f8e890'],
+    cherry: ['#4a1a2a', '#b0507a', '#e07aa6', '#f6a6c6', '#ffd6e8'],
+    willow: ['#0e1f14', '#1f3a24', '#2f5232', '#3f6a3e', '#6a8a5a']
   };
   const P = pals[kind] || pals.oak;
   return pixelCanvas(W2, H2, g => {
@@ -227,7 +238,31 @@ function makeTree(seed, kind) {
     g.fillStyle = '#6b4226'; g.fillRect(17, 30, 6, 17);
     g.fillStyle = '#8a5a34'; g.fillRect(18, 30, 2, 16);
     g.fillStyle = '#2a1a10'; g.fillRect(13, 46, 14, 2);
-    if (kind === 'pine') {
+    if (kind === 'cactus') {
+      g.clearRect(0, 0, W2, H2);
+      const col = (x, y, w, h) => { g.fillStyle = '#1f4a26'; g.fillRect(x - 1, y - 1, w + 2, h + 1); g.fillStyle = '#4f9a50'; g.fillRect(x, y, w, h); g.fillStyle = '#7fc46a'; g.fillRect(x + 1, y + 1, 1, h - 2); g.fillStyle = '#2f6b3a'; g.fillRect(x + w - 1, y, 1, h); };
+      col(16, 8, 8, 40); col(8, 20, 5, 12); col(8, 30, 9, 4); col(27, 14, 5, 12); col(23, 24, 9, 4);
+      g.fillStyle = '#ff7aa6'; g.fillRect(19, 6, 3, 3);
+      g.fillStyle = '#c8b070'; g.fillRect(12, 47, 16, 2);
+      return;
+    }
+    if (kind === 'palm') {
+      g.clearRect(0, 0, W2, H2);
+      for (let y = 14; y < 48; y++) { const x = 19 + Math.round(Math.sin(y / 9) * 3); g.fillStyle = '#3b2618'; g.fillRect(x - 1, y, 6, 1); g.fillStyle = y % 4 === 0 ? '#7a5a34' : '#a07a46'; g.fillRect(x, y, 4, 1); }
+      for (let a = 0; a < 7; a++) {
+        const ang = -Math.PI + a / 6 * Math.PI;
+        for (let r = 0; r < 16; r++) { const x = 21 + Math.cos(ang) * r, y = 14 + Math.sin(ang) * r * 0.55 + r * r * 0.03; g.fillStyle = r > 13 ? '#1f4a26' : '#3f8a37'; g.fillRect(Math.round(x), Math.round(y), 2, 2); }
+      }
+      g.fillStyle = '#5a3a1a'; g.fillRect(18, 15, 3, 3); g.fillRect(22, 16, 3, 3);
+      return;
+    }
+    if (kind === 'dead') {
+      g.clearRect(0, 0, W2, H2);
+      const br = (x0, y0, ang, len, w) => { for (let i = 0; i < len; i++) { const x = x0 + Math.cos(ang) * i, y = y0 + Math.sin(ang) * i; g.fillStyle = '#2a1e18'; g.fillRect(Math.round(x) - 1, Math.round(y), w + 1, 2); g.fillStyle = '#5a4a3e'; g.fillRect(Math.round(x), Math.round(y), w, 1); } };
+      br(20, 48, -Math.PI / 2, 34, 4); br(21, 26, -2.4, 12, 2); br(22, 22, -0.6, 13, 2); br(21, 34, -0.3, 10, 2); br(20, 18, -2.0, 9, 1); br(23, 16, -1.1, 9, 1);
+      return;
+    }
+    if (kind === 'pine' || kind === 'snowpine') {
       for (let l = 0; l < 4; l++) {
         const top = 2 + l * 8, w = 8 + l * 6;
         for (let y = 0; y < 12; y++) {
@@ -235,6 +270,7 @@ function makeTree(seed, kind) {
           for (let x = -hw; x <= hw; x++) {
             const edge = Math.abs(x) >= hw - 0 || y === 11;
             g.fillStyle = edge ? '#132b1a' : (x < -hw / 3 ? '#4f9a50' : x > hw / 3 ? '#1f4f2c' : '#2f6b3a');
+            if (kind === 'snowpine' && !edge && (y < 4 || (x < -hw / 3 && y < 7))) g.fillStyle = y < 2 ? '#ffffff' : '#e4eef6';
             g.fillRect(20 + x, top + y, 1, 1);
           }
         }
@@ -252,7 +288,8 @@ function makeTree(seed, kind) {
       g.fillStyle = l > 0.75 ? P[4] : l > 0.2 ? P[3] : l > -0.4 ? P[2] : P[1];
       g.fillRect(x, y, 1, 1);
     }
-    if (kind === 'bloom') for (let i = 0; i < 26; i++) {
+    if (kind === 'willow') for (let i = 0; i < 9; i++) { const x = 6 + i * 3.5; g.fillStyle = '#2f5232'; g.fillRect(Math.round(x), 24, 2, 8 + (i % 3) * 3); g.fillStyle = '#0e1f14'; g.fillRect(Math.round(x), 32 + (i % 3) * 3, 2, 1); }
+    if (kind === 'bloom' || kind === 'cherry') for (let i = 0; i < 26; i++) {
       const x = Math.floor(6 + R() * 28), y = Math.floor(4 + R() * 26);
       if (inside(x + 0.5, y + 0.5) && inside(x - 1, y) && inside(x + 2, y)) { g.fillStyle = R() < 0.5 ? '#ff9ec7' : '#ffe0ef'; g.fillRect(x, y, 2, 2); }
     }
@@ -260,8 +297,13 @@ function makeTree(seed, kind) {
 }
 const TREE_IMGS = [];
 ['oak', 'oak', 'lime', 'deep', 'bloom', 'pine', 'pine', 'oak'].forEach((k, i) => TREE_IMGS.push({ kind: k, img: makeTree(1000 + i * 77, k) }));
+const TREE_SETS = {};
+for (const [b, kinds] of Object.entries({
+  campo: ['oak', 'lime', 'bloom', 'oak'], floresta: ['deep', 'oak', 'pine', 'deep', 'pine'], outono: ['autumnO', 'autumnR', 'autumnY', 'autumnO'],
+  deserto: ['cactus', 'cactus', 'palm'], neve: ['snowpine', 'snowpine', 'snowpine'], pantano: ['willow', 'dead', 'willow', 'deep'],
+  cerejeiras: ['cherry', 'cherry', 'oak'] })) TREE_SETS[b] = kinds.map((k, i) => makeTree(3000 + i * 131 + b.length * 17, k));
 
-function makeRock(seed, crystal) {
+function makeRock(seed, crystal, style) {
   const R = mulberry(seed);
   return pixelCanvas(20, 16, g => {
     const cx = 10, cy = 10, rx = 8 + R() * 1.5, ry = 5.5;
@@ -270,10 +312,11 @@ function makeRock(seed, crystal) {
       if (d > 1) continue;
       const edge = d > 0.72;
       const l = (cx - x) * 0.4 + (cy - y) * 0.7 + (R() - 0.5) * 1.5;
-      g.fillStyle = edge ? '#3a3a44' : l > 2 ? '#c9c6c0' : l > -1 ? '#9a978f' : '#74716b';
+      const C = style === 'sand' ? ['#5a2e1e', '#e0a070', '#c07a4e', '#9a5a38'] : style === 'snow' ? ['#3a4458', '#ffffff', '#c8d6e4', '#9aa8bc'] : ['#3a3a44', '#c9c6c0', '#9a978f', '#74716b'];
+      g.fillStyle = edge ? C[0] : l > 2 ? C[1] : l > -1 ? C[2] : C[3];
       g.fillRect(x, y, 1, 1);
     }
-    g.fillStyle = 'rgba(80,140,60,0.9)'; g.fillRect(5, 6, 4, 1); g.fillRect(6, 5, 2, 1);
+    if (!style) { g.fillStyle = 'rgba(80,140,60,0.9)'; g.fillRect(5, 6, 4, 1); g.fillRect(6, 5, 2, 1); }
     if (crystal) {
       [[7, 1, 3, 8], [11, 3, 3, 6], [4, 4, 2, 5]].forEach(([x, y, w, h]) => {
         g.fillStyle = '#1e3f7a'; g.fillRect(x - 1, y - 1, w + 2, h + 1);
@@ -284,6 +327,7 @@ function makeRock(seed, crystal) {
   });
 }
 const ROCK_IMGS = [makeRock(5, false), makeRock(9, false), makeRock(13, true)];
+const ROCK_SAND = makeRock(21, false, 'sand'), ROCK_SNOW = makeRock(27, false, 'snow'), ROCK_ICE = makeRock(33, true, 'snow');
 const STUMP = pixelCanvas(16, 8, g => { g.fillStyle = '#2a1a10'; g.fillRect(2, 1, 12, 7); g.fillStyle = '#8a5a34'; g.fillRect(3, 2, 10, 5); g.fillStyle = '#c99a6a'; g.fillRect(5, 3, 6, 2); });
 function makeBush(seed, flowers) {
   const R = mulberry(seed), W2 = 36, H2 = 24, P = ['#1f3d1f', '#2f6b2a', '#3f8a37', '#5fae4a', '#8fd36a'];
@@ -305,3 +349,19 @@ function makeBush(seed, flowers) {
   });
 }
 const BUSH_IMGS = [makeBush(3), makeBush(8), makeBush(21, '#ff9ec7'), makeBush(34, '#ffe066'), makeBush(55, '#ffffff')];
+
+// moradores das cidades: aparência aleatória com semente
+const PERSON_CACHE = new Map();
+function makePerson(seed) {
+  if (PERSON_CACHE.has(seed)) return PERSON_CACHE.get(seed);
+  const R = mulberry(seed * 7 + 3), pick = a => a[Math.floor(R() * a.length)];
+  const hair = pick([['#2a1a10', '#1a100a'], ['#5a3a26', '#3b2618'], ['#c8a040', '#9a7a28'], ['#d0542e', '#9e3b1e'], ['#e4e2ec', '#a9a6bb'], ['#1f1f2a', '#101018'], ['#8a5a2b', '#5e3b1a']]);
+  const cloth = pick([['#4f7fbf', '#355c8f'], ['#5fa65a', '#3f7a3c'], ['#c8423b', '#8e2a2a'], ['#7b5aa6', '#5a3f80'], ['#e0a020', '#a87a18'], ['#6e5a48', '#4f3f31'], ['#e6dccb', '#b8ab95'], ['#2f8a84', '#1f6a66']]);
+  const skin = pick([['#f0c08a', '#cf9461'], ['#d9a066', '#b47a45'], ['#c98f5e', '#9e6a3f'], ['#8a5a3a', '#6a4028'], ['#f6d0a8', '#d8a878']]);
+  const hat = R() < 0.25, robe = R() < 0.35;
+  const top = hat ? ['..OOOOOOOO..', '.OYYYYYYYYO.', 'OYYyYYYYyYYO', '.OWWWWWWWWO.'] : null;
+  const sp = bake(personRows(top, robe ? ROBE : null), pal({ W: hair[0], w: hair[1], R: cloth[1], r: cloth[1], B: cloth[0], b: cloth[1], G: '#c9a14a',
+    P: pick(['#33384e', '#4a3a2a', '#2a2a35', '#5a4a6a']), S: skin[0], s: skin[1], Y: pick(['#e9c46a', '#8a5a34', '#4f7fbf', '#c8423b']), y: '#7a5a20' }));
+  PERSON_CACHE.set(seed, sp);
+  return sp;
+}
