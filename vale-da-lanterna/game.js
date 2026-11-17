@@ -4,8 +4,9 @@
 let MINI = null;
 
 // ---------------------------------------------------------------- estado salvo
+const SAVE_VERSION = 3;
 function newSave() {
-  return {
+  return { version: SAVE_VERSION,
     stage: 0, relics: { petala: false, orvalho: false, brasa: false }, got: {}, kills: {},
     coins: 0, maxHp: 5, chest: false, bossDead: false, done: false,
     inv: { madeira: 0, pedra: 0, fibra: 0, flor: 0, cogumelo: 0, seiva: 0, cristal: 0 },
@@ -15,11 +16,45 @@ function newSave() {
   };
 }
 let S = newSave();
-const hasSave = () => { const s = load(SAVE_KEY); return !!(s && (s.stage > 0 || s.coins > 0 || s.moved)); };
+const hasSave = () => { const s = load(SAVE_KEY) || load('vale-da-lanterna-v1'); return !!(s && (s.stage > 0 || s.coins > 0 || s.moved)); };
+// completa campos novos sem apagar nada do que já existe
+function deepDefaults(t, d) {
+  for (const k in d) {
+    if (t[k] === undefined || t[k] === null) t[k] = JSON.parse(JSON.stringify(d[k]));
+    else if (d[k] && typeof d[k] === 'object' && !Array.isArray(d[k]) && typeof t[k] === 'object') deepDefaults(t[k], d[k]);
+  }
+  return t;
+}
+function migrateV1(o) {
+  // primeira versão (retrato, sem inventário): mantém história, relíquias, moedas e vida máxima
+  return { version: 1, stage: o.stage || 0, relics: o.relics || {}, got: o.got || {}, kills: o.kills || {}, coins: o.coins || 0,
+    maxHp: o.maxHp || 5, chest: !!o.chest, bossDead: !!o.bossDead, done: !!o.done, moved: true };
+}
+function loadSave() {
+  let raw = load(SAVE_KEY);
+  if (!raw) { const v1 = load('vale-da-lanterna-v1'); if (v1) { store('vale-da-lanterna-backup-v1', v1); raw = migrateV1(v1); } }
+  if (!raw) return null;
+  const ver = raw.version || 2;
+  if (ver < SAVE_VERSION) store('vale-da-lanterna-backup-v' + ver, raw);
+  const out = deepDefaults(raw, newSave());
+  out.version = SAVE_VERSION;
+  return out;
+}
+let lastSaveAt = 0;
+const QUALITY = {
+  baixo: { name: 'Baixo', npc3d: false, dirs: 4, fx: 0.4, chunks: 1, bake: 4 },
+  medio: { name: 'Médio', npc3d: true, dirs: 4, fx: 0.7, chunks: 2, bake: 6 },
+  alto: { name: 'Alto', npc3d: true, dirs: 8, fx: 1, chunks: 2, bake: 8 },
+  ultra: { name: 'Ultra', npc3d: true, dirs: 8, fx: 1.4, chunks: 3, bake: 12 }
+};
+const CONFIG = Object.assign({ quality: (navigator.maxTouchPoints > 0 ? 'medio' : 'alto') }, load('vale-da-lanterna-config') || {});
+const Q = () => QUALITY[CONFIG.quality] || QUALITY.medio;
+function setQuality(k) { CONFIG.quality = k; store('vale-da-lanterna-config', CONFIG); if (Char3D) Char3D.setDirs(Q().dirs); toast('Gráficos: ' + Q().name); }
 function save() {
   if (area !== 'world' && DYN.has(area)) { const d = DYN.get(area).door; S.pos = { area: 'world', x: d[0], y: d[1] + 40 }; }
   else S.pos = { area, x: Math.round(player.x), y: Math.round(player.y) };
   store(SAVE_KEY, S);
+  lastSaveAt = time;
 }
 const relicCount = () => (S.relics.petala ? 1 : 0) + (S.relics.orvalho ? 1 : 0) + (S.relics.brasa ? 1 : 0);
 const florlumeCount = () => Object.keys(S.got).filter(k => k.startsWith('flor')).length;
@@ -235,9 +270,9 @@ function advanceDialog() {
   if (dialog.shown < l.text.length) { dialog.shown = l.text.length; return; }
   if (dialog.choices && dialog.i === dialog.lines.length - 1) return;
   dialog.i++; dialog.shown = 0; Audio.sfx('ui');
-  if (dialog.i >= dialog.lines.length) { const d = dialog.done; dialog = null; if (d) d(); }
+  if (dialog.i >= dialog.lines.length) { const d = dialog.done; dialog = null; if (d) d(); if (!dialog) talkFace = null; }
 }
-function choose(c) { Audio.sfx('ui'); dialog = null; if (c.fn) c.fn(); }
+function choose(c) { Audio.sfx('ui'); dialog = null; if (c.fn) c.fn(); if (!dialog) talkFace = null; }
 function giveRelic(key, name) {
   S.relics[key] = true; Audio.sfx('relic'); flash = 0.6;
   floaters.push({ x: player.x, y: player.y - 120, text: name + '!', t: 2.2, col: '#ffe38a' });
@@ -279,8 +314,9 @@ function talkRole(n) {
   } else if (n.role === 'ferreiro') say([who + ': Forja quente, bancada livre! Use à vontade, viajante.', who + ': ' + cityRumor(c)]);
   else say([who + ': Que bom receber visita! ' + cityRumor(c)]);
 }
+let talkFace = null;
 function talkTo(n) {
-  talkPid = n.id;
+  talkPid = n.id; talkFace = n;
   if (n.role) return talkRole(n);
   if (n.v) {
     const c = n.city, lines = ['Bem-vindo a ' + c.name + '!', cityRumor(c), 'Dizem que a Lanterna do Vale voltou a brilhar' + (S.done ? '... foi você? Obrigado!' : '? Ainda não, né...'), 'O mercado fica pertinho da praça.', 'A estalagem tem cama quentinha.'];
@@ -623,13 +659,16 @@ function update(dt) {
   }
   const busy = !!dialog || !!fade;
   const [mx, my] = busy ? [0, 0] : readMove();
-  const spd = 250 * (S.eq.botas ? 1.3 : 1);
-  player.moving = Math.hypot(mx, my) > 0.1;
+  const mag = Math.hypot(mx, my);
+  player.running = input.joy ? mag > 0.82 : !(input.keys['shift']);
+  const spd = (player.running ? 260 : 165) * (S.eq.botas ? 1.3 : 1);
+  player.moving = mag > 0.1;
+  if (dialog && talkFace) { const dx = talkFace.x - player.x, dy = talkFace.y - player.y, d = Math.hypot(dx, dy); if (d > 1) { player.fx = dx / d; player.fy = dy / d; } }
   if (player.moving) {
     const L = Math.hypot(mx, my); player.fx = mx / L; player.fy = my / L;
     player.dir = Math.abs(mx) > Math.abs(my) * 1.1 ? (mx < 0 ? 'left' : 'right') : (my < 0 ? 'up' : 'down');
     moveBody(player, mx * spd * dt, my * spd * dt);
-    player.anim += dt * 10 * (S.eq.botas ? 1.2 : 1);
+    player.anim += dt * (player.running ? 11 : 7.5) * (S.eq.botas ? 1.2 : 1);
     if (!S.moved) S.moved = true;
   } else player.anim = 0;
   if (Math.abs(player.kx) + Math.abs(player.ky) > 5) {
@@ -707,7 +746,8 @@ function updateVillagers(dt) {
         if (opts.length) { const o = opts[Math.floor(Math.random() * opts.length)]; n.tx = o[0] + rand(-24, 24); n.ty = o[1] + rand(-24, 24); }
         n.wait = rand(0.5, 4);
       }
-    } else { const v = Math.min(d, 70 * dt); n.x += dx / d * v; n.y += dy / d * v; n.flip = dx < 0; }
+      n.moving = false;
+    } else { const v = Math.min(d, 70 * dt); n.x += dx / d * v; n.y += dy / d * v; n.flip = dx < 0; n.fx = dx / d; n.fy = dy / d; n.moving = true; }
   }
 }
 function updateWorld(dt, busy) {
@@ -885,19 +925,20 @@ function updateBoss(e, dt, dx, dy, d) {
 function ambient(dt) {
   const vw = view.vw, vh = view.vh;
   const a = area === 'world' ? (curRegion ? curRegion.amb : ({ neve: 'snow', deserto: 'dust', outono: 'leaves', pantano: 'fireflies', cerejeiras: 'petals', floresta: 'butterflies' }[curBiome] || 'meadow')) : 'none';
-  if (a === 'snow' && Math.random() < dt * 22) particles.push({ x: cam.x + rand(-100, vw + 100), y: cam.y - 10, vx: 0, vy: rand(50, 95), g: 0, t: 9, max: 9, col: '#ffffff', s: rand(4, 7), sway: rand(0, 6), snow: 1 });
-  if (a === 'dust' && Math.random() < dt * 8) particles.push({ x: cam.x - 20, y: cam.y + rand(0, vh), vx: rand(160, 260), vy: rand(-10, 10), g: 0, t: 7, max: 7, col: 'rgba(230,200,140,0.7)', s: rand(3, 6) });
-  if (a === 'leaves' && Math.random() < dt * 5) particles.push({ x: cam.x + rand(0, vw), y: cam.y - 10, vx: rand(10, 40), vy: rand(35, 60), g: 0, t: 8, max: 8, col: ['#e8902e', '#c83a2a', '#f0c040'][Math.floor(rand(0, 3))], s: 6, sway: rand(0, 6), amb: 1 });
-  if (a === 'petals' && Math.random() < dt * 4) particles.push({ x: cam.x + rand(0, vw), y: cam.y - 10, vx: rand(10, 40), vy: rand(30, 60), g: 0, t: 8, max: 8, col: Math.random() < 0.5 ? '#ffb7d0' : '#fff2c9', s: 5, sway: rand(0, 6), amb: 1 });
-  if ((a === 'butterflies' || a === 'meadow') && particles.filter(p => p.bf).length < 6 && Math.random() < dt) particles.push({ x: cam.x + rand(0, vw), y: cam.y + rand(0, vh), vx: 0, vy: 0, g: 0, t: 12, max: 12, col: ['#ffe066', '#ffffff', '#ff9ec7', '#9ad1ff'][Math.floor(rand(0, 4))], s: 6, bf: 1, ph: rand(0, 6) });
-  if (a === 'fireflies' && particles.filter(p => p.ff).length < 26 && Math.random() < dt * 6) particles.push({ x: cam.x + rand(0, vw), y: cam.y + rand(0, vh), vx: rand(-12, 12), vy: rand(-12, 12), g: 0, t: rand(4, 8), max: 8, col: '#f5ff9a', s: 4, ff: 1, ph: rand(0, 6) });
+  const sdt = dt * Q().fx;
+  if (a === 'snow' && Math.random() < sdt * 22) particles.push({ x: cam.x + rand(-100, vw + 100), y: cam.y - 10, vx: 0, vy: rand(50, 95), g: 0, t: 9, max: 9, col: '#ffffff', s: rand(4, 7), sway: rand(0, 6), snow: 1 });
+  if (a === 'dust' && Math.random() < sdt * 8) particles.push({ x: cam.x - 20, y: cam.y + rand(0, vh), vx: rand(160, 260), vy: rand(-10, 10), g: 0, t: 7, max: 7, col: 'rgba(230,200,140,0.7)', s: rand(3, 6) });
+  if (a === 'leaves' && Math.random() < sdt * 5) particles.push({ x: cam.x + rand(0, vw), y: cam.y - 10, vx: rand(10, 40), vy: rand(35, 60), g: 0, t: 8, max: 8, col: ['#e8902e', '#c83a2a', '#f0c040'][Math.floor(rand(0, 3))], s: 6, sway: rand(0, 6), amb: 1 });
+  if (a === 'petals' && Math.random() < sdt * 4) particles.push({ x: cam.x + rand(0, vw), y: cam.y - 10, vx: rand(10, 40), vy: rand(30, 60), g: 0, t: 8, max: 8, col: Math.random() < 0.5 ? '#ffb7d0' : '#fff2c9', s: 5, sway: rand(0, 6), amb: 1 });
+  if ((a === 'butterflies' || a === 'meadow') && particles.filter(p => p.bf).length < 6 && Math.random() < sdt) particles.push({ x: cam.x + rand(0, vw), y: cam.y + rand(0, vh), vx: 0, vy: 0, g: 0, t: 12, max: 12, col: ['#ffe066', '#ffffff', '#ff9ec7', '#9ad1ff'][Math.floor(rand(0, 4))], s: 6, bf: 1, ph: rand(0, 6) });
+  if (a === 'fireflies' && particles.filter(p => p.ff).length < 26 && Math.random() < sdt * 6) particles.push({ x: cam.x + rand(0, vw), y: cam.y + rand(0, vh), vx: rand(-12, 12), vy: rand(-12, 12), g: 0, t: rand(4, 8), max: 8, col: '#f5ff9a', s: 4, ff: 1, ph: rand(0, 6) });
   if (area === 'world') {
-    for (const b of BUILDINGS) if (b.smoke && Math.random() < dt * 3 && Math.abs(b.x - player.x) < 1300 && Math.abs(b.y - player.y) < 900)
+    for (const b of BUILDINGS) if (b.smoke && Math.random() < sdt * 3 && Math.abs(b.x - player.x) < 1300 && Math.abs(b.y - player.y) < 900)
       particles.push({ x: b.smoke[0] + rand(-6, 6), y: b.smoke[1], vx: rand(10, 30), vy: rand(-45, -30), g: 0, t: 2.4, max: 2.4, col: 'rgba(220,220,220,0.55)', s: 12, smoke: 1 });
     const P = REGIONS.penhasco, [fx, fy] = toWorld(P, P.fire.x, P.fire.y);
-    if (Math.abs(fx - player.x) < 1200 && Math.abs(fy - player.y) < 900 && Math.random() < dt * (S.relics.brasa ? 16 : 6))
+    if (Math.abs(fx - player.x) < 1200 && Math.abs(fy - player.y) < 900 && Math.random() < sdt * (S.relics.brasa ? 16 : 6))
       particles.push({ x: fx + rand(-20, 20), y: fy - 14, vx: rand(-20, 20), vy: rand(-120, -50), g: -10, t: rand(0.8, 1.8), max: 1.8, col: Math.random() < 0.5 ? '#ffb347' : '#ffe27a', s: 4 });
-    if (Math.random() < dt * 14) {
+    if (Math.random() < sdt * 14) {
       const x = cam.x + rand(0, vw), y = cam.y + rand(0, vh);
       if (terrainAt(x, y) === 2 && !regionAt(x, y)) particles.push({ x, y, vx: 0, vy: 0, g: 0, t: 0.8, max: 0.8, col: '#e8f8ff', s: 5 });
     }
@@ -953,7 +994,7 @@ function drawWorld() {
   if (area !== 'world') { drawInterior(); return; }
   // chão
   ctx.imageSmoothingEnabled = false;
-  chunkBudget = 2;
+  chunkBudget = Q().chunks;
   for (let cy = Math.floor(y0 / CH); cy <= Math.floor(y1 / CH); cy++) for (let cx = Math.floor(x0 / CH); cx <= Math.floor(x1 / CH); cx++) {
     const c = getChunk(cx, cy, false) || (chunkBudget-- > 0 ? getChunk(cx, cy, true) : null);
     if (c) ctx.drawImage(c, cx * CH, cy * CH, CH + 1, CH + 1);
@@ -1294,7 +1335,7 @@ function drawPlayer() {
   const bob = player.moving ? Math.abs(Math.sin(player.anim * Math.PI / 2)) * -2 : Math.sin(time * 2) * 0.6;
   if (Char3D) {
     player.yaw = lerpAngle(player.yaw || 0, Math.atan2(player.fx, player.fy), 0.25);
-    Char3D.draw(ctx, 'kai', { yaw: player.yaw, phase: player.anim, moving: player.moving, t: time, atk: player.atk > 0 ? 1 - player.atk / 0.24 : -1,
+    Char3D.draw(ctx, 'kai', { yaw: player.yaw, phase: player.anim, moving: player.moving, run: player.running, talk: !!dialog && !!talkFace, t: time, atk: player.atk > 0 ? 1 - player.atk / 0.24 : -1,
       espada: S.eq.espada, armadura: S.eq.armadura, botas: S.eq.botas }, player.x, player.y + 4, KAI3D_SIZE);
   } else {
     const [sp, flip] = heroSprite();
@@ -1340,11 +1381,35 @@ function drawCatAt(x, y, flip, lost, sleeping) {
   if (lost) { label('Bolinha', x, y + 20, 15, '#ffe0b8', 0.85); if (Math.sin(time * 2) > 0.6) label('miau?', x + 30, y - 52, 14, '#fff', 0.9); }
   if (sleeping) label('z z', x + 26, y - 40 - Math.sin(time * 2) * 4, 14, '#cfe6ff', 0.8);
 }
+// aparência 3D dos personagens fixos (inspirada nos sprites 2D de cada um)
+const NPC_APP = {
+  aurora: { skin: '#e9b88a', hair: '#e4e2ec', hairStyle: 'bun', top: '#7b5aa6', collar: '#efe2b8', dress: true, scale: 0.95 },
+  mel: { skin: '#f0c08a', hair: '#f08bb0', hairStyle: 'long', top: '#5fa65a', collar: '#fbfbf4', dress: true, apron: '#fbfbf4' },
+  tome: { skin: '#d9a066', hair: '#6b4a2b', hairStyle: 'short', top: '#e2d6b8', bottom: '#4f7fbf', apron: '#4f7fbf', hat: 'straw', beard: '#4a321d' },
+  bruno: { skin: '#d99a66', hair: '#5a3418', hairStyle: 'bald', top: '#8a8f99', bottom: '#3a3a44', apron: '#6e5a48', beard: '#5a3418' },
+  rosa: { skin: '#f0c08a', hair: '#d0542e', hairStyle: 'short', top: '#f2efe6', dress: true, apron: '#fbfbf4', hat: 'chef' },
+  teo: { skin: '#f0c08a', hair: '#8a5a2b', hairStyle: 'spiky', top: '#f2c94c', bottom: '#4a6fa5', scale: 0.74 },
+  rui: { skin: '#c98f5e', hair: '#23232e', hairStyle: 'short', top: '#2f4f7a', bottom: '#2a2a35', beard: '#23232e' },
+  lina: { skin: '#f0c08a', hair: '#5a3a26', hairStyle: 'pony', top: '#e6dccb', bottom: '#6b5a4a' }
+};
+const NPC_IDLE = { tome: 'farm', bruno: 'work', rui: 'rest', lina: 'rest' };
+function npcApp(n) { return NPC_APP[n.id] || (NPC[n.id] && NPC[n.id].app) || null; }
 function drawNpc(n) {
-  const sp = NPC[n.id];
   shadow(n.x, n.y, 22, 8);
-  const sc = n.id === 'teo' ? 5 : 6;
-  spr(sp, n.x, n.y + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
+  const app = npcApp(n);
+  let drawn = false;
+  if (Char3D && Q().npc3d && app) {
+    const talking = dialog && dialog.pid === n.id;
+    let anim = n.moving ? 'walk' : (NPC_IDLE[n.id] || (n.role === 'ferreiro' ? 'work' : 'idle'));
+    let fx = n.fx || 0, fy = n.fy == null ? 1 : n.fy;
+    if (talking) { anim = n.id === 'rui' || n.id === 'lina' ? 'rest' : 'talk'; const dx = player.x - n.x, dy = player.y - n.y, d = Math.hypot(dx, dy) || 1; fx = dx / d; fy = dy / d; }
+    else if (anim === 'rest') { fx = 0; fy = 1; }
+    drawn = Char3D.drawPerson(ctx, n.id, app, anim, time + (n.x % 7), fx, fy, n.x, n.y + 3, KAI3D_SIZE);
+  }
+  if (!drawn) {
+    const sc = n.id === 'teo' ? 5 : 6;
+    spr(NPC[n.id], n.x, n.y + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
+  }
   label(n.name, n.x, n.y + 22, 15, '#fff6d8', 0.9);
 }
 function drawEnemy(e) {
@@ -1630,15 +1695,29 @@ function drawMenu() {
   const pw = Math.min(W - 24 - SAFE.l - SAFE.r, 820), ph = H - 20 - SAFE.t - SAFE.b, px = (W - pw) / 2, py = SAFE.t + 10;
   ctx.fillStyle = '#2b2219'; ctx.strokeStyle = '#e8d6a8'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 16); ctx.fill(); ctx.stroke();
-  const tabs = [['bag', 'Mochila'], ['craft', 'Criar'], ['quests', 'Missões']];
-  const tw = Math.min(130, (pw - 80) / 3);
+  const tabs = [['bag', 'Mochila'], ['craft', 'Criar'], ['quests', 'Missões'], ['config', 'Ajustes']];
+  const tw = Math.min(130, (pw - 80) / tabs.length);
   tabs.forEach(([id, t], i) => panelButton(t, px + 12 + i * (tw + 8), py + 10, tw, 34, () => { menu.tab = id; Audio.sfx('ui'); }, menu.tab === id ? 'on' : null));
   panelButton('✕', px + pw - 46, py + 10, 34, 34, () => { menu = null; Audio.sfx('ui'); });
   const cx = px + 14, cy = py + 54, cw = pw - 28, ch = ph - 64;
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   if (menu.tab === 'bag') drawBagTab(cx, cy, cw, ch);
   else if (menu.tab === 'craft') drawCraftTab(cx, cy, cw, ch);
-  else drawQuestTab(cx, cy, cw, ch);
+  else if (menu.tab === 'quests') drawQuestTab(cx, cy, cw, ch);
+  else drawConfigTab(cx, cy, cw, ch);
+}
+function drawConfigTab(x, y, w, h) {
+  text('Qualidade gráfica', x, y + 10, 15, '#ffe38a', 700);
+  const ks = Object.keys(QUALITY), bw = Math.min(120, (w - 30) / 4);
+  ks.forEach((k, i) => panelButton(QUALITY[k].name, x + i * (bw + 10), y + 26, bw, 36, () => setQuality(k), CONFIG.quality === k ? 'on' : null));
+  const q = Q();
+  text('NPCs ' + (q.npc3d ? 'em 3D (' + q.dirs + ' direções)' : 'em 2D') + ' · efeitos ' + Math.round(q.fx * 100) + '%', x, y + 78, 13, '#cfc3a6', 500, w);
+  text('Jogo', x, y + 112, 15, '#ffe38a', 700);
+  panelButton('Salvar agora', x, y + 128, 170, 38, () => { save(); Audio.sfx('pick'); toast('Jogo salvo!'); });
+  panelButton(Audio.muted ? 'Som: desligado' : 'Som: ligado', x + 184, y + 128, 170, 38, () => Audio.setMuted(!Audio.muted));
+  const ago = Math.max(0, Math.round(time - lastSaveAt));
+  text('Salvamento automático a cada 6 segundos · último há ' + ago + ' s', x, y + 184, 12, '#cfc3a6', 500, w);
+  text('Versão do save: ' + S.version + ' · cópia de segurança guardada antes de cada migração', x, y + 204, 12, '#cfc3a6', 500, w);
 }
 function text(t, x, y, size, col, weight = 600, maxW) { ctx.font = `${weight} ${size}px ${FONT}`; ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y, maxW); }
 function drawBagTab(x, y, w, h) {
@@ -1720,7 +1799,7 @@ function drawQuestTab(x, y, w, h) {
 }
 
 // ---------------------------------------------------------------- título, final e "gire o celular"
-let endT = 0, titleStart = null;
+let endT = 0, titleStart = null, newGameAsk = -9;
 function backdrop(cx, cy, zoom) {
   // desenha o próprio mundo como fundo das telas de título e final
   area = 'world'; grid = worldGrid;
@@ -1749,7 +1828,7 @@ function goLandscape() {
 function startGame(fresh) {
   goLandscape();
   if (fresh) { wipe(SAVE_KEY); S = newSave(); }
-  else { const L = load(SAVE_KEY) || {}; S = Object.assign(newSave(), L); for (const k of ['inv', 'bag', 'eq', 'q', 'relics']) S[k] = Object.assign(newSave()[k], L[k] || {}); }
+  else S = loadSave() || newSave();
   player.hp = S.maxHp; player.inv = 0; dialog = null; endT = 0; menu = null; showMap = false; player.hidden = false;
   buildWorldEntities();
   mode = 'play';
@@ -1795,7 +1874,8 @@ function drawTitle() {
   if (hasSave()) {
     titleStart = () => startGame(false);
     bigButton('Continuar', bx, by, bw, 54, titleStart, true); by += 68;
-    bigButton('Novo jogo', bx, by, bw, 50, () => startGame(true));
+    const sure = time - newGameAsk < 4;
+    bigButton(sure ? 'Apagar progresso?' : 'Novo jogo', bx, by, bw, 50, () => { if (sure) startGame(true); else newGameAsk = time; });
   } else { titleStart = () => startGame(true); bigButton('Jogar', bx, by, bw, 58, titleStart, true); }
   label('Mundo aberto • casas • criação de itens • missões', land ? W * 0.72 : W / 2, by + 80, 13, '#cfe6c0', 0.85);
   if (H > W) drawRotate();
@@ -1826,7 +1906,8 @@ function drawEnd() {
   label('Moedas: ' + S.coins + '   Corações: ' + S.maxHp + '   Missões extras: ' + sideDone + '/5   Musgos: ' + S.mkills, W / 2, H * 0.32 + 84, 15, '#e9ffd0', k);
   if (endT > 1.5) {
     bigButton('Continuar explorando', W / 2 - 280, H * 0.8, 260, 50, () => { mode = 'play'; area = 'world'; grid = worldGrid; player.hidden = false; toast('O mundo é infinito: siga as estradas!'); }, true);
-    bigButton('Jogar de novo', W / 2 + 20, H * 0.8, 260, 50, () => { wipe(SAVE_KEY); mode = 'title'; });
+    const sure = time - newGameAsk < 4;
+    bigButton(sure ? 'Apagar progresso?' : 'Jogar de novo', W / 2 + 20, H * 0.8, 260, 50, () => { if (sure) { wipe(SAVE_KEY); mode = 'title'; newGameAsk = -9; } else newGameAsk = time; });
   }
 }
 
@@ -1835,6 +1916,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   frameNo++;
+  if (Char3D) Char3D.tick(Q().bake);
   try {
     if (mode === 'play') {
       update(dt);
@@ -1872,6 +1954,7 @@ document.addEventListener('visibilitychange', () => {
   placeProps();
   for (const id of Object.keys(INTERIORS)) buildInterior(id);
   grid = worldGrid;
+  if (Char3D) Char3D.setDirs(Q().dirs);
   document.getElementById('loading').remove();
   mode = 'title';
   requestAnimationFrame(frame);

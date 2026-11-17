@@ -114,14 +114,15 @@ const Char3D = (() => {
   const cnv = renderer.domElement;
 
   function poseKai(st) {
-    const ph = st.phase || 0, mv = st.moving ? 1 : 0;
+    const ph = st.phase || 0, mv = st.moving ? 1 : 0, run = st.run && mv ? 1 : 0;
     kai.rotation.y = st.yaw;
-    const sw = Math.sin(ph * Math.PI / 2) * 0.75 * mv;
+    const sw = Math.sin(ph * Math.PI / 2) * (run ? 1.1 : 0.75) * mv;
     legs[0].p.rotation.x = sw; legs[1].p.rotation.x = -sw;
-    arms[0].rotation.set(-sw * 0.8, 0, 0.08); arms[1].rotation.set(sw * 0.8, 0, -0.08);
-    body.position.y = mv ? Math.abs(Math.sin(ph * Math.PI / 2)) * 0.05 : Math.sin(st.t * 2) * 0.012;
-    torso.rotation.set(mv * 0.06, 0, 0);
-    head.rotation.set(0, 0, 0);
+    arms[0].rotation.set(-sw * (run ? 1.1 : 0.8), 0, 0.08); arms[1].rotation.set(sw * (run ? 1.1 : 0.8), 0, -0.08);
+    body.position.y = mv ? Math.abs(Math.sin(ph * Math.PI / 2)) * (run ? 0.09 : 0.05) : Math.sin(st.t * 2) * 0.012;
+    torso.rotation.set(mv * (run ? 0.22 : 0.06), 0, 0);
+    head.rotation.set(run ? -0.12 : 0, 0, 0);
+    if (st.talk && !mv) { arms[1].rotation.set(-0.9 - Math.sin(st.t * 5) * 0.35, 0, -0.25); head.rotation.set(Math.sin(st.t * 4) * 0.06, 0, 0); }
     scarfTail.rotation.x = 0.3 + mv * 0.4 + Math.sin(st.t * 6) * 0.1 * mv;
     const tier = st.espada || 1, bladeCol = tier >= 3 ? 0x8fd8ff : tier === 2 ? 0xa9a6a0 : 0xe8eef5;
     bsBlade.material = M(bladeCol); hsBlade.material = M(bladeCol);
@@ -144,9 +145,159 @@ const Char3D = (() => {
     ears.forEach((e, i) => { e.rotation.z = (i ? -1 : 1) * (0.15 + Math.sin(st.t * 3 + i) * 0.05); });
     collar.material = M(st.coleira ? 0xe0a020 : 0xd04a4a);
   }
+  // ------------------------------------------------ pessoas genéricas (NPCs)
+  // app = { skin, hair, hairStyle, top, bottom, dress, apron, hat, beard, shoes, scale }
+  const hex = c => typeof c === 'number' ? c : parseInt(String(c).replace('#', ''), 16);
+  function buildPerson(app) {
+    const root = new T.Group(), P = {};
+    const sk = hex(app.skin || '#f0c08a'), hr = hex(app.hair || '#5a3a26'), tp = hex(app.top || '#4f7fbf');
+    const bt = hex(app.bottom || '#33384e'), sh = hex(app.shoes || '#3b2618');
+    P.body = pivot(root, 0, 0, 0);
+    P.body.scale.setScalar(app.scale || 1);
+    P.legs = [-0.11, 0.11].map(x => {
+      const p = pivot(P.body, x, 0.6, 0);
+      box(p, 0.17, 0.42, 0.19, app.dress ? sk : bt, 0, -0.21, 0);
+      box(p, 0.19, 0.14, 0.24, sh, 0, -0.52, 0.03);
+      return p;
+    });
+    P.torso = pivot(P.body, 0, 0.6, 0);
+    box(P.torso, 0.5, 0.54, 0.3, tp, 0, 0.27, 0);
+    if (app.dress) { const d = new T.Mesh(new T.CylinderGeometry(0.24, 0.36, 0.5, 8), M(tp)); d.position.set(0, -0.12, 0); const o = new T.Mesh(d.geometry, OUT); o.scale.set(1.06, 1.04, 1.06); d.add(o); P.torso.add(d); }
+    if (app.apron) box(P.torso, 0.4, app.dress ? 0.8 : 0.5, 0.04, hex(app.apron), 0, app.dress ? 0.05 : 0.2, 0.17, false);
+    box(P.torso, 0.54, 0.08, 0.33, hex(app.collar || app.top || '#4f7fbf') , 0, 0.53, 0, false);
+    P.head = pivot(P.torso, 0, 0.6, 0);
+    box(P.head, 0.42, 0.4, 0.4, sk, 0, 0.2, 0);
+    for (const x of [-0.1, 0.1]) box(P.head, 0.06, 0.08, 0.02, 0x2a2238, x, 0.2, 0.205, false);
+    box(P.head, 0.07, 0.03, 0.02, 0x9e5a4a, 0, 0.1, 0.205, false);
+    const st = app.hairStyle || 'short';
+    if (st !== 'bald') {
+      box(P.head, 0.46, 0.12, 0.44, hr, 0, 0.44, -0.01);
+      box(P.head, 0.46, 0.3, 0.1, hr, 0, 0.28, -0.19);
+      box(P.head, 0.44, 0.07, 0.06, hr, 0, 0.38, 0.2, false);
+    }
+    if (st === 'long') { box(P.head, 0.48, 0.5, 0.12, hr, 0, 0.12, -0.2); box(P.head, 0.07, 0.36, 0.3, hr, -0.24, 0.2, -0.04, false); box(P.head, 0.07, 0.36, 0.3, hr, 0.24, 0.2, -0.04, false); }
+    if (st === 'bun') { const b = new T.Mesh(new T.SphereGeometry(0.13, 8, 6), M(hr)); b.position.set(0, 0.55, -0.12); P.head.add(b); }
+    if (st === 'pony') box(P.head, 0.12, 0.34, 0.12, hr, 0, 0.22, -0.3);
+    if (st === 'spiky') [[-0.12, 0.52, 0.4], [0.06, 0.54, -0.3], [0.18, 0.5, -0.7]].forEach(([x, y, r]) => { const s = box(P.head, 0.12, 0.15, 0.12, hr, x, y, 0); s.rotation.z = r; });
+    if (app.beard) box(P.head, 0.4, 0.14, 0.08, hex(app.beard), 0, 0.05, 0.2, false);
+    if (app.hat === 'straw') { box(P.head, 0.72, 0.04, 0.72, 0xe9c46a, 0, 0.47, 0); box(P.head, 0.42, 0.14, 0.42, 0xd8b058, 0, 0.55, 0); }
+    if (app.hat === 'chef') { box(P.head, 0.44, 0.08, 0.44, 0xfbfbf4, 0, 0.46, 0); const c = new T.Mesh(new T.SphereGeometry(0.2, 8, 6), M(0xfbfbf4)); c.position.set(0, 0.6, 0); P.head.add(c); }
+    if (app.hat === 'cap') { box(P.head, 0.46, 0.1, 0.44, hex(app.hatCol || '#c8423b'), 0, 0.46, 0); box(P.head, 0.3, 0.03, 0.18, hex(app.hatCol || '#c8423b'), 0, 0.42, 0.27, false); }
+    P.arms = [-0.32, 0.32].map(x => {
+      const p = pivot(P.torso, x, 0.5, 0);
+      box(p, 0.14, 0.36, 0.16, tp, 0, -0.17, 0);
+      box(p, 0.12, 0.11, 0.14, sk, 0, -0.4, 0);
+      return p;
+    });
+    // ferramentas na mão direita
+    P.hammer = pivot(P.arms[1], 0, -0.42, 0.04);
+    box(P.hammer, 0.05, 0.05, 0.4, 0x7a4a2a, 0, 0, 0.18); box(P.hammer, 0.12, 0.12, 0.18, 0x55555f, 0, 0, 0.38);
+    P.hoe = pivot(P.arms[1], 0, -0.42, 0.04);
+    box(P.hoe, 0.05, 0.05, 0.7, 0x8a5a34, 0, 0, 0.25); box(P.hoe, 0.18, 0.04, 0.12, 0x9a9aa8, 0, -0.05, 0.6);
+    P.rod = pivot(P.arms[1], 0, -0.42, 0.04);
+    box(P.rod, 0.04, 0.04, 1.1, 0x8a5a34, 0, 0.25, 0.45, false);
+    P.basket = pivot(P.arms[0], 0, -0.48, 0.04);
+    box(P.basket, 0.26, 0.16, 0.2, 0xc99a5a, 0, -0.04, 0.05);
+    box(P.basket, 0.2, 0.06, 0.14, 0xd83a3a, 0, 0.06, 0.05, false);
+    return { root, P };
+  }
+  // anim: idle walk run talk work farm fish rest — k é a fase (0..1) do quadro
+  function posePerson(P, anim, k) {
+    const s = Math.sin(k * Math.PI * 2), c = Math.cos(k * Math.PI * 2);
+    P.body.position.y = 0; P.body.rotation.set(0, 0, 0); P.torso.rotation.set(0, 0, 0); P.head.rotation.set(0, 0, 0);
+    P.legs.forEach(l => l.rotation.set(0, 0, 0)); P.arms[0].rotation.set(0, 0, 0.08); P.arms[1].rotation.set(0, 0, -0.08);
+    P.hammer.visible = anim === 'work'; P.hoe.visible = anim === 'farm'; P.rod.visible = anim === 'fish'; P.basket.visible = false;
+    if (anim === 'walk' || anim === 'run') {
+      const a = anim === 'run' ? 1.1 : 0.7;
+      P.legs[0].rotation.x = s * a; P.legs[1].rotation.x = -s * a;
+      P.arms[0].rotation.x = -s * a * 0.9; P.arms[1].rotation.x = s * a * 0.9;
+      P.body.position.y = Math.abs(s) * (anim === 'run' ? 0.08 : 0.04);
+      P.torso.rotation.x = anim === 'run' ? 0.22 : 0.04;
+    } else if (anim === 'idle') {
+      P.body.position.y = s * 0.012; P.head.rotation.x = s * 0.03;
+    } else if (anim === 'talk') {
+      P.arms[1].rotation.set(-0.8 - s * 0.35, 0, -0.25); P.arms[0].rotation.set(-0.2 + c * 0.15, 0, 0.12);
+      P.head.rotation.set(s * 0.07, c * 0.08, 0);
+    } else if (anim === 'work') {
+      P.arms[1].rotation.set(-2.2 + Math.max(0, s) * 2.2, 0, -0.1); P.torso.rotation.x = 0.1 + Math.max(0, s) * 0.12;
+      P.arms[0].rotation.set(-0.5, 0, 0.2);
+    } else if (anim === 'farm') {
+      P.torso.rotation.x = 0.55; P.head.rotation.x = 0.2; P.body.position.y = -0.08;
+      P.legs[0].rotation.x = -0.35; P.legs[1].rotation.x = 0.2;
+      P.arms[1].rotation.set(-1.2 + s * 0.6, 0, -0.1); P.arms[0].rotation.set(-0.9 - c * 0.3, 0, 0.1);
+    } else if (anim === 'fish') {
+      P.arms[1].rotation.set(-1.1 + s * 0.08, 0, -0.1); P.arms[0].rotation.set(-1.0 + s * 0.08, 0, 0.3); P.head.rotation.x = 0.12;
+    } else if (anim === 'rest') {
+      P.body.position.y = -0.3; P.legs.forEach(l => { l.rotation.x = -1.45; }); P.arms[0].rotation.set(-0.4, 0, 0.1); P.arms[1].rotation.set(-0.4, 0, -0.1);
+      P.head.rotation.x = 0.08 + s * 0.03;
+    } else if (anim === 'carry') {
+      P.basket.visible = true; P.arms[0].rotation.set(-0.3, 0, 0.1);
+      P.legs[0].rotation.x = s * 0.6; P.legs[1].rotation.x = -s * 0.6; P.arms[1].rotation.x = s * 0.5;
+    }
+  }
+  const ANIMS = { idle: 2, walk: 4, run: 4, talk: 2, work: 2, farm: 2, fish: 2, rest: 2, carry: 4 };
+  const ANIM_OFF = {}; let FRAMES = 0;
+  for (const [a, n] of Object.entries(ANIMS)) { ANIM_OFF[a] = FRAMES; FRAMES += n; }
+  const ANIM_FPS = { idle: 2, walk: 7, run: 11, talk: 4, work: 4, farm: 2.5, fish: 1.5, rest: 1, carry: 7 };
+  const atlases = new Map();
+  let bakeBudget = 0, dirs = 8;
+  function setDirs(n) { if (n !== dirs) { dirs = n; atlases.clear(); } }
+  function getAtlas(key, app) {
+    let A = atlases.get(key);
+    if (!A) {
+      const c = document.createElement('canvas'); c.width = FRAMES * RES; c.height = dirs * RES;
+      A = { c, g: c.getContext('2d'), next: 0, total: FRAMES * dirs, ready: false, app, model: null, used: 0 };
+      atlases.set(key, A);
+      if (atlases.size > 28) {
+        const old = [...atlases.entries()].filter(([, a]) => a !== A).sort((a, b) => a[1].used - b[1].used)[0];
+        if (old) { disposeModel(old[1]); atlases.delete(old[0]); }
+      }
+    }
+    A.used = performance.now();
+    return A;
+  }
+  function disposeModel(A) {
+    if (!A.model) return;
+    scene.remove(A.model.root);
+    A.model.root.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    A.model = null;
+  }
+  function bakeStep(A) {
+    if (A.ready) return;
+    if (!A.model) { A.model = buildPerson(A.app); scene.add(A.model.root); }
+    kai.visible = false; dog.visible = false;
+    for (const a of atlases.values()) if (a.model) a.model.root.visible = a === A;
+    while (bakeBudget > 0 && A.next < A.total) {
+      const d = Math.floor(A.next / FRAMES), f = A.next % FRAMES;
+      let anim = 'idle', k = 0;
+      for (const [a, n] of Object.entries(ANIMS)) if (f >= ANIM_OFF[a] && f < ANIM_OFF[a] + n) { anim = a; k = (f - ANIM_OFF[a]) / n; }
+      A.model.root.rotation.y = d / dirs * Math.PI * 2;
+      posePerson(A.model.P, anim, k);
+      renderer.render(scene, cam);
+      A.g.drawImage(cnv, f * RES, d * RES);
+      A.next++; bakeBudget--;
+    }
+    A.model.root.visible = false;
+    if (A.next >= A.total) { A.ready = true; disposeModel(A); }
+  }
+  // desenha um NPC; devolve false se a folha ainda não ficou pronta (use o sprite 2D)
+  function drawPerson(ctx, key, app, anim, t, fx, fy, x, y, size) {
+    const A = getAtlas(key, app);
+    if (!A.ready) { bakeStep(A); if (!A.ready) return false; }
+    let d = Math.round(Math.atan2(fx, fy) / (Math.PI * 2) * dirs); d = ((d % dirs) + dirs) % dirs;
+    const n = ANIMS[anim] || 2, f = ANIM_OFF[anim] + Math.floor(t * (ANIM_FPS[anim] || 2)) % n;
+    const k = size / RES;
+    const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(A.c, f * RES, d * RES, RES, RES, Math.round(x - anchor[0] * k), Math.round(y - anchor[1] * k), size, size);
+    ctx.imageSmoothingEnabled = sm;
+    return true;
+  }
+  function tick(budget) { bakeBudget = budget; }
+
   // desenha o modelo com o pé em (x, y); size = largura/altura do quadro em unidades do contexto atual
   function draw(ctx, which, st, x, y, size, white) {
     kai.visible = which === 'kai'; dog.visible = which === 'dog';
+    for (const a of atlases.values()) if (a.model) a.model.root.visible = false;
     if (which === 'kai') poseKai(st); else poseDog(st);
     renderer.render(scene, cam);
     const k = size / RES;
@@ -156,5 +307,5 @@ const Char3D = (() => {
     if (white) ctx.restore();
     ctx.imageSmoothingEnabled = sm;
   }
-  return { draw, RES };
+  return { draw, drawPerson, tick, setDirs, RES, ANIMS, atlasCount: () => atlases.size };
 })();

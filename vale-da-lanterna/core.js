@@ -360,8 +360,12 @@ function makePerson(seed) {
   const skin = pick([['#f0c08a', '#cf9461'], ['#d9a066', '#b47a45'], ['#c98f5e', '#9e6a3f'], ['#8a5a3a', '#6a4028'], ['#f6d0a8', '#d8a878']]);
   const hat = R() < 0.25, robe = R() < 0.35;
   const top = hat ? ['..OOOOOOOO..', '.OYYYYYYYYO.', 'OYYyYYYYyYYO', '.OWWWWWWWWO.'] : null;
+  const pants = pick(['#33384e', '#4a3a2a', '#2a2a35', '#5a4a6a']), hatCol = pick(['#e9c46a', '#8a5a34', '#4f7fbf', '#c8423b']);
   const sp = bake(personRows(top, robe ? ROBE : null), pal({ W: hair[0], w: hair[1], R: cloth[1], r: cloth[1], B: cloth[0], b: cloth[1], G: '#c9a14a',
-    P: pick(['#33384e', '#4a3a2a', '#2a2a35', '#5a4a6a']), S: skin[0], s: skin[1], Y: pick(['#e9c46a', '#8a5a34', '#4f7fbf', '#c8423b']), y: '#7a5a20' }));
+    P: pants, S: skin[0], s: skin[1], Y: hatCol, y: '#7a5a20' }));
+  sp.app = { skin: skin[0], hair: hair[0], top: cloth[0], collar: cloth[1], bottom: pants, dress: robe,
+    hairStyle: pick(robe ? ['long', 'bun', 'pony', 'short'] : ['short', 'short', 'spiky', 'bald', 'pony']),
+    hat: hat ? (hatCol === '#e9c46a' ? 'straw' : 'cap') : null, hatCol, beard: !robe && R() < 0.25 ? hair[1] : null, scale: 1 };
   PERSON_CACHE.set(seed, sp);
   return sp;
 }
