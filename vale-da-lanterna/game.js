@@ -513,7 +513,8 @@ function useTowerDoor() {
 const input = { joy: null, keys: {} };
 let uiButtons = [];
 const btn = { action: { x: 0, y: 0, r: 44 } };
-function layoutButtons() { btn.action.x = W - 76 - SAFE.r; btn.action.y = H - 76 - SAFE.b; }
+const HS = () => CONFIG.leftHand ? -1 : 1;   // lado dos botões (canhotos: esquerda)
+function layoutButtons() { btn.action.x = CONFIG.leftHand ? 76 + SAFE.l : W - 76 - SAFE.r; btn.action.y = H - 76 - SAFE.b; }
 const inCircle = (x, y, c, pad = 0) => Math.hypot(x - c.x, y - c.y) <= c.r + pad;
 function addBtn(x, y, w, h, fn) { uiButtons.push({ x, y, w, h, fn }); }
 function hitUI(x, y) {
@@ -532,7 +533,7 @@ cv.addEventListener('pointerdown', e => {
   if (showMap) { showMap = false; return; }
   if (dialog) { if (!(dialog.choices && dialog.i === dialog.lines.length - 1 && dialog.shown >= dialog.lines[dialog.i].text.length)) advanceDialog(); return; }
   if (inCircle(x, y, btn.action, 16)) { pressAction(); return; }
-  if (!input.joy && x < W * 0.55) input.joy = { id: e.pointerId, ox: x, oy: y, x, y };
+  if (!input.joy && (CONFIG.leftHand ? x > W * 0.45 : x < W * 0.55)) input.joy = { id: e.pointerId, ox: x, oy: y, x, y };
 });
 cv.addEventListener('pointermove', e => { if (input.joy && e.pointerId === input.joy.id) { input.joy.x = e.clientX; input.joy.y = e.clientY; } });
 const endPointer = e => { if (input.joy && e.pointerId === input.joy.id) input.joy = null; };
@@ -547,7 +548,7 @@ window.addEventListener('keydown', e => {
   if (work) { if (k === ' ' || k === 'enter' || k === 'j' || k === 'e') { e.preventDefault(); workAction(); } return; }
   if (build) { if (k === 'escape') closeBuild(); else if (k === 'r') build.rot = (build.rot + 1) % 4; else if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); buildConfirm(); } return; }
   if (k === 'escape') { menu = null; showMap = false; return; }
-  if (k === 'i' || k === 'tab') { e.preventDefault(); menu = menu ? null : { tab: 'bag' }; return; }
+  if (k === 'i' || k === 'tab') { e.preventDefault(); if (menu) menu = null; else openMainMenu(); return; }
   if (k === 'm') { showMap = !showMap; return; }
   if (k === 'q') { useItem(S.bag.pocao ? 'pocao' : 'torta'); return; }
   if (dialog && dialog.choices && dialog.i === dialog.lines.length - 1 && dialog.shown >= dialog.lines[dialog.i].text.length) {
@@ -1731,7 +1732,7 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(j.ox, j.oy, 52, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(j.x, j.y, 24, 0, 7); ctx.fill();
-  } else if (!dialog && !S.moved) label('Arraste aqui para andar', W * 0.22, H - 50 - SAFE.b, 15, '#fff6d8', 0.6 + Math.sin(time * 3) * 0.3);
+  } else if (!dialog && !S.moved) label('Arraste aqui para andar', CONFIG.leftHand ? W * 0.78 : W * 0.22, H - 50 - SAFE.b, 15, '#fff6d8', 0.6 + Math.sin(time * 3) * 0.3);
   // botões
   const b = btn.action, it = interactTarget;
   ctx.fillStyle = it ? 'rgba(255,214,90,0.92)' : 'rgba(255,250,235,0.85)'; ctx.strokeStyle = '#2a2238'; ctx.lineWidth = 3;
@@ -1739,11 +1740,11 @@ function drawHUD() {
   if (build) { ctx.fillStyle = '#2a2238'; ctx.font = `700 15px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(build.mode === 'remove' ? 'Remover' : build.mode === 'move' && !build.moving ? 'Pegar' : 'Colocar', b.x, b.y + 1); }
   else if (it) { ctx.fillStyle = '#2a2238'; ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(it.label, b.x, b.y + 1); }
   else drawIcon('espada' + S.eq.espada, b.x, b.y, 44);
-  hudButton(b.x - 92, b.y + 14, 28, (x, y) => {
+  hudButton(b.x - 92 * HS(), b.y + 14, 28, (x, y) => {
     ctx.fillStyle = '#c99a6a'; ctx.fillRect(x - 11, y - 7, 22, 17); ctx.fillStyle = '#8a5a34'; ctx.fillRect(x - 11, y - 7, 22, 5); ctx.fillRect(x - 5, y - 12, 10, 5);
     ctx.fillStyle = '#e0a020'; ctx.fillRect(x - 2, y - 3, 4, 4);
-  }, () => { menu = { tab: 'bag' }; Audio.sfx('ui'); });
-  label('Mochila', b.x - 92, b.y + 52, 11, '#fff6d8', 0.8);
+  }, () => openMainMenu());
+  label('Mochila', b.x - 92 * HS(), b.y + 52, 11, '#fff6d8', 0.8);
   const potion = S.bag.pocao ? 'pocao' : S.bag.torta ? 'torta' : null;
   if (potion) {
     hudButton(b.x - 6, b.y - 82, 24, (x, y) => drawIcon(potion, x, y, 28), () => useItem(potion));
@@ -1768,8 +1769,8 @@ function drawHUD() {
   }
   if (!build) drawFarmBar();
   if (build) drawBuildUI();
-  else if (buildContext() && !dialog && !menu && !work) hudButton(b.x - 162, b.y + 14, 26, (x, y) => { ctx.fillStyle = '#c99a6a'; ctx.fillRect(x - 3, y - 4, 4, 14); ctx.fillStyle = '#9a9aa8'; ctx.fillRect(x - 10, y - 10, 18, 7); }, openBuild);
-  if (!build && buildContext() && !dialog && !menu && !work) label('Construir', b.x - 162, b.y + 50, 11, '#fff6d8', 0.8);
+  else if (buildContext() && !dialog && !menu && !work) hudButton(b.x - 162 * HS(), b.y + 14, 26, (x, y) => { ctx.fillStyle = '#c99a6a'; ctx.fillRect(x - 3, y - 4, 4, 14); ctx.fillStyle = '#9a9aa8'; ctx.fillRect(x - 10, y - 10, 18, 7); }, openBuild);
+  if (!build && buildContext() && !dialog && !menu && !work) label('Construir', b.x - 162 * HS(), b.y + 50, 11, '#fff6d8', 0.8);
   if (dialog) drawDialog();
   if (showMap) drawBigMap();
   if (menu) drawMenu();
@@ -1839,31 +1840,6 @@ function panelButton(text, x, y, w, h, fn, style) {
   ctx.fillStyle = style === 'off' ? 'rgba(255,255,255,0.45)' : '#2a2238'; ctx.font = `700 ${Math.min(15, h * 0.45)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, x + w / 2, y + h / 2 + 1, w - 6);
   if (fn && style !== 'off') addBtn(x, y, w, h, fn);
-}
-function drawMenu() {
-  ctx.fillStyle = 'rgba(10,14,10,0.6)'; ctx.fillRect(0, 0, W, H);
-  addBtn(0, 0, W, H, () => {});
-  const pw = Math.min(W - 24 - SAFE.l - SAFE.r, 820), ph = H - 20 - SAFE.t - SAFE.b, px = (W - pw) / 2, py = SAFE.t + 10;
-  ctx.fillStyle = '#2b2219'; ctx.strokeStyle = '#e8d6a8'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 16); ctx.fill(); ctx.stroke();
-  const tabs = [['bag', 'Mochila'], ['craft', 'Criar'], ['quests', 'Missões'], ['people', 'Pessoas'], ['family', 'Família'], ['job', 'Trabalho'], ['farm', 'Fazenda'], ['config', 'Ajustes']];
-  const tw = Math.min(130, (pw - 70 - (tabs.length - 1) * 6) / tabs.length);
-  tabs.forEach(([id, t], i) => panelButton(t, px + 12 + i * (tw + 6), py + 10, tw, 34, () => { menu.tab = id; Audio.sfx('ui'); }, menu.tab === id ? 'on' : null));
-  panelButton('✕', px + pw - 46, py + 10, 34, 34, () => { menu = null; Audio.sfx('ui'); });
-  const cx = px + 14, cy = py + 54, cw = pw - 28, ch = ph - 64;
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  if (menu.tab === 'bag') drawBagTab(cx, cy, cw, ch);
-  else if (menu.tab === 'craft') drawCraftTab(cx, cy, cw, ch);
-  else if (menu.tab === 'quests') drawQuestTab(cx, cy, cw, ch);
-  else if (menu.tab === 'people') drawPeopleTab(cx, cy, cw, ch);
-  else if (menu.tab === 'family') drawFamilyTab(cx, cy, cw, ch);
-  else if (menu.tab === 'gift') drawGiftTab(cx, cy, cw, ch);
-  else if (menu.tab === 'shop') drawShopTab(cx, cy, cw, ch);
-  else if (menu.tab === 'job') drawJobTab(cx, cy, cw, ch);
-  else if (menu.tab === 'farm') drawFarmTab(cx, cy, cw, ch);
-  else if (menu.tab === 'storage') drawStorageTab(cx, cy, cw, ch);
-  else if (menu.tab === 'myshop') drawMyShopTab(cx, cy, cw, ch);
-  else drawConfigTab(cx, cy, cw, ch);
 }
 function smallHearts(x, y, n) { for (let i = 0; i < 10; i++) heart(x + i * 12, y, 10, '#ff5a7a', i >= n); }
 function drawPeopleTab(x, y, w, h) {
@@ -2058,42 +2034,44 @@ function drawJobTab(x, y, w, h) {
     text(S.job.lastShift === S.time.day ? 'Turno de hoje: concluído ✓' : onShiftHours() ? 'Turno aberto agora!' : 'Próximo turno às ' + J.hours[0] + 'h', x + 10, yy + 85, 11, onShiftHours() && S.job.lastShift !== S.time.day ? '#9be36a' : '#cfc3a6', 700, colW - 20);
     yy += 100;
   } else { text('Sem emprego. Fale com um dos chefes abaixo e escolha "Emprego".', x, yy + 6, 12, '#e8dcc0', 600, colW); yy += 24; }
-  for (const [k, J] of Object.entries(JOBS)) {
-    if (yy > y + h - 16) break;
-    text((S.job && S.job.id === k ? '● ' : '○ ') + J.name + ' — ' + RES_BY_ID[J.boss].name + ', ' + J.hours[0] + 'h–' + J.hours[1] + 'h, ' + J.wage + (k === 'pescador' ? '/peixe' : '/turno'), x, yy + 6, 11, '#e8dcc0', 600, colW);
-    yy += 17;
-  }
+  if (S.job) yy = wrapText('O que fazer: ' + JOBS[S.job.id].desc, x, yy + 6, 12, '#e8dcc0', 600, colW, 16) + 4;
+  for (const l of ['Chegue no local no horário e toque no botão de ação para começar o turno.', 'Cada turno conta experiência; promoções aumentam o salário.', 'Para trocar de emprego, fale com outro chefe e escolha "Emprego".'])
+    yy = wrapText('• ' + l, x, yy + 4, 11, '#cfc3a6', 500, colW, 15);
+  text('Ganhou ' + S.stats.earned + ' · gastou ' + S.stats.spent + ' moedas no total', x, y + h - 8, 11, '#cfc3a6', 600, colW);
   const ex = x + colW + 16;
-  text('Propriedades', ex, y + 8, 15, '#ffe38a', 700);
-  yy = y + 28;
-  for (const pl of PLOTS) { text((S.props.plots[pl.id] ? '✓ ' : '○ ') + pl.name + (S.props.plots[pl.id] ? ' (seu)' : ' — ' + pl.price + ' moedas (placa no local)'), ex, yy, 11, S.props.plots[pl.id] ? '#9be36a' : '#e8dcc0', 600, colW); yy += 17; }
-  for (const [id, city] of Object.entries(S.props.houses)) { text('✓ Casa em ' + city, ex, yy, 11, '#9be36a', 600, colW); yy += 17; }
-  text('Casas à venda aparecem nas cidades com a placa "À venda".', ex, yy, 11, '#b8ad94', 500, colW); yy += 24;
-  text('Roupas', ex, yy, 15, '#ffe38a', 700); yy += 18;
-  OUTFITS.filter(o => S.outfits.includes(o.id)).forEach((o, i) => {
-    const bx = ex + (i % 3) * 112, by = yy + Math.floor(i / 3) * 34;
-    panelButton(o.name, bx, by, 104, 28, () => { S.outfit = o.id; save(); }, S.outfit === o.id ? 'on' : null);
-  });
-  yy += Math.ceil(S.outfits.length / 3) * 34 + 8;
-  text('Mais roupas no Ateliê da Nina (barraca roxa da praça)', ex, yy, 11, '#b8ad94', 500, colW); yy += 22;
-  text('Ferramentas: ' + (S.tools.vara ? 'Vara de Pesca ✓' : 'nenhuma (Vara de Pesca no Armazém ou na Oficina)'), ex, yy, 11, '#e8dcc0', 600, colW); yy += 18;
-  text('Ganhou ' + S.stats.earned + ' · gastou ' + S.stats.spent + ' moedas no total', ex, yy, 11, '#cfc3a6', 600, colW);
+  text('Empregos do vale', ex, y + 8, 15, '#ffe38a', 700);
+  let ry = y + 24;
+  const rh = Math.min(46, (h - 34) / Object.keys(JOBS).length - 4);
+  for (const [k, J] of Object.entries(JOBS)) {
+    const mine = S.job && S.job.id === k;
+    ctx.fillStyle = mine ? 'rgba(255,214,90,0.16)' : 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(ex, ry, colW, rh, 8); ctx.fill();
+    text(J.name + ' · ' + J.wage + (k === 'pescador' ? ' moedas/peixe' : ' moedas/turno') + ' · ' + J.hours[0] + 'h–' + J.hours[1] + 'h', ex + 8, ry + rh * 0.32, 12, '#fff6e6', 700, colW - 16);
+    text((mine ? 'Seu emprego · ' : 'Fale com ' + RES_BY_ID[J.boss].name + ' · ') + J.where, ex + 8, ry + rh * 0.72, 10, mine ? '#9be36a' : '#cfc3a6', 600, colW - 16);
+    ry += rh + 4;
+  }
 }
 function drawConfigTab(x, y, w, h) {
+  const half = w >= 560, colW = half ? (w - 20) / 2 : w;
   text('Qualidade gráfica', x, y + 10, 15, '#ffe38a', 700);
-  const ks = Object.keys(QUALITY), bw = Math.min(120, (w - 30) / 4);
-  ks.forEach((k, i) => panelButton(QUALITY[k].name, x + i * (bw + 10), y + 26, bw, 36, () => setQuality(k), CONFIG.quality === k ? 'on' : null));
+  const ks = Object.keys(QUALITY), bw = Math.min(110, (colW - 18) / 4);
+  ks.forEach((k, i) => panelButton(QUALITY[k].name, x + i * (bw + 6), y + 26, bw, 36, () => setQuality(k), CONFIG.quality === k ? 'on' : null));
   const q = Q();
-  text('NPCs ' + (q.npc3d ? 'em 3D (' + q.dirs + ' direções)' : 'em 2D') + ' · efeitos ' + Math.round(q.fx * 100) + '%', x, y + 78, 13, '#cfc3a6', 500, w);
-  text('Duração de um dia', x + 520, y + 10, 15, '#ffe38a', 700);
-  [[30, '30 min'], [60, '1 hora'], [120, '2 horas']].forEach(([m, t], i) => panelButton(t, x + 520 + i * 92, y + 26, 84, 36, () => { CONFIG.dayMinutes = m; store('vale-da-lanterna-config', CONFIG); toast('Um dia agora dura ' + t); }, dayMinutes() === m ? 'on' : null));
-  text('Hoje: ' + forecastText() + ' · Amanhã: ' + forecastText(S.time.day + 1), x + 520, y + 78, 12, '#cfc3a6', 500, w - 520);
-  text('Jogo', x, y + 112, 15, '#ffe38a', 700);
-  panelButton('Salvar agora', x, y + 128, 170, 38, () => { save(); Audio.sfx('pick'); toast('Jogo salvo!'); });
-  panelButton(Audio.muted ? 'Som: desligado' : 'Som: ligado', x + 184, y + 128, 170, 38, () => Audio.setMuted(!Audio.muted));
+  text('NPCs ' + (q.npc3d ? 'em 3D (' + q.dirs + ' direções)' : 'em 2D') + ' · efeitos ' + Math.round(q.fx * 100) + '%', x, y + 76, 12, '#cfc3a6', 500, colW);
+  const dx = half ? x + colW + 20 : x, dy = half ? y : y + 92;
+  text('Duração de um dia', dx, dy + 10, 15, '#ffe38a', 700);
+  const dw = Math.min(84, (colW - 18) / 4);
+  [[20, '20 min'], [30, '30 min'], [60, '1 hora'], [120, '2 horas']].forEach(([m, t], i) => panelButton(t, dx + i * (dw + 6), dy + 26, dw, 36, () => { CONFIG.dayMinutes = m; store('vale-da-lanterna-config', CONFIG); toast('Um dia agora dura ' + t); }, dayMinutes() === m ? 'on' : null));
+  text('Hoje: ' + forecastText() + ' · Amanhã: ' + forecastText(S.time.day + 1), dx, dy + 76, 12, '#cfc3a6', 500, colW);
+  const gy = half ? y + 100 : y + 180;
+  text('Jogo', x, gy + 10, 15, '#ffe38a', 700);
+  const gb = Math.min(170, (w - 24) / 3);
+  panelButton('Salvar agora', x, gy + 26, gb, 38, () => { save(); Audio.sfx('pick'); toast('Jogo salvo!'); });
+  panelButton(Audio.muted ? 'Som: desligado' : 'Som: ligado', x + gb + 10, gy + 26, gb, 38, () => Audio.setMuted(!Audio.muted));
+  panelButton(CONFIG.leftHand ? 'Botões: esquerda' : 'Botões: direita', x + (gb + 10) * 2, gy + 26, gb, 38, () => { CONFIG.leftHand = !CONFIG.leftHand; store('vale-da-lanterna-config', CONFIG); });
   const ago = Math.max(0, Math.round(time - lastSaveAt));
-  text('Salvamento automático a cada 6 segundos · último há ' + ago + ' s', x, y + 184, 12, '#cfc3a6', 500, w);
-  text('Versão do save: ' + S.version + ' · cópia de segurança guardada antes de cada migração', x, y + 204, 12, '#cfc3a6', 500, w);
+  text('Salvamento automático a cada 6 segundos · último há ' + ago + ' s', x, gy + 76, 12, '#cfc3a6', 500, w);
+  text('Versão do save: ' + S.version + ' · cópia de segurança guardada antes de cada migração', x, gy + 92, 12, '#cfc3a6', 500, w);
+  text('Teclado: WASD/setas andam · Espaço/E age · I abre o menu · M mapa · Q usa poção · R gira na construção', x, gy + 108, 11, '#b8ad94', 500, w);
 }
 function text(t, x, y, size, col, weight = 600, maxW) { ctx.font = `${weight} ${size}px ${FONT}`; ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y, maxW); }
 function drawBagTab(x, y, w, h) {
@@ -2351,4 +2329,4 @@ document.addEventListener('visibilitychange', () => {
 // para testes automáticos
 window.__vale = { get build() { return build; }, openBuild, buildConfirm, closeBuild, get work() { return work; }, startShift, workAction, workPick, openShop, shopBuy, shopSell, giveGift, socialOpen, makeKid, get npcs() { return npcs; }, RESIDENTS, sleepUntilMorning, snapResidents, get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
   get enemies() { return enemies; }, get dialog() { return dialog; }, advanceDialog, choose, interact, get target() { return interactTarget; },
-  openMenu(tab, station) { menu = { tab, station }; }, closeMenu() { menu = null; }, set showMap(v) { showMap = v; }, toWorld, REGIONS, INTERIORS, craft, RECIPES, props };
+  openMenu(tab, station) { menu = { tab, station }; }, closeMenu() { menu = null; }, get menuTab() { return menu && menu.tab; }, get menuSel() { return menu && menu.calSel; }, set showMap(v) { showMap = v; }, toWorld, REGIONS, INTERIORS, craft, RECIPES, props };

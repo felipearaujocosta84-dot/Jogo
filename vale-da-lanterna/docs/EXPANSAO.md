@@ -73,7 +73,7 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 | 6 | Agricultura e animais | ✅ concluída |
 | 7 | Construção livre e decoração | ✅ concluída |
 | 8 | Dia e noite, clima | ✅ concluída |
-| 9 | Interface, menus, controles | ⏳ próxima |
+| 9 | Interface, menus, controles | ✅ concluída |
 | 10 | Salvamento completo, otimização, testes gerais | ⏳ |
 
 Observação: a Fase 3 (rotinas) depende do relógio do jogo, então a parte básica do relógio da Fase 8
@@ -236,3 +236,22 @@ será antecipada no início da Fase 3.
 - **Janelas acesas** à noite em todas as casas (do vale, das cidades e as construídas), cada casa apagando a luz
   num horário diferente (entre 21h30 e 23h30).
 - Saves antigos recebem o clima automaticamente (`deepDefaults`).
+
+## Fase 9 — Interface, menus e controles (`menus.js`)
+- **Menu com barra lateral**: 11 abas sempre visíveis à esquerda (cabe num celular deitado, testado em 667×375,
+  844×390 e 1280×720): Mochila, Criar, Missões, Pessoas (relacionamentos), Família, Trabalho, Fazenda (agricultura
+  e animais), **Construção**, **Propriedades**, **Calendário** e Ajustes. Cabeçalho com o nome da aba, moedas e hora.
+- **Bolinha vermelha** nas abas que pedem atenção: filho com fome ou carente / par chateado (Família), colheita
+  ou produto de animal pronto (Fazenda), turno aberto (Trabalho), dinheiro no caixa da loja (Propriedades).
+- O botão Mochila e a tecla I **reabrem a última aba usada**.
+- **Calendário e clima**: grade da estação (4 semanas), dia de hoje destacado, previsão com ícone para hoje e os
+  próximos 2 dias, marcadores de festas, aniversários, casamento e bebê; toque num dia para ver detalhes
+  (eventos, previsão e o que plantar na estação); ◀ ▶ mudam de estação.
+- **Propriedades**: terrenos (preço, uso horta/pasto/quintal, construções em cada um), casas (Casa do Kai, casas
+  compradas e construídas), Loja do Kai (vitrine e botão Recolher caixa), baús, roupas (trocar), ferramentas, finanças.
+- **Construção**: catálogo completo por categoria com custos (amarelo = você tem os materiais), explicação e botão
+  "Construir aqui" (ativo só num terreno ou casa sua).
+- **Trabalho**: cartão do emprego atual com o que fazer e dicas; lista de todos os empregos com salário, horário,
+  chefe e local.
+- **Ajustes**: dia de 20 min, 30 min, 1 h ou 2 h; **modo canhoto** (botão de ação, Mochila e Construir à esquerda;
+  joystick do lado direito); lista de atalhos de teclado; layout se adapta a telas estreitas.
