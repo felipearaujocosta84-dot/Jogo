@@ -12,7 +12,7 @@ function newSave() {
     inv: { madeira: 0, pedra: 0, fibra: 0, flor: 0, cogumelo: 0, seiva: 0, cristal: 0 },
     bag: { pocao: 0, torta: 0, feixe: 0 },
     eq: { espada: 1, armadura: false, botas: false, coleira: false },
-    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
+    q: { ferro: 0, torta: 0, gato: 0, caca: 0, artesao: 0, viajante: 0 }, cities: {}, time: { day: 1, min: 7 * 60 }, npcs: {}, cat: 'none', mkills: 0, crafted: {}, pos: null, moved: false
   };
 }
 let S = newSave();
@@ -138,7 +138,10 @@ function objective() {
 }
 function questTargets() {
   const T = [];
-  const npcPos = id => { for (const r of REGION_LIST) for (const n of r.npcs) if (n.id === id) return toWorld(r, n.x, n.y); return null; };
+  const npcPos = id => {
+    const R = RES_BY_ID[id]; if (R) return R.area === 'world' ? [R.x, R.y] : doorOut(R.area);
+    for (const r of REGION_LIST) for (const n of r.npcs) if (n.id === id) return toWorld(r, n.x, n.y); return null;
+  };
   const doorPos = to => { for (const r of REGION_LIST) for (const d of r.doors) if (d.to === to) return toWorld(r, d.x, d.y); return null; };
   if (S.stage === 0) T.push(npcPos('aurora'));
   else if (relicCount() < 3) {
@@ -163,7 +166,7 @@ function questTargets() {
 let mode = 'loading';             // loading | title | play | end
 let area = 'world';
 let grid = null;
-let npcs = [], items = [], enemies = [];
+let npcs = [], baseNpcs = [], items = [], enemies = [];
 const world = { npcs: [], items: [], enemies: [] };
 let interiorDef = null;
 const player = { x: 0, y: 0, dir: 'down', fx: 0, fy: 1, hp: 5, inv: 0, atk: 0, atkCd: 0, anim: 0, moving: false, kx: 0, ky: 0 };
@@ -215,11 +218,11 @@ function setArea(id, x, y) {
   area = id;
   if (id === 'world') {
     grid = worldGrid; interiorDef = null;
-    npcs = world.npcs; items = world.items; enemies = world.enemies;
+    baseNpcs = world.npcs; npcs = baseNpcs.slice(); items = world.items; enemies = world.enemies;
   } else {
     interiorDef = INTERIORS[id];
     grid = interiorDef.grid;
-    npcs = interiorDef.npcs.map(n => Object.assign({}, n, { x: n.x * TILE, y: n.y * TILE }));
+    baseNpcs = interiorDef.npcs.map(n => Object.assign({}, n, { x: n.x * TILE, y: n.y * TILE })); npcs = baseNpcs.slice();
     items = []; enemies = [];
     banner = { text: interiorDef.name, t: 2.2 };
   }
@@ -315,8 +318,14 @@ function talkRole(n) {
   else say([who + ': Que bom receber visita! ' + cityRumor(c)]);
 }
 let talkFace = null;
+const QUEST_NPCS = ['aurora', 'mel', 'tome', 'bruno', 'rosa', 'teo'];
 function talkTo(n) {
   talkPid = n.id; talkFace = n;
+  if (n.resident) {
+    if (n.sleeping) { say([n.name + ' está dormindo. Zzz...']); return; }
+    if (!QUEST_NPCS.includes(n.id)) return lifeTalk(n);
+    noteTalk(n.id);
+  }
   if (n.role) return talkRole(n);
   if (n.v) {
     const c = n.city, lines = ['Bem-vindo a ' + c.name + '!', cityRumor(c), 'Dizem que a Lanterna do Vale voltou a brilhar' + (S.done ? '... foi você? Obrigado!' : '? Ainda não, né...'), 'O mercado fica pertinho da praça.', 'A estalagem tem cama quentinha.'];
@@ -350,7 +359,7 @@ function talkTo(n) {
       say(['Vó Aurora: As três relíquias! Estão brilhando tanto...', 'Vó Aurora: Leve-as à Torre da Lanterna, bem a leste. Siga a trilha!',
         'Vó Aurora: Mas cuidado... algo grande dorme ao pé da torre.']);
       Audio.sfx('heal');
-    } else say(['Vó Aurora: Você conseguiu, Kai. A Lanterna brilha de novo!']);
+    } else say(['Vó Aurora: ' + lifeLine('aurora')]);
     return;
   }
   if (id === 'bruno') return talkBruno();
@@ -361,13 +370,13 @@ function talkTo(n) {
     say([who + ': Oi, Kai! A Vó Aurora estava te procurando lá na Praça.']);
   } else if (id === 'mel') {
     const f = florlumeCount();
-    if (S.relics.petala) say(['Mel: Cuidado com os Musgos, viu? O Floco que o diga!', 'Mel: Ah, e pode pegar o que quiser do baú lá de casa.']);
+    if (S.relics.petala) say(['Mel: ' + lifeLine('mel'), 'Mel: Ah, e pode pegar o que quiser do baú lá de casa.']);
     else if (f < 5) say(['Mel: Oi, Kai! As flores-lume perderam o brilho e se espalharam pela vila.',
       'Mel: Junte 5 delas e eu teço a Pétala Solar pra você! (' + f + '/5)']);
     else say(['Mel: Que lindas! Olha só, voltaram a brilhar!', 'Mel: Aqui está: a Pétala Solar. Leve com carinho!'], () => giveRelic('petala', 'Pétala Solar'));
   } else if (id === 'tome') {
     const k = hortaKills();
-    if (S.relics.orvalho) say(['Seu Tomé: Minhas couves agradecem, rapaz!', 'Seu Tomé: Dica: cogumelo nasce na sombra das árvores.']);
+    if (S.relics.orvalho) say(['Seu Tomé: ' + lifeLine('tome')]);
     else if (k < 5) say(['Seu Tomé: Ei, rapaz! Esses Musgos estão comendo minhas couves!',
       'Seu Tomé: Espante os 5 que estão na horta e eu te dou o Orvalho do Poço. (' + k + '/5)']);
     else say(['Seu Tomé: Ufa! Minha horta está salva.', 'Seu Tomé: Tome: o Orvalho do Poço, colhido em noite de lua cheia.'], () => giveRelic('orvalho', 'Orvalho do Poço'));
@@ -393,7 +402,7 @@ function talkBruno() {
   } else if (S.q.artesao === 1 && Object.keys(S.crafted).length >= 3) {
     say(['Bruno: Três criações! Você tem mão boa, garoto.', 'Bruno: Leve estes 2 cristais e 15 moedas.'],
       () => { S.q.artesao = 2; S.inv.cristal += 2; S.coins += 15; Audio.sfx('relic'); save(); });
-  } else say(['Bruno: A bancada é toda sua. Cristais azuis aparecem nas rochas do leste.', 'Bruno: Com cristal dá pra fazer a melhor espada do vale!']);
+  } else say(['Bruno: ' + lifeLine('bruno'), 'Bruno: A bancada da oficina é toda sua.']);
 }
 function talkRosa() {
   const shop = [{ t: 'Comprar torta (6 moedas)', fn: () => {
@@ -415,7 +424,7 @@ function talkTeo() {
   else if (S.cat === 'lost') say(['Téo: A Bolinha está no Bosque Norte... ela é laranjinha!']);
   else if (S.cat === 'follow') say(['Téo: BOLINHA!!! Você achou!', 'Téo: Toma, é meu amuleto da sorte. Dizem que ele dá mais coragem! (+1 coração)'],
     () => { S.cat = 'home'; S.q.gato = 2; S.maxHp += 1; player.hp = S.maxHp; S.coins += 10; Audio.sfx('relic'); Audio.sfx('meow'); save(); });
-  else say(['Téo: A Bolinha não sai mais do meu lado. Valeu, Kai!']);
+  else say(['Téo: ' + lifeLine('teo')]);
 }
 function interact(t) {
   if (t.kind === 'npc') talkTo(t.ref);
@@ -430,8 +439,9 @@ function interact(t) {
       if (S.q.ferro < 2) say(['Bruno: Ei! Essa bancada é minha. Me ajuda primeiro e eu deixo você usar.']);
       else { menu = { tab: 'craft', station: true }; Audio.sfx('ui'); }
     } else if (f.use === 'bed') {
-      fade = { t: 0, dur: 1.2, mid: () => { player.hp = S.maxHp; save(); } };
-      Audio.sfx('sleep'); toast('Você descansou. Vida cheia e jogo salvo.');
+      const night = gameHour() >= 20 || gameHour() < 5;
+      fade = { t: 0, dur: 1.4, mid: () => { player.hp = S.maxHp; if (night) sleepUntilMorning(); save(); } };
+      Audio.sfx('sleep'); toast(night ? 'Você dormiu até de manhã. Jogo salvo.' : 'Você descansou. Vida cheia e jogo salvo.');
     } else if (f.use === 'chest') {
       if (S.got[f.id]) say(['O baú está vazio.']);
       else {
@@ -648,6 +658,7 @@ function update(dt) {
     if (fade.t >= fade.dur) fade = null;
   }
   if (mode !== 'play' || rotateNeeded()) return;
+  lifeUpdate(dt);
   if (menu || showMap) return;
 
   if (dialog) {
@@ -837,7 +848,7 @@ function findInteract(busy) {
   } else {
     for (const f of interiorDef.furn) if (f.use) {
       const x = (f.x + f.w / 2) * TILE, y = (f.y + f.h) * TILE;
-      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'bancada' || f.use === 'bancada2' ? 'Criar' : f.use === 'bed' ? 'Dormir' : 'Abrir' });
+      consider(Math.hypot(x - player.x, y - player.y), 95, { kind: 'furn', ref: f, x, y: f.y * TILE - 10, label: f.use === 'bancada' || f.use === 'bancada2' ? 'Criar' : f.use === 'bed' ? ((gameHour() >= 20 || gameHour() < 5) ? 'Dormir' : 'Deitar') : 'Abrir' });
     }
   }
 }
@@ -1040,6 +1051,7 @@ function drawWorld() {
   list.sort((a, b) => a.y - b.y);
   for (const o of list) { if (o.p) drawProp(o.p); else o.f(); }
   drawLanternGlow();
+  drawLighting();
   drawOverlays();
 }
 function addCommon(list) {
@@ -1055,6 +1067,7 @@ function drawInterior() {
   // brilho de fogo
   for (const f of I.furn) if (f.t === 'forge' || f.t === 'oven' || f.t === 'fireplace') {
     const x = (f.x + f.w / 2) * TILE, y = (f.y + f.h) * TILE - 20, rr = 130 + Math.sin(time * 8) * 8;
+    addLight(x, y, 220, '255,170,80');
     const g = ctx.createRadialGradient(x, y, 4, x, y, rr);
     g.addColorStop(0, 'rgba(255,170,80,0.4)'); g.addColorStop(1, 'rgba(255,140,60,0)');
     ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(x - rr, y - rr, rr * 2, rr * 2); ctx.globalCompositeOperation = 'source-over';
@@ -1065,6 +1078,7 @@ function drawInterior() {
   if (area === 'casaTeo' && S.cat === 'home') { const cb = I.furn.find(f => f.t === 'catbed'); list.push({ y: (cb.y + 1) * TILE, f: () => drawCatAt((cb.x + 0.5) * TILE, (cb.y + 0.85) * TILE, false, false, true) }); }
   addCommon(list);
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
+  drawLighting();
   // tapete de saída
   label('Sair', I.pw / 2, I.ph + 12, 15, '#fff6d8', 0.7);
   drawOverlays();
@@ -1201,6 +1215,7 @@ function drawDeco(p) {
   const x = p.x, y = p.y, R = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
   switch (p.d) {
     case 'lamp':
+      addLight(x, y - 110, 190, '255,214,130');
       shadow(x, y, 14, 5, 0.25);
       R(-4, -96, 8, 96, '#2a2238'); R(-2, -96, 3, 96, '#4a4458'); R(-10, -4, 20, 6, '#2a2238');
       R(-12, -124, 24, 30, '#2a2238'); R(-8, -120, 16, 22, '#ffe9a0'); R(-8, -120, 5, 22, '#fff8d8'); R(-14, -130, 28, 8, '#2a2238');
@@ -1291,6 +1306,7 @@ function drawDeco(p) {
       }
       break;
     case 'campfire': {
+      addLight(x, y - 30, 320, '255,160,70');
       const big = S.relics.brasa || S.bag.feixe > 0;
       ctx.fillStyle = '#5f5c57';
       for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; ctx.fillRect(x + Math.cos(a) * 36 - 7, y - 10 + Math.sin(a) * 14 - 5, 14, 10); }
@@ -1393,24 +1409,27 @@ const NPC_APP = {
   lina: { skin: '#f0c08a', hair: '#5a3a26', hairStyle: 'pony', top: '#e6dccb', bottom: '#6b5a4a' }
 };
 const NPC_IDLE = { tome: 'farm', bruno: 'work', rui: 'rest', lina: 'rest' };
-function npcApp(n) { return NPC_APP[n.id] || (NPC[n.id] && NPC[n.id].app) || null; }
+function npcApp(n) { return n.app || NPC_APP[n.id] || (NPC[n.id] && NPC[n.id].app) || null; }
 function drawNpc(n) {
   shadow(n.x, n.y, 22, 8);
   const app = npcApp(n);
   let drawn = false;
   if (Char3D && Q().npc3d && app) {
     const talking = dialog && dialog.pid === n.id;
-    let anim = n.moving ? 'walk' : (NPC_IDLE[n.id] || (n.role === 'ferreiro' ? 'work' : 'idle'));
+    let anim = n.moving ? 'walk' : n.resident ? n.anim : (NPC_IDLE[n.id] || (n.role === 'ferreiro' ? 'work' : 'idle'));
     let fx = n.fx || 0, fy = n.fy == null ? 1 : n.fy;
     if (talking) { anim = n.id === 'rui' || n.id === 'lina' ? 'rest' : 'talk'; const dx = player.x - n.x, dy = player.y - n.y, d = Math.hypot(dx, dy) || 1; fx = dx / d; fy = dy / d; }
-    else if (anim === 'rest') { fx = 0; fy = 1; }
+    else if (anim === 'rest' && !n.resident) { fx = 0; fy = 1; }
+    if (n.sleeping) { anim = 'sleep'; fx = 0; fy = 1; }
     drawn = Char3D.drawPerson(ctx, n.id, app, anim, time + (n.x % 7), fx, fy, n.x, n.y + 3, KAI3D_SIZE);
   }
   if (!drawn) {
     const sc = n.id === 'teo' ? 5 : 6;
-    spr(NPC[n.id], n.x, n.y + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
+    if (n.sleeping) { spr(NPC[n.id], n.x, n.y - 10, sc * 0.9, false, false); ctx.fillStyle = '#5a4a6a'; ctx.fillRect(n.x - 26, n.y - 50, 52, 44); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(n.x - 26, n.y - 50, 52, 5); }
+    else spr(NPC[n.id], n.x, n.y + Math.sin(time * 2 + n.x) * 0.8, sc, Math.sin(time * 0.5 + n.x) > 0.7, false);
   }
   label(n.name, n.x, n.y + 22, 15, '#fff6d8', 0.9);
+  if (n.sleeping) label('z z Z', n.x + 30, n.y - 70 - Math.sin(time * 2) * 5, 15, '#cfe6ff', 0.85);
 }
 function drawEnemy(e) {
   const SP = e.boss ? MUSGO_BOSS : e.azul ? MUSGO_AZUL : e.variant ? MUSGO_VAR[e.variant] : MUSGO;
@@ -1580,9 +1599,10 @@ function drawHUD() {
     if (Audio.muted) { ctx.moveTo(x + 4, y - 5); ctx.lineTo(x + 10, y + 5); ctx.moveTo(x + 10, y - 5); ctx.lineTo(x + 4, y + 5); } else ctx.arc(x + 2, y, 6, -0.8, 0.8);
     ctx.stroke();
   }, () => Audio.setMuted(!Audio.muted));
+  drawClockHUD(T + 2);
   // chefe
   if (bossRef && !bossRef.dead) {
-    const bw = Math.min(300, W - 360), bx = (W - bw) / 2, by = T + 18;
+    const bw = Math.min(300, W - 360), bx = (W - bw) / 2, by = T + 50;
     label('Musgo Ancião', W / 2, by - 4, 15, '#e9ffd0');
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.roundRect(bx, by + 6, bw, 12, 6); ctx.fill();
     ctx.fillStyle = '#7ccf55'; ctx.beginPath(); ctx.roundRect(bx + 2, by + 8, (bw - 4) * Math.max(0, bossRef.hp / bossRef.maxHp), 8, 4); ctx.fill();
@@ -1712,6 +1732,8 @@ function drawConfigTab(x, y, w, h) {
   ks.forEach((k, i) => panelButton(QUALITY[k].name, x + i * (bw + 10), y + 26, bw, 36, () => setQuality(k), CONFIG.quality === k ? 'on' : null));
   const q = Q();
   text('NPCs ' + (q.npc3d ? 'em 3D (' + q.dirs + ' direções)' : 'em 2D') + ' · efeitos ' + Math.round(q.fx * 100) + '%', x, y + 78, 13, '#cfc3a6', 500, w);
+  text('Duração de um dia', x + 520, y + 10, 15, '#ffe38a', 700);
+  [[30, '30 min'], [60, '1 hora'], [120, '2 horas']].forEach(([m, t], i) => panelButton(t, x + 520 + i * 92, y + 26, 84, 36, () => { CONFIG.dayMinutes = m; store('vale-da-lanterna-config', CONFIG); toast('Um dia agora dura ' + t); }, dayMinutes() === m ? 'on' : null));
   text('Jogo', x, y + 112, 15, '#ffe38a', 700);
   panelButton('Salvar agora', x, y + 128, 170, 38, () => { save(); Audio.sfx('pick'); toast('Jogo salvo!'); });
   panelButton(Audio.muted ? 'Som: desligado' : 'Som: ligado', x + 184, y + 128, 170, 38, () => Audio.setMuted(!Audio.muted));
@@ -1831,6 +1853,7 @@ function startGame(fresh) {
   else S = loadSave() || newSave();
   player.hp = S.maxHp; player.inv = 0; dialog = null; endT = 0; menu = null; showMap = false; player.hidden = false;
   buildWorldEntities();
+  snapResidents();
   mode = 'play';
   fade = { t: 0.35, dur: 0.7, mid: null };
   curRegion = null;
@@ -1954,6 +1977,8 @@ document.addEventListener('visibilitychange', () => {
   placeProps();
   for (const id of Object.keys(INTERIORS)) buildInterior(id);
   grid = worldGrid;
+  makeResidentObjects();
+  buildNav();
   if (Char3D) Char3D.setDirs(Q().dirs);
   document.getElementById('loading').remove();
   mode = 'title';
@@ -1961,6 +1986,6 @@ document.addEventListener('visibilitychange', () => {
 })();
 
 // para testes automáticos
-window.__vale = { get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
+window.__vale = { get npcs() { return npcs; }, RESIDENTS, sleepUntilMorning, snapResidents, get S() { return S; }, player, get mode() { return mode; }, startGame, get area() { return area; }, setArea,
   get enemies() { return enemies; }, get dialog() { return dialog; }, advanceDialog, choose, interact, get target() { return interactTarget; },
   openMenu(tab, station) { menu = { tab, station }; }, closeMenu() { menu = null; }, set showMap(v) { showMap = v; }, toWorld, REGIONS, INTERIORS, craft, RECIPES, props };

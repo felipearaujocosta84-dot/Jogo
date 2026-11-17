@@ -67,8 +67,8 @@ ciclo de dia e noite e clima; novos menus; migração de saves, salvamento manua
 |---|---|---|
 | 1 | Análise, arquitetura, backup, migração de saves | ✅ concluída |
 | 2 | Personagens 3D e animações (Kai + todos os NPCs) | ✅ concluída |
-| 3 | Mais NPCs, rotinas diárias, navegação | ⏳ próxima |
-| 4 | Relacionamentos, namoro, casamento, família | ⏳ |
+| 3 | Mais NPCs, rotinas diárias, navegação (+ relógio e luz do dia antecipados) | ✅ concluída |
+| 4 | Relacionamentos, namoro, casamento, família | ⏳ próxima |
 | 5 | Empregos, profissões, economia | ⏳ |
 | 6 | Agricultura e animais | ⏳ |
 | 7 | Construção livre e decoração | ⏳ |
@@ -88,3 +88,27 @@ será antecipada no início da Fase 3.
 - Kai: caminhada e corrida (joystick todo para o lado, ou Shift), conversa durante diálogos.
 - Aparências feitas para os NPCs das missões; moradores das cidades ganham aparência aleatória com semente.
 - Opções gráficas Baixo/Médio/Alto/Ultra e salvamento manual na nova aba "Ajustes" da Mochila.
+
+## Fase 3 — Moradores, rotinas e navegação
+- **Relógio** (`life.js`): dia de 60 min reais por padrão (30 min, 1 h ou 2 h em Ajustes), dias da semana,
+  períodos (madrugada, manhã, tarde, pôr do sol, noite), relógio no topo da tela. O relógio para com menus abertos.
+- **Luz do dia** antecipada da Fase 8: a cena muda de cor ao longo do dia; à noite postes, fogueira e fornos acendem.
+  Interiores ficam menos escuros. (Janelas acesas, sombras e clima ficam para a Fase 8.)
+- **Dormir**: camas de casa e da estalagem fazem dormir até as 6h quando é noite (20h–5h); de dia, só descansa.
+- **12 moradores com perfil** (nome, idade, personalidade, profissão, casa, gostos e rotina):
+  Vó Aurora, Mel, Seu Tomé, Bruno, Rosa, Téo, e os novos Iara (pescadora), Davi (carpinteiro), Nina (costureira),
+  Léo (guarda), Bia (cozinheira, mora com o Léo) e Joca (lenhador, mora com o Seu Tomé).
+- **7 casas novas com interior** no Vale: casas do Bruno, Rosa, Iara, Davi, Nina, Léo e Bia, e a cabana do Seu Tomé
+  (3 delas são construções novas; o resto eram casas decorativas que ganharam porta).
+- **Rotinas**: acordar, sair de casa, ir ao trabalho, almoçar (em casa ou na padaria), trabalhar, passear na praça,
+  voltar e dormir na própria cama. Animações conforme a atividade (pesca, plantio, martelo, ronda, sentar, dormir).
+  Moradores das cidades se recolhem à noite.
+- **Navegação**: rede de caminhos sobre as trilhas e praças do Vale (84 pontos) com rotas pelo menor caminho;
+  todos os trajetos de rotina foram verificados contra a colisão (nenhum atravessa parede, casa ou água).
+  NPCs entram e saem pelas portas das casas.
+- **Simulação simplificada**: moradores longe do jogador ou em outra área pulam direto para o destino;
+  os que estão perto andam de verdade pelo caminho.
+- **Diálogos por contexto**: frases por profissão, lugar, horário, dia da semana, progresso da história e
+  personalidade (saudação e despedida próprias), apresentação no primeiro encontro, e memória das últimas
+  frases para não repetir. As missões continuam com prioridade nas falas dos NPCs de missão.
+- O alvo das missões no mapa acompanha o morador (ou a porta da casa onde ele está).

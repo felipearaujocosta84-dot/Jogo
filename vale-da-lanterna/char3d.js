@@ -204,7 +204,7 @@ const Char3D = (() => {
   // anim: idle walk run talk work farm fish rest — k é a fase (0..1) do quadro
   function posePerson(P, anim, k) {
     const s = Math.sin(k * Math.PI * 2), c = Math.cos(k * Math.PI * 2);
-    P.body.position.y = 0; P.body.rotation.set(0, 0, 0); P.torso.rotation.set(0, 0, 0); P.head.rotation.set(0, 0, 0);
+    P.body.position.set(0, 0, 0); P.body.rotation.set(0, 0, 0); P.torso.rotation.set(0, 0, 0); P.head.rotation.set(0, 0, 0);
     P.legs.forEach(l => l.rotation.set(0, 0, 0)); P.arms[0].rotation.set(0, 0, 0.08); P.arms[1].rotation.set(0, 0, -0.08);
     P.hammer.visible = anim === 'work'; P.hoe.visible = anim === 'farm'; P.rod.visible = anim === 'fish'; P.basket.visible = false;
     if (anim === 'walk' || anim === 'run') {
@@ -230,15 +230,18 @@ const Char3D = (() => {
     } else if (anim === 'rest') {
       P.body.position.y = -0.3; P.legs.forEach(l => { l.rotation.x = -1.45; }); P.arms[0].rotation.set(-0.4, 0, 0.1); P.arms[1].rotation.set(-0.4, 0, -0.1);
       P.head.rotation.x = 0.08 + s * 0.03;
+    } else if (anim === 'sleep') {
+      P.body.rotation.x = -Math.PI / 2; P.body.position.set(0, 0.32, 0.55);
+      P.arms[0].rotation.set(0, 0, 0.12); P.arms[1].rotation.set(0, 0, -0.12);
     } else if (anim === 'carry') {
       P.basket.visible = true; P.arms[0].rotation.set(-0.3, 0, 0.1);
       P.legs[0].rotation.x = s * 0.6; P.legs[1].rotation.x = -s * 0.6; P.arms[1].rotation.x = s * 0.5;
     }
   }
-  const ANIMS = { idle: 2, walk: 4, run: 4, talk: 2, work: 2, farm: 2, fish: 2, rest: 2, carry: 4 };
+  const ANIMS = { idle: 2, walk: 4, run: 4, talk: 2, work: 2, farm: 2, fish: 2, rest: 2, carry: 4, sleep: 1 };
   const ANIM_OFF = {}; let FRAMES = 0;
   for (const [a, n] of Object.entries(ANIMS)) { ANIM_OFF[a] = FRAMES; FRAMES += n; }
-  const ANIM_FPS = { idle: 2, walk: 7, run: 11, talk: 4, work: 4, farm: 2.5, fish: 1.5, rest: 1, carry: 7 };
+  const ANIM_FPS = { idle: 2, walk: 7, run: 11, talk: 4, work: 4, farm: 2.5, fish: 1.5, rest: 1, carry: 7, sleep: 1 };
   const atlases = new Map();
   let bakeBudget = 0, dirs = 8;
   function setDirs(n) { if (n !== dirs) { dirs = n; atlases.clear(); } }

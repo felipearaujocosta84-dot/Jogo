@@ -9,17 +9,17 @@ const CELL = 8, GC = Math.ceil(WW / CELL), GR = Math.ceil(WH / CELL);
 // Regiões (coordenadas de mundo). ox/oy/iw/ih = retângulo da região.
 const REGIONS = {
   praca: { name: 'Praça das Telhas', amb: 'petals', ox: 3000, oy: 1100, iw: 1104, ih: 1965, safe: true,
-    npcs: [{ id: 'aurora', x: 3420, y: 2170, name: 'Vó Aurora' }],
+    npcs: [],   // Vó Aurora agora é moradora com rotina (life.js)
     items: [{ id: 'c_p1', k: 'moeda', x: 3700, y: 1780 }, { id: 'c_p2', k: 'moeda', x: 3330, y: 2420 }],
     doors: [], start: [3550, 2420] },
   vila: { name: 'Vila do Rio', amb: 'butterflies', ox: 1500, oy: 300, iw: 1104, ih: 1965, safe: true,
-    npcs: [{ id: 'mel', x: 2010, y: 1440, name: 'Mel' }],
+    npcs: [],   // Mel: moradora com rotina (life.js)
     items: [
-      { id: 'flor1', k: 'florlume', x: 1610, y: 1290 }, { id: 'flor2', k: 'florlume', x: 2290, y: 1060 }, { id: 'flor3', k: 'florlume', x: 1580, y: 1820 },
+      { id: 'flor1', k: 'florlume', x: 1610, y: 1290 }, { id: 'flor2', k: 'florlume', x: 2290, y: 1060 }, { id: 'flor3', k: 'florlume', x: 1560, y: 2080 },
       { id: 'flor4', k: 'florlume', x: 2230, y: 1720 }, { id: 'flor5', k: 'florlume', x: 2010, y: 560 }, { id: 'c_v1', k: 'moeda', x: 1790, y: 1420 }],
     doors: [], start: [1900, 1700] },
   horta: { name: 'Horta do Seu Tomé', amb: 'butterflies', ox: 4600, oy: 300, iw: 1104, ih: 1965,
-    npcs: [{ id: 'tome', x: 4990, y: 1400, name: 'Seu Tomé' }],
+    npcs: [],   // Seu Tomé: morador com rotina (life.js)
     items: [{ id: 'c_h1', k: 'moeda', x: 4700, y: 1380 }, { id: 'c_h2', k: 'moeda', x: 5480, y: 2000 }],
     foes: [{ id: 'hm1', x: 4880, y: 1100 }, { id: 'hm2', x: 5380, y: 1080 }, { id: 'hm3', x: 4870, y: 1650 },
       { id: 'hm4', x: 5370, y: 1660 }, { id: 'hm5', x: 5250, y: 1400 }],
@@ -348,12 +348,15 @@ const BUILDINGS = [
   { kind: 'house', x: 3250, y: 1560, w: 66, roof: 'slate', wall: 'stone', sign: 'anvil', chimney: true, to: 'oficina' },
   { kind: 'house', x: 3850, y: 1560, w: 62, roof: 'red', wall: 'plaster', to: 'casaTeo' },
   { kind: 'house', x: 3850, y: 2640, w: 62, roof: 'purple', wall: 'plaster', chimney: true, to: 'casaAurora' },
-  { kind: 'house', x: 3250, y: 2640, w: 58, roof: 'blue', wall: 'wood', chimney: true },
+  { kind: 'house', x: 3250, y: 2640, w: 58, roof: 'blue', wall: 'wood', chimney: true, to: 'casaBruno' },
   { kind: 'house', x: 1700, y: 1160, w: 66, roof: 'orange', wall: 'plaster', sign: 'bread', chimney: true, to: 'padaria' },
   { kind: 'house', x: 2130, y: 1340, w: 58, roof: 'teal', wall: 'wood', to: 'casaMel' },
-  { kind: 'house', x: 1700, y: 1640, w: 54, roof: 'blue', wall: 'plaster' },
-  { kind: 'house', x: 2140, y: 880, w: 58, roof: 'brown', wall: 'plaster', chimney: true },
-  { kind: 'house', x: 1700, y: 720, w: 54, roof: 'red', wall: 'stone', chimney: true },
+  { kind: 'house', x: 1700, y: 1640, w: 54, roof: 'blue', wall: 'plaster', to: 'casaRosa' },
+  { kind: 'house', x: 2140, y: 880, w: 58, roof: 'brown', wall: 'plaster', chimney: true, to: 'casaIara' },
+  { kind: 'house', x: 1700, y: 720, w: 54, roof: 'red', wall: 'stone', chimney: true, to: 'casaDavi' },
+  { kind: 'house', x: 1650, y: 2000, w: 52, roof: 'pink', wall: 'plaster', to: 'casaNina' },
+  { kind: 'house', x: 4000, y: 2100, w: 58, roof: 'teal', wall: 'stone', chimney: true, to: 'casaLeo' },
+  { kind: 'house', x: 4690, y: 2210, w: 54, roof: 'brown', wall: 'wood', chimney: true, to: 'cabanaTome' },
   { kind: 'barn', x: 5380, y: 820 },
   { kind: 'tower', x: 6750, y: 2262 },
   { kind: 'well', x: 5640, y: 1420 },
@@ -407,8 +410,8 @@ function placeTownDecor() {
   deco('crate', 3060, 1620, { block: 18 }); deco('anvilout', 3400, 1610, { block: 16 });
   // vila
   for (const [x, y] of [[1820, 1250], [1980, 1250], [1820, 800], [1980, 1520]]) deco('lamp', x, y, { block: 12 });
-  for (const [x, y] of [[1600, 1300], [2260, 1080], [1580, 1830], [2230, 1740], [2000, 580], [1640, 900], [2250, 1440]]) deco('flowerbed', x, y);
-  deco('bench', 1780, 1700); deco('crate', 1590, 1190, { block: 18 }); deco('barrel', 1850, 1180, { block: 18 });
+  for (const [x, y] of [[1600, 1300], [2260, 1080], [1660, 2070], [2230, 1740], [2000, 580], [1640, 900], [2250, 1440]]) deco('flowerbed', x, y);
+  deco('bench', 1990, 1745); deco('stall', 3330, 1880, { block: 30, col: '#7b5aa6' }); deco('log', 1545, 880); deco('log', 1600, 905); deco('crate', 1590, 1190, { block: 18 }); deco('barrel', 1850, 1180, { block: 18 });
   // horta: cercas, plantações, feno
   for (const [fx, fy, fw, fh] of FIELDS) {
     for (let x = fx + 12; x < fx + fw; x += 48) {
@@ -599,12 +602,12 @@ const INTERIORS = {
     furn: [{ t: 'forge', x: 1, y: 0, w: 2, h: 2 }, { t: 'shelf', x: 8, y: 0, w: 2, h: 2 }, { t: 'window', x: 5, y: 0, w: 1, h: 2 },
       { t: 'anvil', x: 3, y: 3, w: 1, h: 1, block: 1 }, { t: 'bancada', x: 8, y: 3, w: 2, h: 1, block: 1, use: 'bancada' },
       { t: 'barrel', x: 10, y: 5, w: 1, h: 1, block: 1 }, { t: 'barrel', x: 10, y: 6, w: 1, h: 1, block: 1 }, { t: 'rug', x: 4, y: 5, w: 3, h: 2 }],
-    npcs: [{ id: 'bruno', x: 5.5, y: 4.2, name: 'Bruno' }] },
+    npcs: [] },
   casaTeo: { name: 'Casa do Téo', w: 10, h: 7, floor: 'wood', wall: 'wood',
     furn: [{ t: 'window', x: 2, y: 0, w: 1, h: 2 }, { t: 'shelf', x: 6, y: 0, w: 2, h: 2 }, { t: 'window', x: 8, y: 0, w: 1, h: 2 },
       { t: 'bed', x: 1, y: 2, w: 1, h: 2, block: 1, col: '#4f7fbf' }, { t: 'rug', x: 3, y: 4, w: 3, h: 2 },
       { t: 'table', x: 6, y: 3, w: 2, h: 1, block: 1 }, { t: 'plant', x: 8, y: 2, w: 1, h: 1, block: 1 }, { t: 'catbed', x: 8, y: 5, w: 1, h: 1 }],
-    npcs: [{ id: 'teo', x: 4.5, y: 3.4, name: 'Téo' }] },
+    npcs: [] },
   casaAurora: { name: 'Casa da Vó Aurora', w: 10, h: 7, floor: 'wood', wall: 'wood',
     furn: [{ t: 'shelf', x: 1, y: 0, w: 2, h: 2 }, { t: 'fireplace', x: 4, y: 0, w: 2, h: 2 }, { t: 'window', x: 7, y: 0, w: 1, h: 2 },
       { t: 'bed', x: 8, y: 2, w: 1, h: 2, block: 1, col: '#7b5aa6', use: 'bed' }, { t: 'rug', x: 3, y: 3, w: 4, h: 2 },
@@ -614,13 +617,29 @@ const INTERIORS = {
     furn: [{ t: 'oven', x: 1, y: 0, w: 2, h: 2 }, { t: 'window', x: 5, y: 0, w: 1, h: 2 }, { t: 'shelf', x: 8, y: 0, w: 3, h: 2, bread: 1 },
       { t: 'counter', x: 3, y: 3, w: 5, h: 1, block: 1 }, { t: 'sack', x: 10, y: 3, w: 1, h: 1, block: 1 }, { t: 'sack', x: 10, y: 4, w: 1, h: 1, block: 1 },
       { t: 'table', x: 2, y: 5, w: 2, h: 1, block: 1 }, { t: 'table', x: 7, y: 5, w: 2, h: 1, block: 1 }],
-    npcs: [{ id: 'rosa', x: 5.5, y: 2.55, name: 'Rosa' }] },
+    npcs: [] },
   casaMel: { name: 'Casa da Mel', w: 10, h: 7, floor: 'wood', wall: 'wood',
     furn: [{ t: 'window', x: 2, y: 0, w: 1, h: 2 }, { t: 'flowers', x: 4, y: 0, w: 3, h: 2 }, { t: 'window', x: 8, y: 0, w: 1, h: 2 },
       { t: 'bed', x: 1, y: 2, w: 1, h: 2, block: 1, col: '#e86a9a' }, { t: 'loom', x: 5, y: 2, w: 2, h: 1, block: 1 },
       { t: 'rug', x: 3, y: 4, w: 3, h: 2 }, { t: 'plant', x: 8, y: 2, w: 1, h: 1, block: 1 }, { t: 'chest', x: 8, y: 5, w: 1, h: 1, block: 1, use: 'chest', id: 'ch_mel' }],
     npcs: [] }
 };
+// casas dos moradores (Fase 3)
+function homeDef(name, wall, beds, cols) {
+  const furn = [{ t: 'window', x: 2, y: 0, w: 1, h: 2 }, { t: 'shelf', x: 4, y: 0, w: 2, h: 2 }, { t: 'window', x: 7, y: 0, w: 1, h: 2 },
+    { t: 'rug', x: 3, y: 4, w: 3, h: 2 }, { t: 'table', x: 6, y: 4, w: 2, h: 1, block: 1 }, { t: 'plant', x: 8, y: 2, w: 1, h: 1, block: 1 }];
+  for (let i = 0; i < beds; i++) furn.push({ t: 'bed', x: 1 + i * 2, y: 2, w: 1, h: 2, block: 1, col: cols[i % cols.length], use: 'bed' });
+  return { name, w: 10, h: 7, floor: 'wood', wall, furn, npcs: [] };
+}
+Object.assign(INTERIORS, {
+  casaBruno: homeDef('Casa do Bruno', 'stone', 1, ['#6e5a48']),
+  casaRosa: homeDef('Casa da Rosa', 'brick', 1, ['#e86a8a']),
+  casaIara: homeDef('Casa da Iara', 'wood', 1, ['#2f8a84']),
+  casaDavi: homeDef('Casa do Davi', 'wood', 1, ['#7a4a2a']),
+  casaNina: homeDef('Casa da Nina', 'brick', 1, ['#b59cff']),
+  casaLeo: homeDef('Casa do Léo e da Bia', 'stone', 2, ['#4f7fbf', '#e8944e']),
+  cabanaTome: homeDef('Cabana do Seu Tomé', 'wood', 2, ['#c8423b', '#5fa65a'])
+});
 const CHEST_LOOT = { ch_aurora: { pocao: 1, flor: 2, moeda: 5 }, ch_mel: { fibra: 3, flor: 3, moeda: 5 } };
 function buildInterior(id) {
   const I = INTERIORS[id];
