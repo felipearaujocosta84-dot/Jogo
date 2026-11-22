@@ -22,7 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ps5launcher.data.SettingsRepository
 import com.ps5launcher.ui.components.AnimatedBackground
+import com.ps5launcher.ui.components.LandscapeFrame
 import com.ps5launcher.ui.components.LocalBattery
 import com.ps5launcher.ui.components.LocalNow
 import com.ps5launcher.ui.components.rememberBattery
@@ -63,6 +65,10 @@ fun LauncherRoot(vm: LauncherViewModel, onRequestDefault: () -> Unit) {
     BackHandler(enabled = true) { vm.back() }
 
     CompositionLocalProvider(LocalNow provides now, LocalBattery provides battery) {
+      LandscapeFrame(
+          force = settings.orientation != SettingsRepository.ORIENTATION_PORTRAIT,
+          onRotatedChange = { vm.rotatedUi = it },
+      ) {
         Box(Modifier.fillMaxSize().background(PsNavy)) {
             AnimatedBackground(tint = tint, animated = settings.animatedBackground)
 
@@ -107,5 +113,6 @@ fun LauncherRoot(vm: LauncherViewModel, onRequestDefault: () -> Unit) {
                 vm.optionsFor?.let { entry -> AppOptionsDialog(vm, entry) }
             }
         }
+      }
     }
 }

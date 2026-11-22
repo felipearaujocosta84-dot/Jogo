@@ -85,6 +85,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     var optionsFor by mutableStateOf<AppEntry?>(null)
         private set
     var backgroundTint by mutableStateOf<Color?>(null)
+
+    /** true quando o celular ignorou o pedido de horizontal e o launcher está girando a própria tela. */
+    var rotatedUi = false
     var focusedLibraryEntry: AppEntry? = null
     var homeResetSignal by mutableIntStateOf(0)
         private set

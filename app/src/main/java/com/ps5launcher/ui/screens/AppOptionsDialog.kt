@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -40,12 +41,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.ps5launcher.ui.AppEntry
 import com.ps5launcher.ui.LauncherViewModel
 import com.ps5launcher.ui.components.focusHighlight
@@ -65,8 +66,18 @@ fun AppOptionsDialog(vm: LauncherViewModel, entry: AppEntry) {
     }
     val firstFocus = remember { FocusRequester() }
 
-    Dialog(onDismissRequest = { vm.dismissOptions() }) {
-        LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    // Desenhado dentro do launcher (e não como janela separada), para girar junto com a tela.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                vm.dismissOptions()
+            }
+            .padding(16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         val shape = RoundedCornerShape(26.dp)
         Column(
             Modifier
@@ -75,6 +86,7 @@ fun AppOptionsDialog(vm: LauncherViewModel, entry: AppEntry) {
                 .clip(shape)
                 .background(PsSurfaceStrong)
                 .border(1.dp, GlassStroke, shape)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),

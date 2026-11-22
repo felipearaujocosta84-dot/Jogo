@@ -120,10 +120,15 @@ fun SettingsScreen(vm: LauncherViewModel, settings: LauncherSettings, onRequestD
             ) { vm.setBoolean(SettingsRepository.K_FULLSCREEN, it) }
         }
         item {
+            val portrait = settings.orientation == SettingsRepository.ORIENTATION_PORTRAIT
             SettingChoices(
                 Icons.Filled.ScreenRotation, "Orientação",
-                listOf("Automática", "Paisagem", "Retrato"), settings.orientation,
-            ) { vm.setOrientation(it) }
+                listOf("Horizontal", "Vertical"), if (portrait) 1 else 0,
+            ) {
+                vm.setOrientation(
+                    if (it == 1) SettingsRepository.ORIENTATION_PORTRAIT else SettingsRepository.ORIENTATION_LANDSCAPE
+                )
+            }
         }
 
         item {
@@ -173,7 +178,7 @@ fun SettingsScreen(vm: LauncherViewModel, settings: LauncherSettings, onRequestD
         }
         item {
             SettingRow(
-                Icons.Filled.Info, "PS5 Launcher 1.1",
+                Icons.Filled.Info, "PS5 Launcher 1.2",
                 "Projeto pessoal inspirado no visual de consoles. Não é afiliado à Sony. " +
                     "O launcher nunca apaga nem modifica seus apps.",
                 onClick = null,

@@ -46,15 +46,14 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
 
+        // Pede a horizontal antes mesmo de desenhar a primeira tela.
+        applyOrientation(vm.settings.value.orientation)
+
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
 
-            LaunchedEffect(settings.orientation) {
-                requestedOrientation = when (settings.orientation) {
-                    SettingsRepository.ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    SettingsRepository.ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                }
+            LaunchedEffect(settings.orientation, vm.resumeTick) {
+                applyOrientation(settings.orientation)
             }
             LaunchedEffect(settings.fullscreen, vm.resumeTick) {
                 applyFullscreen(settings.fullscreen)
@@ -64,6 +63,16 @@ class MainActivity : ComponentActivity() {
                 LauncherRoot(vm = vm, onRequestDefault = ::requestDefaultLauncher)
             }
         }
+    }
+
+    /** Horizontal sempre, a não ser que o usuário escolha "Vertical" nas configurações. */
+    private fun applyOrientation(orientation: Int) {
+        val wanted = if (orientation == SettingsRepository.ORIENTATION_PORTRAIT) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+        if (requestedOrientation != wanted) requestedOrientation = wanted
     }
 
     private fun applyFullscreen(enabled: Boolean) {
@@ -109,6 +118,17 @@ class MainActivity : ComponentActivity() {
      * O direcional e o analógico esquerdo movem a seleção.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Se a tela está girada manualmente, o direcional precisa girar junto.
+        if (vm.rotatedUi) {
+            val rotated = when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_RIGHT -> KeyEvent.KEYCODE_DPAD_DOWN
+                KeyEvent.KEYCODE_DPAD_LEFT -> KeyEvent.KEYCODE_DPAD_UP
+                KeyEvent.KEYCODE_DPAD_UP -> KeyEvent.KEYCODE_DPAD_RIGHT
+                KeyEvent.KEYCODE_DPAD_DOWN -> KeyEvent.KEYCODE_DPAD_LEFT
+                else -> null
+            }
+            if (rotated != null) return super.dispatchKeyEvent(remap(event, rotated))
+        }
         val up = event.action == KeyEvent.ACTION_UP
         when (event.keyCode) {
             KeyEvent.KEYCODE_BUTTON_A ->
