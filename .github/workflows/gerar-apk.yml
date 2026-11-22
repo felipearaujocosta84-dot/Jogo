@@ -16,16 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Baixar o projeto
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Instalar Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
-
-      - name: Preparar Android SDK
-        uses: android-actions/setup-android@v3
 
       - name: Preparar Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -34,6 +31,7 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
+          echo "ANDROID_HOME=$ANDROID_HOME"
           set -o pipefail
           ./gradlew assembleRelease --stacktrace 2>&1 | tee build.log
 
