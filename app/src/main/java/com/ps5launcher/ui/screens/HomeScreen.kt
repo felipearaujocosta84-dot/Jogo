@@ -1,6 +1,9 @@
 package com.ps5launcher.ui.screens
 
 import android.text.format.DateUtils
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
@@ -11,6 +14,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,21 +38,30 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -59,6 +72,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,17 +95,33 @@ import com.ps5launcher.ui.components.focusHighlight
 import com.ps5launcher.ui.components.rememberAppIcon
 import com.ps5launcher.ui.components.rememberAppTint
 import com.ps5launcher.ui.components.rememberStoredImage
-import com.ps5launcher.ui.theme.GlassFill
 import com.ps5launcher.ui.theme.GlassStroke
 import com.ps5launcher.ui.theme.LocalAccent
 import com.ps5launcher.ui.theme.PsNavy
 import com.ps5launcher.ui.theme.TextPrimary
 import com.ps5launcher.ui.theme.TextSecondary
 
+/** Cada cartão da fileira: a Loja no começo, os jogos/apps e a Biblioteca no final. */
+private sealed interface HomeTileItem {
+    val key: String
+}
+
+private object StoreTile : HomeTileItem {
+    override val key = "__store"
+}
+
+private object LibraryTileItem : HomeTileItem {
+    override val key = "__library"
+}
+
+private class AppTile(val entry: AppEntry) : HomeTileItem {
+    override val key: String get() = entry.key
+}
+
 /**
- * Tela inicial no estilo do console:
- * abas Jogos/Mídia no topo, fileira de cartões e, abaixo, o destaque do item selecionado
- * com o botão "Jogar". A arte de fundo muda conforme o jogo selecionado.
+ * Tela inicial no estilo do console (pensada para a horizontal):
+ * abas no topo, fileira de cartões, a arte do jogo ocupando o fundo,
+ * título grande com o botão "Jogar" e cartões de informação logo abaixo.
  */
 @Composable
 fun HomeScreen(
@@ -104,26 +134,43 @@ fun HomeScreen(
     onRequestDefault: () -> Unit,
 ) {
     val items = if (vm.homeTab == HomeTab.GAMES) games else media
-    val tileCount = items.size + 1 // +1 = cartão da Biblioteca no final
-    val selection = vm.homeSelection.coerceIn(0, tileCount - 1)
-    val selectedEntry = items.getOrNull(selection)
-    val listState = rememberLazyListState()
-    val firstTileFocus = remember { FocusRequester() }
+    val tiles: List<HomeTileItem> = remember(items) {
+        buildList {
+            add(StoreTile)
+            items.forEach { add(AppTile(it)) }
+            add(LibraryTileItem)
+        }
+    }
+    val selection = vm.homeSelection.coerceIn(0, tiles.lastIndex)
+    val selected = tiles[selection]
+    val selectedEntry = (selected as? AppTile)?.entry
 
-    // Ao voltar para a tela inicial: rola para o começo e coloca o foco no primeiro cartão
-    // (necessário para navegar com controle Bluetooth).
+    val listState = rememberLazyListState()
+    val scroll = rememberScrollState()
+    val selectedFocus = remember { FocusRequester() }
+
+    // Escolher capa direto pelo cartão "Capa".
+    var coverTarget by remember { mutableStateOf<AppEntry?>(null) }
+    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val target = coverTarget
+        if (uri != null && target != null) vm.setCover(target, uri)
+        coverTarget = null
+    }
+
     LaunchedEffect(vm.homeResetSignal, vm.homeTab) {
         listState.scrollToItem(0)
+        scroll.scrollTo(0)
     }
-    LaunchedEffect(vm.homeResetSignal, vm.resumeTick, vm.homeTab, items.isEmpty()) {
-        runCatching { firstTileFocus.requestFocus() }
+    // Coloca o foco no cartão selecionado (necessário para o controle Bluetooth).
+    LaunchedEffect(vm.homeResetSignal, vm.resumeTick, vm.homeTab, tiles.size) {
+        runCatching { selectedFocus.requestFocus() }
     }
-    // Mantém o cartão selecionado visível quando você toca num cartão parcialmente escondido.
+    // Mantém o cartão selecionado visível ao tocar num cartão escondido pela metade.
     LaunchedEffect(selection) {
         val info = listState.layoutInfo
         val item = info.visibleItemsInfo.firstOrNull { it.index == selection }
         if (item == null || item.offset < 0 || item.offset + item.size > info.viewportEndOffset) {
-            listState.animateScrollToItem(selection)
+            listState.animateScrollToItem((selection - 1).coerceAtLeast(0))
         }
     }
 
@@ -132,8 +179,10 @@ fun HomeScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
-        val tileSize = if (landscape) 84.dp else 74.dp
-        val selectedSize = if (landscape) 116.dp else 100.dp
+        val compact = maxHeight < 430.dp
+        val tileSize = if (compact) 62.dp else 78.dp
+        val selectedSize = if (compact) 86.dp else 108.dp
+        val sidePadding = if (landscape) 40.dp else 20.dp
 
         HeroArt(selectedEntry, landscape)
 
@@ -141,108 +190,126 @@ fun HomeScreen(
             Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .verticalScroll(scroll)
+                .padding(vertical = 10.dp)
         ) {
-            HomeTopBar(vm, settings, landscape)
-            Spacer(Modifier.height(if (landscape) 18.dp else 28.dp))
+            HomeTopBar(vm, settings, Modifier.padding(horizontal = sidePadding))
+            Spacer(Modifier.height(if (compact) 8.dp else 16.dp))
 
             LazyRow(
                 state = listState,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top,
-                contentPadding = PaddingValues(end = 64.dp),
+                contentPadding = PaddingValues(start = sidePadding, end = 160.dp),
                 modifier = Modifier.fillMaxWidth().height(selectedSize + 8.dp),
             ) {
-                itemsIndexed(items, key = { _, e -> e.key }) { index, entry ->
-                    HomeTile(
-                        entry = entry,
+                itemsIndexed(tiles, key = { _, t -> t.key }) { index, tile ->
+                    TileSlot(
+                        tile = tile,
                         selected = index == selection,
                         normalSize = tileSize,
                         selectedSize = selectedSize,
-                        modifier = if (index == 0) Modifier.focusRequester(firstTileFocus) else Modifier,
+                        modifier = if (index == selection) Modifier.focusRequester(selectedFocus) else Modifier,
                         onFocused = { vm.selectHome(index) },
-                        onClick = { if (index == selection) vm.launch(entry) else vm.selectHome(index) },
-                        onLongClick = { vm.showOptions(entry) },
-                    )
-                }
-                item(key = "library") {
-                    val libIndex = items.size
-                    LibraryTile(
-                        selected = selection == libIndex,
-                        normalSize = tileSize,
-                        selectedSize = selectedSize,
-                        modifier = if (items.isEmpty()) Modifier.focusRequester(firstTileFocus) else Modifier,
-                        onFocused = { vm.selectHome(libIndex) },
                         onClick = {
-                            if (selection == libIndex) vm.navigate(Screen.LIBRARY) else vm.selectHome(libIndex)
+                            if (index != selection) {
+                                vm.selectHome(index)
+                            } else {
+                                when (tile) {
+                                    is AppTile -> vm.launch(tile.entry)
+                                    StoreTile -> vm.openStore()
+                                    LibraryTileItem -> vm.navigate(Screen.LIBRARY)
+                                }
+                            }
                         },
+                        onLongClick = { if (tile is AppTile) vm.showOptions(tile.entry) },
                     )
                 }
             }
 
-            Spacer(Modifier.height(if (landscape) 20.dp else 32.dp))
+            Spacer(Modifier.height(if (compact) 10.dp else 22.dp))
 
-            Crossfade(targetState = selectedEntry, animationSpec = tween(250), label = "hero") { entry ->
+            Crossfade(
+                targetState = selected,
+                animationSpec = tween(250),
+                label = "hero",
+                modifier = Modifier.padding(horizontal = sidePadding),
+            ) { tile ->
                 HeroInfo(
-                    entry = entry,
+                    tile = tile,
+                    compact = compact,
                     tab = vm.homeTab,
                     itemsEmpty = items.isEmpty(),
                     appsLoaded = appsLoaded,
                     gameCount = games.size,
                     totalApps = totalApps,
-                    onPlay = { e -> vm.launch(e) },
-                    onOptions = { e -> vm.showOptions(e) },
+                    onPlay = { vm.launch(it) },
+                    onOptions = { vm.showOptions(it) },
+                    onStore = { vm.openStore() },
                     onLibrary = { vm.navigate(Screen.LIBRARY) },
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(if (compact) 14.dp else 22.dp))
+
+            InfoCards(
+                tile = selected,
+                gameCount = games.size,
+                mediaCount = media.size,
+                totalApps = totalApps,
+                sidePadding = sidePadding,
+                onPickCover = { entry ->
+                    coverTarget = entry
+                    coverPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+                onAppInfo = { vm.openAppInfo(it) },
+                onLibrary = { vm.navigate(Screen.LIBRARY) },
+                onStore = { vm.openStore() },
+            )
 
             if (!vm.isDefaultLauncher) {
-                DefaultLauncherBanner(onRequestDefault)
+                Spacer(Modifier.height(18.dp))
+                DefaultLauncherBanner(onRequestDefault, Modifier.padding(horizontal = sidePadding))
             }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
+// ------------------------------------------------------------
+// Barra superior
+// ------------------------------------------------------------
+
 @Composable
-private fun HomeTopBar(vm: LauncherViewModel, settings: LauncherSettings, landscape: Boolean) {
-    Column {
-        if (!landscape) {
-            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.End) {
-                StatusCluster()
-            }
+private fun HomeTopBar(vm: LauncherViewModel, settings: LauncherSettings, modifier: Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        TabLabel("Jogos", vm.homeTab == HomeTab.GAMES) { vm.setTab(HomeTab.GAMES) }
+        Spacer(Modifier.width(26.dp))
+        TabLabel("Mídia", vm.homeTab == HomeTab.MEDIA) { vm.setTab(HomeTab.MEDIA) }
+        Spacer(Modifier.weight(1f))
+        PsIconButton(Icons.Filled.Search, "Buscar", { vm.navigate(Screen.LIBRARY) }, size = 38.dp, plain = true)
+        Spacer(Modifier.width(4.dp))
+        PsIconButton(Icons.Filled.Tune, "Central de controle", { vm.openControlCenter() }, size = 38.dp, plain = true)
+        Spacer(Modifier.width(4.dp))
+        PsIconButton(Icons.Filled.Settings, "Configurações", { vm.navigate(Screen.SETTINGS) }, size = 38.dp, plain = true)
+        Spacer(Modifier.width(10.dp))
+        val interaction = remember { MutableInteractionSource() }
+        Box(
+            Modifier
+                .focusHighlight(interaction, CircleShape, 1.1f)
+                .clip(CircleShape)
+                .clickableCompat(interaction, onClick = { vm.navigate(Screen.PROFILE) })
+        ) {
+            Avatar(settings.avatarPath, settings.userName, 32.dp)
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TabLabel("Jogos", vm.homeTab == HomeTab.GAMES) { vm.setTab(HomeTab.GAMES) }
-            Spacer(Modifier.width(22.dp))
-            TabLabel("Mídia", vm.homeTab == HomeTab.MEDIA) { vm.setTab(HomeTab.MEDIA) }
-            Spacer(Modifier.weight(1f))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                PsIconButton(Icons.Filled.Search, "Buscar", { vm.navigate(Screen.LIBRARY) }, size = 40.dp)
-                PsIconButton(Icons.Filled.Tune, "Central de controle", { vm.openControlCenter() }, size = 40.dp)
-                PsIconButton(Icons.Filled.Settings, "Configurações", { vm.navigate(Screen.SETTINGS) }, size = 40.dp)
-                val interaction = remember { MutableInteractionSource() }
-                Box(
-                    Modifier
-                        .focusHighlight(interaction, CircleShape, 1.1f)
-                        .clip(CircleShape)
-                        .combinedClickableCompat(interaction, onClick = { vm.navigate(Screen.PROFILE) })
-                ) {
-                    Avatar(settings.avatarPath, settings.userName, 40.dp)
-                }
-            }
-            if (landscape) {
-                Spacer(Modifier.width(18.dp))
-                StatusCluster()
-            }
-        }
+        Spacer(Modifier.width(18.dp))
+        StatusCluster()
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Modifier.combinedClickableCompat(
+private fun Modifier.clickableCompat(
     interaction: MutableInteractionSource,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -256,34 +323,29 @@ private fun Modifier.combinedClickableCompat(
 @Composable
 private fun TabLabel(text: String, active: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Column(
+    Box(
         Modifier
             .focusHighlight(interaction, RoundedCornerShape(8.dp), 1.05f)
             .clip(RoundedCornerShape(8.dp))
-            .combinedClickableCompat(interaction, onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .clickableCompat(interaction, onClick)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
     ) {
         Text(
             text,
-            color = if (active) TextPrimary else TextSecondary.copy(alpha = 0.7f),
-            fontSize = if (active) 22.sp else 19.sp,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-        )
-        Spacer(Modifier.height(4.dp))
-        Box(
-            Modifier
-                .width(if (active) 28.dp else 0.dp)
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White)
+            color = if (active) TextPrimary else TextSecondary.copy(alpha = 0.55f),
+            fontSize = 19.sp,
+            fontWeight = if (active) FontWeight.Medium else FontWeight.Light,
         )
     }
 }
 
+// ------------------------------------------------------------
+// Cartões da fileira
+// ------------------------------------------------------------
+
 @Composable
-private fun HomeTile(
-    entry: AppEntry,
+private fun TileSlot(
+    tile: HomeTileItem,
     selected: Boolean,
     normalSize: Dp,
     selectedSize: Dp,
@@ -292,29 +354,53 @@ private fun HomeTile(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    val size by animateDpAsState(if (selected) selectedSize else normalSize, label = "tileSize")
-    val shape = RoundedCornerShape(16.dp)
+    val size by animateDpAsState(if (selected) selectedSize else normalSize, tween(220), label = "tileSize")
+    val outer = RoundedCornerShape(18.dp)
+    val inner = RoundedCornerShape(14.dp)
     val interaction = remember { MutableInteractionSource() }
-    Row(verticalAlignment = Alignment.Bottom) {
+    val label = when (tile) {
+        is AppTile -> tile.entry.label
+        StoreTile -> "Loja"
+        LibraryTileItem -> "Biblioteca de jogos"
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier
                 .size(size)
                 .onFocusChanged { if (it.isFocused) onFocused() }
-                .clip(shape)
-                .border(if (selected) 2.5.dp else 1.dp, if (selected) Color.White else GlassStroke, shape)
-                .combinedClickableCompat(interaction, onClick, onLongClick)
+                // Contorno branco com uma pequena folga, como o cartão selecionado do console.
+                .then(if (selected) Modifier.border(2.dp, Color.White, outer).padding(4.dp) else Modifier)
+                .clip(inner)
+                .alpha(if (selected) 1f else 0.88f)
+                .clickableCompat(interaction, onClick, onLongClick)
         ) {
-            TileArt(entry, Modifier.fillMaxSize())
+            when (tile) {
+                is AppTile -> TileArt(tile.entry, Modifier.fillMaxSize())
+                StoreTile -> Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.linearGradient(listOf(Color(0xFF2D7BFF), Color(0xFF0B3EA8)))
+                    ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.ShoppingBag, contentDescription = "Loja", tint = Color.White, modifier = Modifier.fillMaxSize(0.45f))
+                }
+                LibraryTileItem -> Box(
+                    Modifier.fillMaxSize().background(Color(0xFF1A2340)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Apps, contentDescription = "Biblioteca", tint = Color.White, modifier = Modifier.fillMaxSize(0.45f))
+                }
+            }
         }
         AnimatedVisibility(visible = selected) {
             Text(
-                entry.label,
+                label,
                 color = TextPrimary,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 14.dp, bottom = 6.dp).widthIn(max = 220.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 8.dp).widthIn(max = 240.dp),
             )
         }
     }
@@ -342,47 +428,13 @@ fun TileArt(entry: AppEntry, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun LibraryTile(
-    selected: Boolean,
-    normalSize: Dp,
-    selectedSize: Dp,
-    modifier: Modifier,
-    onFocused: () -> Unit,
-    onClick: () -> Unit,
-) {
-    val size by animateDpAsState(if (selected) selectedSize else normalSize, label = "libSize")
-    val shape = RoundedCornerShape(16.dp)
-    val interaction = remember { MutableInteractionSource() }
-    Row(verticalAlignment = Alignment.Bottom) {
-        Box(
-            modifier
-                .size(size)
-                .onFocusChanged { if (it.isFocused) onFocused() }
-                .clip(shape)
-                .background(GlassFill)
-                .border(if (selected) 2.5.dp else 1.dp, if (selected) Color.White else GlassStroke, shape)
-                .combinedClickableCompat(interaction, onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.Apps, contentDescription = "Biblioteca", tint = TextPrimary, modifier = Modifier.size(size * 0.42f))
-        }
-        AnimatedVisibility(visible = selected) {
-            Text(
-                "Biblioteca",
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 14.dp, bottom = 6.dp),
-            )
-        }
-    }
-}
+// ------------------------------------------------------------
+// Arte de fundo
+// ------------------------------------------------------------
 
-/** Arte grande no fundo, do lado direito, como no dashboard do console. */
 @Composable
 private fun HeroArt(entry: AppEntry?, landscape: Boolean) {
-    Crossfade(targetState = entry, animationSpec = tween(400), label = "heroArt") { current ->
+    Crossfade(targetState = entry, animationSpec = tween(450), label = "heroArt") { current ->
         if (current != null) HeroArtContent(current, landscape)
     }
 }
@@ -392,24 +444,33 @@ private fun HeroArtContent(entry: AppEntry, landscape: Boolean) {
     val cover = rememberStoredImage(entry.coverPath, 1280)
     Box(Modifier.fillMaxSize()) {
         if (cover != null) {
+            // Capa ocupando a tela toda, como a arte do jogo no console.
             Image(
                 cover,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().alpha(0.55f),
+                modifier = Modifier.fillMaxSize().alpha(0.9f),
             )
-            // Degradês para misturar a capa com o fundo e deixar o texto legível
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.horizontalGradient(listOf(PsNavy.copy(alpha = 0.92f), PsNavy.copy(alpha = 0.35f), Color.Transparent))
+                    Brush.horizontalGradient(
+                        0f to PsNavy.copy(alpha = 0.92f),
+                        0.45f to PsNavy.copy(alpha = 0.55f),
+                        1f to Color.Transparent,
+                    )
                 )
             )
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(PsNavy.copy(alpha = 0.6f), Color.Transparent, PsNavy.copy(alpha = 0.85f)))
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.55f),
+                        0.3f to Color.Transparent,
+                        1f to PsNavy.copy(alpha = 0.9f),
+                    )
                 )
             )
         } else {
+            // Sem capa: o ícone do jogo, grande e desfocado, vira a "arte" de fundo.
             val icon = rememberAppIcon(entry.app, AppRepository.HERO_ICON_DP)
             if (icon != null) {
                 Image(
@@ -417,20 +478,25 @@ private fun HeroArtContent(entry: AppEntry, landscape: Boolean) {
                     contentDescription = null,
                     modifier = Modifier
                         .align(if (landscape) Alignment.CenterEnd else Alignment.BottomEnd)
-                        .padding(end = 24.dp, bottom = if (landscape) 0.dp else 120.dp)
-                        .fillMaxHeight(if (landscape) 0.62f else 0.3f)
+                        .padding(end = 40.dp, bottom = if (landscape) 0.dp else 120.dp)
+                        .fillMaxHeight(if (landscape) 0.75f else 0.3f)
                         .aspectRatio(1f)
-                        .blur(18.dp)
-                        .alpha(0.28f),
+                        .blur(22.dp)
+                        .alpha(0.32f),
                 )
             }
         }
     }
 }
 
+// ------------------------------------------------------------
+// Título, botão Jogar e cartões de informação
+// ------------------------------------------------------------
+
 @Composable
 private fun HeroInfo(
-    entry: AppEntry?,
+    tile: HomeTileItem,
+    compact: Boolean,
     tab: HomeTab,
     itemsEmpty: Boolean,
     appsLoaded: Boolean,
@@ -438,83 +504,150 @@ private fun HeroInfo(
     totalApps: Int,
     onPlay: (AppEntry) -> Unit,
     onOptions: (AppEntry) -> Unit,
+    onStore: () -> Unit,
     onLibrary: () -> Unit,
 ) {
-    val now = LocalNow.current
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        when {
-            entry != null -> {
+    val titleSize = if (compact) 30.sp else 40.sp
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (tile) {
+            is AppTile -> {
+                val entry = tile.entry
                 Text(
                     entry.label,
                     color = TextPrimary,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
+                    fontSize = titleSize,
+                    fontWeight = FontWeight.Light,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val usage = entry.usage
-                val subtitle = if (usage != null) {
-                    val ago = DateUtils.getRelativeTimeSpanString(usage.lastLaunched, now, DateUtils.MINUTE_IN_MILLIS)
-                    val times = if (usage.count == 1) "1 vez" else "${usage.count} vezes"
-                    "Aberto $times · Última vez $ago"
-                } else if (entry.isGame) {
-                    "Pronto para jogar"
-                } else {
-                    "Toque em Abrir para começar"
-                }
-                Text(subtitle, color = TextSecondary, fontSize = 15.sp)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     PsButton(
                         text = if (entry.isGame) "Jogar" else "Abrir",
-                        icon = Icons.Filled.PlayArrow,
                         onClick = { onPlay(entry) },
+                        modifier = Modifier.widthIn(min = 180.dp),
                     )
-                    PsIconButton(Icons.Filled.MoreHoriz, "Opções", { onOptions(entry) }, size = 48.dp)
+                    PsIconButton(Icons.Filled.MoreHoriz, "Opções", { onOptions(entry) }, size = 46.dp)
                 }
             }
-            itemsEmpty && tab == HomeTab.GAMES -> {
-                Text(
-                    if (appsLoaded) "Nenhum jogo encontrado" else "Carregando seus jogos…",
-                    color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold,
-                )
-                if (appsLoaded) {
-                    Text(
-                        "Na Biblioteca, toque e segure um app e escolha \"Marcar como jogo\".",
-                        color = TextSecondary, fontSize = 15.sp,
-                    )
+            StoreTile -> {
+                Text("Loja", color = TextPrimary, fontSize = titleSize, fontWeight = FontWeight.Light)
+                Text("Encontre novos jogos e apps na Google Play.", color = TextSecondary, fontSize = 14.sp)
+                Spacer(Modifier.height(4.dp))
+                PsButton("Abrir loja", onStore, modifier = Modifier.widthIn(min = 180.dp))
+            }
+            LibraryTileItem -> {
+                Text("Biblioteca de jogos", color = TextPrimary, fontSize = titleSize, fontWeight = FontWeight.Light)
+                val subtitle = when {
+                    !appsLoaded -> "Carregando seus jogos…"
+                    itemsEmpty && tab == HomeTab.GAMES ->
+                        "Nenhum jogo encontrado. Na biblioteca, toque e segure um app e escolha \"Marcar como jogo\"."
+                    itemsEmpty -> "Nenhum app de mídia. Adicione pela biblioteca."
+                    else -> "$gameCount jogos · $totalApps apps instalados"
                 }
-                Spacer(Modifier.height(6.dp))
-                PsButton("Abrir biblioteca", onLibrary, icon = Icons.Filled.Apps)
-            }
-            itemsEmpty -> {
-                Text("Nenhum app de mídia", color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    "Apps de vídeo e música aparecem aqui. Você também pode adicioná-los pela Biblioteca.",
-                    color = TextSecondary, fontSize = 15.sp,
-                )
-                Spacer(Modifier.height(6.dp))
-                PsButton("Abrir biblioteca", onLibrary, icon = Icons.Filled.Apps)
-            }
-            else -> {
-                Text("Biblioteca", color = TextPrimary, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                Text("$gameCount jogos · $totalApps apps instalados", color = TextSecondary, fontSize = 15.sp)
-                Spacer(Modifier.height(6.dp))
-                PsButton("Abrir", onLibrary, icon = Icons.Filled.Apps)
+                Text(subtitle, color = TextSecondary, fontSize = 14.sp)
+                Spacer(Modifier.height(4.dp))
+                PsButton("Abrir", onLibrary, modifier = Modifier.widthIn(min = 180.dp))
             }
         }
     }
 }
 
 @Composable
-private fun DefaultLauncherBanner(onRequestDefault: () -> Unit) {
-    GlassPanel(Modifier.fillMaxWidth()) {
+private fun InfoCards(
+    tile: HomeTileItem,
+    gameCount: Int,
+    mediaCount: Int,
+    totalApps: Int,
+    sidePadding: Dp,
+    onPickCover: (AppEntry) -> Unit,
+    onAppInfo: (AppEntry) -> Unit,
+    onLibrary: () -> Unit,
+    onStore: () -> Unit,
+) {
+    val now = LocalNow.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = sidePadding),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        when (tile) {
+            is AppTile -> {
+                val entry = tile.entry
+                val usage = entry.usage
+                val count = usage?.count ?: 0
+                InfoCard(
+                    Icons.Filled.SportsEsports, "Sua atividade",
+                    when (count) {
+                        0 -> "Ainda não aberto"
+                        1 -> "Aberto 1 vez"
+                        else -> "Aberto $count vezes"
+                    },
+                )
+                InfoCard(
+                    Icons.Filled.History, "Última sessão",
+                    if (usage != null) {
+                        DateUtils.getRelativeTimeSpanString(usage.lastLaunched, now, DateUtils.MINUTE_IN_MILLIS).toString()
+                    } else {
+                        "Nunca"
+                    },
+                )
+                InfoCard(
+                    Icons.Filled.Image, "Capa",
+                    if (entry.coverPath != null) "Trocar a capa" else "Escolher da galeria",
+                    onClick = { onPickCover(entry) },
+                )
+                InfoCard(Icons.Filled.Info, "Informações", "Detalhes no Android", onClick = { onAppInfo(entry) })
+            }
+            StoreTile -> {
+                InfoCard(Icons.Filled.ShoppingBag, "Google Play", "Jogos em destaque", onClick = onStore)
+                InfoCard(Icons.Filled.SportsEsports, "Dica", "Jogos instalados aparecem sozinhos aqui")
+            }
+            LibraryTileItem -> {
+                InfoCard(Icons.Filled.SportsEsports, "Jogos", "$gameCount instalados", onClick = onLibrary)
+                InfoCard(Icons.Filled.Movie, "Mídia", "$mediaCount apps", onClick = onLibrary)
+                InfoCard(Icons.Filled.Apps, "Todos os apps", "$totalApps no celular", onClick = onLibrary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoCard(icon: ImageVector, title: String, value: String, onClick: (() -> Unit)? = null) {
+    val interaction = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        Modifier
+            .width(200.dp)
+            .height(86.dp)
+            .focusHighlight(interaction, shape, 1.04f)
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.35f))
+            .border(1.dp, GlassStroke, shape)
+            .then(if (onClick != null) Modifier.clickableCompat(interaction, onClick) else Modifier)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(title, color = TextSecondary, fontSize = 12.sp)
+        }
+        Text(value, color = TextPrimary, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
+    }
+}
+
+@Composable
+private fun DefaultLauncherBanner(onRequestDefault: () -> Unit, modifier: Modifier) {
+    GlassPanel(modifier.fillMaxWidth()) {
         Row(
             Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Use como tela inicial", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text("Use como tela inicial", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 Text(
                     "Defina o PS5 Launcher como tela inicial padrão do Android.",
                     color = TextSecondary, fontSize = 13.sp,

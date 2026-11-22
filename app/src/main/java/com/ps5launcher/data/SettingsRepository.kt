@@ -17,7 +17,8 @@ data class LauncherSettings(
     val startupSound: Boolean = true,
     val animatedBackground: Boolean = true,
     val fullscreen: Boolean = true,
-    val orientation: Int = SettingsRepository.ORIENTATION_AUTO,
+    val orientation: Int = SettingsRepository.ORIENTATION_LANDSCAPE,
+    val bootScreen: Boolean = true,
     val accentIndex: Int = 0,
     val forcedGames: Set<String> = emptySet(),
     val forcedNotGames: Set<String> = emptySet(),
@@ -59,7 +60,8 @@ class SettingsRepository(context: Context) {
         startupSound = prefs.getBoolean(K_STARTUP_SOUND, true),
         animatedBackground = prefs.getBoolean(K_ANIMATED_BG, true),
         fullscreen = prefs.getBoolean(K_FULLSCREEN, true),
-        orientation = prefs.getInt(K_ORIENTATION, ORIENTATION_AUTO),
+        orientation = prefs.getInt(K_ORIENTATION, ORIENTATION_LANDSCAPE),
+        bootScreen = prefs.getBoolean(K_BOOT_SCREEN, true),
         accentIndex = prefs.getInt(K_ACCENT, 0),
         forcedGames = set(K_FORCED_GAMES),
         forcedNotGames = set(K_FORCED_NOT_GAMES),
@@ -116,6 +118,7 @@ class SettingsRepository(context: Context) {
         const val K_ANIMATED_BG = "animated_background"
         const val K_FULLSCREEN = "fullscreen"
         const val K_ORIENTATION = "orientation"
+        const val K_BOOT_SCREEN = "boot_screen"
         const val K_ACCENT = "accent_index"
         const val K_FORCED_GAMES = "forced_games"
         const val K_FORCED_NOT_GAMES = "forced_not_games"

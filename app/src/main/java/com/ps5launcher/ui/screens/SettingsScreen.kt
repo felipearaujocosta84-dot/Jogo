@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material3.Icon
@@ -125,6 +126,14 @@ fun SettingsScreen(vm: LauncherViewModel, settings: LauncherSettings, onRequestD
             ) { vm.setOrientation(it) }
         }
 
+        item {
+            SettingSwitch(
+                Icons.Filled.PlayCircle, "Tela de abertura",
+                "Logo e \"Quem está jogando?\" quando o launcher liga (ex.: ao reiniciar o celular).",
+                settings.bootScreen,
+            ) { vm.setBoolean(SettingsRepository.K_BOOT_SCREEN, it) }
+        }
+
         item { SectionTitle("Som") }
         item {
             SettingSwitch(
@@ -164,7 +173,7 @@ fun SettingsScreen(vm: LauncherViewModel, settings: LauncherSettings, onRequestD
         }
         item {
             SettingRow(
-                Icons.Filled.Info, "PS5 Launcher 1.0",
+                Icons.Filled.Info, "PS5 Launcher 1.1",
                 "Projeto pessoal inspirado no visual de consoles. Não é afiliado à Sony. " +
                     "O launcher nunca apaga nem modifica seus apps.",
                 onClick = null,

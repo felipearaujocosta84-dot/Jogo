@@ -12,8 +12,8 @@ android {
         applicationId = "com.ps5launcher"
         minSdk = 26          // Android 8.0 ou superior
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     // Chave de assinatura própria do projeto. Assim, cada nova versão do APK

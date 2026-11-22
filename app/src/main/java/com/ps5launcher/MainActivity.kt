@@ -69,8 +69,9 @@ class MainActivity : ComponentActivity() {
     private fun applyFullscreen(enabled: Boolean) {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        if (enabled) controller.hide(WindowInsetsCompat.Type.statusBars())
-        else controller.show(WindowInsetsCompat.Type.statusBars())
+        // Modo console: esconde as barras do Android. Deslize da borda para mostrá-las.
+        if (enabled) controller.hide(WindowInsetsCompat.Type.systemBars())
+        else controller.show(WindowInsetsCompat.Type.systemBars())
     }
 
     /** Pede ao Android para usar o PS5 Launcher como tela inicial padrão. */

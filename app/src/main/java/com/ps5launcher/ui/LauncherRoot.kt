@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ps5launcher.ui.components.AnimatedBackground
@@ -27,6 +28,7 @@ import com.ps5launcher.ui.components.LocalNow
 import com.ps5launcher.ui.components.rememberBattery
 import com.ps5launcher.ui.components.rememberNow
 import com.ps5launcher.ui.screens.AppOptionsDialog
+import com.ps5launcher.ui.screens.BootScreen
 import com.ps5launcher.ui.screens.ControlCenter
 import com.ps5launcher.ui.screens.HomeScreen
 import com.ps5launcher.ui.screens.LibraryScreen
@@ -44,6 +46,11 @@ fun LauncherRoot(vm: LauncherViewModel, onRequestDefault: () -> Unit) {
     val games by vm.games.collectAsStateWithLifecycle()
     val media by vm.media.collectAsStateWithLifecycle()
     val appsLoaded by vm.appsLoaded.collectAsStateWithLifecycle()
+    val recent = remember(entries) {
+        entries.filter { it.usage != null && !it.isHidden }
+            .sortedByDescending { it.usage?.lastLaunched ?: 0L }
+            .take(6)
+    }
 
     val now = rememberNow(vm.resumeTick)
     val battery = rememberBattery()
@@ -61,6 +68,8 @@ fun LauncherRoot(vm: LauncherViewModel, onRequestDefault: () -> Unit) {
 
             if (!settings.firstRunDone) {
                 WelcomeScreen(vm, onRequestDefault)
+            } else if (vm.bootStage < LauncherViewModel.BOOT_DONE) {
+                BootScreen(vm, settings)
             } else {
 
                 AnimatedContent(
@@ -92,7 +101,7 @@ fun LauncherRoot(vm: LauncherViewModel, onRequestDefault: () -> Unit) {
                     enter = fadeIn(tween(200)) + slideInVertically(tween(280)) { it / 3 },
                     exit = fadeOut(tween(160)) + slideOutVertically(tween(200)) { it / 3 },
                 ) {
-                    ControlCenter(vm)
+                    ControlCenter(vm, recent)
                 }
 
                 vm.optionsFor?.let { entry -> AppOptionsDialog(vm, entry) }

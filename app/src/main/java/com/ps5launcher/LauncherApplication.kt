@@ -26,6 +26,9 @@ class LauncherApplication : Application() {
     /** Garante que o som de abertura toque só uma vez por inicialização. */
     var startupSoundPlayed = false
 
+    /** Garante que a tela de abertura (logo + perfil) apareça só ao "ligar" o launcher. */
+    var bootShown = false
+
     override fun onCreate() {
         super.onCreate()
         settings = SettingsRepository(this)

@@ -1,6 +1,7 @@
 package com.ps5launcher.ui
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.runtime.getValue
@@ -76,7 +77,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         private set
     var homeTab by mutableStateOf(HomeTab.GAMES)
         private set
-    var homeSelection by mutableIntStateOf(0)
+    // Índice 0 é a Loja; 1 é o jogo mais recente (como no console).
+    var homeSelection by mutableIntStateOf(1)
         private set
     var controlCenterOpen by mutableStateOf(false)
         private set
@@ -91,11 +93,29 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     var isDefaultLauncher by mutableStateOf(true)
         private set
 
+    /** 0 = logo de abertura, 1 = escolha de perfil, 2 = launcher pronto. */
+    var bootStage by mutableIntStateOf(BOOT_DONE)
+        private set
+    private val booting: Boolean get() = bootStage < BOOT_DONE
+
     init {
         viewModelScope.launch {
             settings.collect { sounds.enabled = it.soundsEnabled }
         }
         refreshDefaultStatus()
+        val s = settings.value
+        if (s.firstRunDone && s.bootScreen && !launcher.bootShown) bootStage = BOOT_LOGO
+        launcher.bootShown = true
+    }
+
+    fun bootToProfile() {
+        if (bootStage == BOOT_LOGO) bootStage = BOOT_PROFILE
+    }
+
+    fun finishBoot() {
+        if (bootStage == BOOT_DONE) return
+        bootStage = BOOT_DONE
+        sounds.play(Sfx.SELECT)
     }
 
     private fun toEntry(app: InstalledApp, s: LauncherSettings): AppEntry {
@@ -118,6 +138,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     // ---- Navegação ----
     fun navigate(target: Screen) {
+        if (booting) return
         if (screen == target && !controlCenterOpen) return
         controlCenterOpen = false
         screen = target
@@ -136,12 +157,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun setTab(tab: HomeTab) {
         if (homeTab == tab) return
         homeTab = tab
-        homeSelection = 0
+        homeSelection = 1
         sounds.play(Sfx.MOVE)
     }
 
     fun switchTab(delta: Int) {
-        if (screen != Screen.HOME || controlCenterOpen) return
+        if (booting || screen != Screen.HOME || controlCenterOpen) return
         val tabs = HomeTab.entries
         setTab(tabs[(homeTab.ordinal + delta + tabs.size) % tabs.size])
     }
@@ -157,7 +178,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun openControlCenter() {
-        if (!settings.value.firstRunDone) return
+        if (!settings.value.firstRunDone || booting) return
         controlCenterOpen = true
         sounds.play(Sfx.PANEL)
     }
@@ -182,6 +203,26 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /** Abre a Google Play (o equivalente da loja do console). */
+    fun openStore() {
+        sounds.play(Sfx.SELECT)
+        val intent = launcher.packageManager.getLaunchIntentForPackage("com.android.vending")
+        try {
+            if (intent != null) launcher.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            else toast("Google Play não encontrada neste celular")
+        } catch (e: Exception) {
+            toast("Não foi possível abrir a loja")
+        }
+    }
+
+    /** Botão "Início" da central de controle. */
+    fun goHome() {
+        controlCenterOpen = false
+        optionsFor = null
+        screen = Screen.HOME
+        sounds.play(Sfx.BACK)
+    }
+
     fun showOptions(entry: AppEntry) {
         optionsFor = entry
         sounds.play(Sfx.PANEL)
@@ -193,9 +234,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     /** Botão X do controle: abre as opções do item em foco. */
     fun openOptionsForFocused() {
-        if (controlCenterOpen || optionsFor != null) return
+        if (booting || controlCenterOpen || optionsFor != null) return
         val entry = when (screen) {
-            Screen.HOME -> currentHomeItems().getOrNull(homeSelection)
+            Screen.HOME -> currentHomeItems().getOrNull(homeSelection - 1)
             Screen.LIBRARY -> focusedLibraryEntry
             else -> null
         }
@@ -304,8 +345,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         controlCenterOpen = false
         screen = Screen.HOME
         homeTab = HomeTab.GAMES
-        homeSelection = 0
+        homeSelection = 1
         homeResetSignal++
+    }
+
+    companion object {
+        const val BOOT_LOGO = 0
+        const val BOOT_PROFILE = 1
+        const val BOOT_DONE = 2
     }
 
     private fun toast(message: String) {

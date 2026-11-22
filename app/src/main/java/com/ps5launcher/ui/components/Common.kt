@@ -271,6 +271,7 @@ fun PsButton(
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
             .padding(horizontal = 26.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
         if (icon != null) {
             Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
@@ -289,6 +290,7 @@ fun PsIconButton(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
     active: Boolean = false,
+    plain: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val accent = LocalAccent.current
@@ -297,11 +299,11 @@ fun PsIconButton(
             .focusHighlight(interaction, CircleShape, 1.1f)
             .size(size)
             .clip(CircleShape)
-            .background(if (active) accent else GlassFill)
+            .background(if (active) accent else if (plain) Color.Transparent else GlassFill)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = description, tint = TextPrimary, modifier = Modifier.size(size * 0.5f))
+        Icon(icon, contentDescription = description, tint = TextPrimary, modifier = Modifier.size(size * if (plain) 0.6f else 0.5f))
     }
 }
 
