@@ -1,0 +1,71 @@
+# Gera o APK automaticamente nos computadores do GitHub (grátis).
+# Sempre que o projeto for enviado ao GitHub, ou quando você tocar em "Run workflow",
+# o APK fica disponível na página "Releases" do repositório.
+name: Gerar APK do PS5 Launcher
+
+on:
+  push:
+    branches: [ main, master, ps5-launcher ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o projeto
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Preparar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compilar o APK
+        shell: bash
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee build.log
+
+      - name: Renomear APK
+        run: cp app/build/outputs/apk/release/app-release.apk PS5Launcher.apk
+
+      - name: Guardar APK (aba Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS5Launcher-apk
+          path: PS5Launcher.apk
+
+      - name: Publicar em Releases (fácil de baixar pelo celular)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ps5-launcher-build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: PS5 Launcher (versão ${{ github.run_number }})
+          body: Baixe o arquivo PS5Launcher.apk abaixo e instale no celular.
+          files: PS5Launcher.apk
+
+      # Se a compilação falhar, salva o registro de erros num branch separado
+      # para que possa ser lido e corrigido.
+      - name: Salvar registro de erro
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p /tmp/log && cp build.log /tmp/log/build.log 2>/dev/null || echo "sem build.log" > /tmp/log/build.log
+          cd /tmp/log
+          git init -q
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add build.log
+          git commit -qm "Registro de erro da compilação ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ps5-launcher-log
