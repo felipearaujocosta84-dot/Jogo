@@ -178,7 +178,7 @@ fun SettingsScreen(vm: LauncherViewModel, settings: LauncherSettings, onRequestD
         }
         item {
             SettingRow(
-                Icons.Filled.Info, "PS5 Launcher 1.2",
+                Icons.Filled.Info, "PS5 Launcher 1.3",
                 "Projeto pessoal inspirado no visual de consoles. Não é afiliado à Sony. " +
                     "O launcher nunca apaga nem modifica seus apps.",
                 onClick = null,
