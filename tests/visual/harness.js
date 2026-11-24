@@ -28,11 +28,13 @@ async function main() {
   const sg = new ShadowGenerator(1024, sun);
   const cam = new ArcRotateCamera('cam', 0, 1.2, 7, new Vector3(0, 0.6, 0), scene);
 
+  log('cena pronta');
   const spec = getCar('vortex') ?? getCar(undefined);
   const cars = [];
   for (const [detail, x, color] of [['full', -1.6, '#1d4ed8'], ['lite', 1.6, '#f2b705']]) {
     const mats = createCarMaterials(scene, { paint: color, rim: '#2b2b2b' }, 'metallic');
     const t0 = performance.now();
+    log(detail, 'carregando...');
     const model = await loadCarModel(scene, spec, mats, { detail });
     log(detail, 'source', model.source, 'ms', Math.round(performance.now() - t0));
     model.root.position.x = x;
@@ -55,7 +57,9 @@ async function main() {
     log(detail, 'bbox min', bb.min.asArray().map((v) => +v.toFixed(2)), 'max', bb.max.asArray().map((v) => +v.toFixed(2)));
     cars.push(model);
   }
+  log('compilando shaders...');
   await scene.whenReadyAsync();
+  log('pronto para fotos');
   const shots = [
     ['frente34', -0.6, 1.25, 9.5, new Vector3(0, 0.6, 0)],
     ['traseira34', 2.3, 1.25, 9.5, new Vector3(0, 0.6, 0)],
@@ -68,6 +72,7 @@ async function main() {
     cam.alpha = a; cam.beta = b; cam.radius = r; cam.setTarget(tgt);
     for (let i = 0; i < 3; i++) scene.render();
     out.shots[name] = canvas.toDataURL('image/png');
+    log('foto', name);
   }
   // Cockpit
   const eye = cars[0].driverEye.add(cars[0].root.position);
