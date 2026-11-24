@@ -51,7 +51,11 @@ export class Vehicle {
 
     // Modelo (GLB licenciado ou procedural)
     this.materials = createCarMaterials(scene, this.opts.colors ?? spec.colors, this.opts.finish ?? 'metallic');
-    this.model = await loadCarModel(scene, { ...spec, rimStyle: this.opts.rimStyle ?? 0 }, this.materials);
+    // Adversários no gráfico Baixo usam o modelo procedural (leve)
+    const lowGfx = this.opts.graphics?.key === 'low';
+    const modelSpec = { ...spec, rimStyle: this.opts.rimStyle ?? 0, ...(lowGfx && !this.isPlayer ? { model: null } : {}) };
+    this.model = await loadCarModel(scene, modelSpec, this.materials, { detail: this.isPlayer ? 'full' : 'lite' });
+    this.materials = this.model.materials; // GLB: materiais do próprio modelo
     this.model.root.parent = this.root;
     this.model.root.position.y = -spec.wheelRadius;
 
@@ -315,6 +319,7 @@ export class Vehicle {
     this.effects?.dispose();
     this.body?.dispose();
     this.headLight?.dispose();
-    this.root?.dispose(false, true);
+    if (this.model?.dispose) { this.model.dispose(); this.root?.dispose(false, true); }
+    else this.root?.dispose(false, true);
   }
 }

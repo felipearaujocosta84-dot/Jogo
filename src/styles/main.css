@@ -182,8 +182,9 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .controls > * { pointer-events: auto; position: absolute; touch-action: none; }
 .ctl { display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.25); font-weight: 900; color: rgba(255, 255, 255, 0.9); font-size: 2.4vh; backdrop-filter: blur(2px); }
 .ctl.active { background: rgba(227, 18, 46, 0.45); border-color: var(--accent); }
-.wheel { left: calc(3vw + var(--safe-l)); bottom: calc(4vh + var(--safe-b)); width: 34vh; height: 34vh; }
-.wheel svg { width: 100%; height: 100%; transition: transform 0.03s linear; pointer-events: none; }
+.steer-zone { left: 0; bottom: 0; width: 46vw; height: 62vh; }
+.steer-zone .wheel { position: absolute; left: calc(3vw + var(--safe-l)); bottom: calc(4vh + var(--safe-b)); width: 36vh; height: 36vh; pointer-events: none; }
+.wheel svg { width: 100%; height: 100%; pointer-events: none; }
 .steer-btn { bottom: calc(5vh + var(--safe-b)); width: 18vh; height: 18vh; border-radius: 16px; }
 .steer-left { left: calc(3vw + var(--safe-l)); }
 .steer-right { left: calc(3vw + 20vh + var(--safe-l)); }

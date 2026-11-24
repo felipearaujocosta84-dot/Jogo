@@ -84,7 +84,10 @@ export class SettingsUI {
         this._confirmReset = true;
         toast(this.root, 'Toque de novo para confirmar.');
         setTimeout(() => { this._confirmReset = false; }, 3000);
-      } }, 'APAGAR')));
+      } }, 'APAGAR')),
+      h('div', { class: 'set-section' }, 'CRÉDITOS'),
+      h('div', { class: 'label', style: { gridColumn: '1 / -1' } },
+        'Modelo 3D do carro: "Car Concept" de Eric Chadwick / Darmstadt Graphics Group, licença CC BY 4.0 (creativecommons.org/licenses/by/4.0), adaptado para o jogo (pintura, rodas e detalhes).'));
     clear(this.el);
     const content = [
       h('div', { class: 'topbar' },

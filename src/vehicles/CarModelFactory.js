@@ -456,45 +456,293 @@ export function buildProceduralCar(scene, spec, materials) {
   };
 }
 
+// =============================================================
+// Modelos GLB (realistas)
+// =============================================================
+const containers = new WeakMap(); // scene -> Map(url -> Promise<AssetContainer>)
+
+/** Carrega o GLB uma vez por cena; cada carro recebe uma cópia (geometria compartilhada). */
+function getContainer(scene, url) {
+  if (!containers.has(scene)) {
+    containers.set(scene, new Map());
+    scene.onDisposeObservable.add(() => {
+      for (const p of containers.get(scene)?.values() ?? []) p.then((c) => c.dispose()).catch(() => {});
+    });
+  }
+  const map = containers.get(scene);
+  if (!map.has(url)) {
+    // Desliga extensões caras no celular (refração em tempo real e iridescência)
+    const obs = SceneLoader.OnPluginActivatedObservable.add((loader) => {
+      if (loader.name === 'gltf') {
+        loader.extensionOptions = {
+          ...(loader.extensionOptions || {}),
+          KHR_materials_transmission: { enabled: false },
+          KHR_materials_iridescence: { enabled: false },
+        };
+      }
+    });
+    const slash = url.lastIndexOf('/') + 1;
+    const p = SceneLoader.LoadAssetContainerAsync(url.slice(0, slash), url.slice(slash), scene).finally(() => {
+      SceneLoader.OnPluginActivatedObservable.remove(obs);
+    });
+    map.set(url, p);
+  }
+  return map.get(url);
+}
+
+const strip = (n, prefix) => (n.startsWith(prefix) ? n.slice(prefix.length) : n);
+
+/** Qual roda é este nó? (aceita wheel_FL e também WheelFrontL etc.) */
+function wheelKey(name) {
+  const n = name.toLowerCase().replace(/[\s_-]/g, '');
+  if (!n.startsWith('wheel') && !n.includes('wheel')) return null;
+  if (/wheel(fl|frontl(eft)?)$/.test(n)) return 'FL';
+  if (/wheel(fr|frontr(ight)?)$/.test(n)) return 'FR';
+  if (/wheel(rl|rearl(eft)?|backl(eft)?)$/.test(n)) return 'RL';
+  if (/wheel(rr|rearr(ight)?|backr(ight)?)$/.test(n)) return 'RR';
+  return null;
+}
+
 /**
- * Tenta carregar o GLB do carro. Convenção de nomes no GLB:
- *   wheel_FL / wheel_FR / wheel_RL / wheel_RR  — rodas (giram/esterçam)
- *   steering_wheel                               — volante (gira com a direção)
- *   brake_light*                                 — lanternas de freio
- * Escala em metros, +Z para a frente, solo em y = 0.
+ * Monta um carro a partir de um GLB, normalizando escala, frente (+Z),
+ * chão (y = 0) e rodas (raio físico). detail: 'full' (jogador/showroom)
+ * ou 'lite' (adversários: sem interior e peças miúdas, menos polígonos).
  */
-export async function loadCarModel(scene, spec, materials) {
-  const file = spec.model;
-  if (file && (await glbExists(`assets/cars/${file}`))) {
+async function buildFromGlb(scene, spec, url, detail) {
+  const container = await getContainer(scene, url);
+  const prefix = `${spec.id}_${Math.random().toString(36).slice(2, 7)}_`;
+  const inst = container.instantiateModelsToScene((n) => prefix + n, true, { doNotInstantiate: true });
+  const root = new TransformNode(`car_${spec.id}_glb`, scene);
+  const fit = new TransformNode('fit', scene);
+  fit.parent = root;
+  for (const r of inst.rootNodes) r.parent = fit;
+  const nodes = fit.getDescendants(false);
+  const meshes = nodes.filter((n) => typeof n.getTotalVertices === 'function');
+
+  // Esconde logotipos/placa, palhetas (muitos polígonos) e, no modo leve, o interior
+  const hideRe = detail === 'lite'
+    ? /^(License|InteriorSteeringEmblem|BodyWindshieldWipers|Interior|Engine|Axles|BodyHoodInterior|BodyHoodUnder|.*BrakePad)/i
+    : /^(License|InteriorSteeringEmblem|BodyWindshieldWipers)/i;
+  for (const m of meshes) {
+    if (hideRe.test(strip(m.name, prefix))) { m.setEnabled(false); m.isVisible = false; }
+  }
+
+  // Materiais: pintura principal, vidros (sem refração), luzes
+  const mats = {};
+  const seen = new Set();
+  for (const m of meshes) {
+    const mat = m.material;
+    if (!mat || seen.has(mat)) continue;
+    seen.add(mat);
+    const name = strip(mat.name || '', prefix);
+    if (/paint\s*1/i.test(name) || (!mats.paint && /paint|body|carpaint/i.test(name) && !/paint\s*2/i.test(name))) mats.paint ||= mat;
+    if (/glass|window/i.test(name)) {
+      mat.albedoColor = new Color3(0.02, 0.025, 0.03);
+      mat.alpha = 0.38;
+      mat.metallic = 0.1;
+      mat.roughness = 0.05;
+      if (mat.subSurface) mat.subSurface.isRefractionEnabled = false;
+      mat.transparencyMode = 2; // ALPHABLEND
+      mat.backFaceCulling = false;
+    }
+    if (/brake.?light|taillight/i.test(name)) mats.taillight ||= mat;
+    if (/head.?light/i.test(name)) mats.headlight ||= mat;
+    if (/^rim\d*$/i.test(name.trim())) mats.rim ||= mat;
+  }
+
+  // Rodas: destrava o esterço da pose do modelo copiando a rotação da traseira do mesmo lado
+  const wheelNodes = {};
+  for (const n of nodes) {
+    const k = wheelKey(strip(n.name, prefix));
+    if (k && !wheelNodes[k]) wheelNodes[k] = n;
+  }
+  if (!wheelNodes.FL || !wheelNodes.FR || !wheelNodes.RL || !wheelNodes.RR) throw new Error('GLB sem as 4 rodas nomeadas');
+  for (const [front, rear] of [['FL', 'RL'], ['FR', 'RR']]) {
+    const f = wheelNodes[front], r = wheelNodes[rear];
+    if (r.rotationQuaternion) f.rotationQuaternion = r.rotationQuaternion.clone();
+    else f.rotation.copyFrom(r.rotation);
+    f.scaling.copyFrom(r.scaling);
+  }
+
+  const update = () => { root.computeWorldMatrix(true); for (const n of nodes) n.computeWorldMatrix(true); };
+  const centers = () => Object.fromEntries(Object.entries(wheelNodes).map(([k, n]) => [k, n.getAbsolutePosition().clone()]));
+  update();
+  let c = centers();
+  // Frente para +Z
+  const frontZ = (c.FL.z + c.FR.z) / 2, rearZ = (c.RL.z + c.RR.z) / 2;
+  if (frontZ < rearZ) fit.rotation.y = Math.PI;
+  // Escala: raio do pneu do modelo = raio físico
+  update();
+  let tireR = 0;
+  for (const n of Object.values(wheelNodes)) {
+    for (const m of n.getChildMeshes(false)) {
+      m.refreshBoundingInfo?.();
+      const bb = m.getBoundingInfo().boundingBox;
+      tireR = Math.max(tireR, (bb.maximumWorld.y - bb.minimumWorld.y) / 2);
+    }
+  }
+  const s = tireR > 0.05 ? spec.wheelRadius / tireR : 1;
+  fit.scaling.setAll(s);
+  update();
+  c = centers();
+  const midX = (c.FL.x + c.FR.x + c.RL.x + c.RR.x) / 4;
+  const midZ = (c.FL.z + c.FR.z + c.RL.z + c.RR.z) / 4;
+  const wheelY = (c.FL.y + c.FR.y + c.RL.y + c.RR.y) / 4;
+  fit.position.set(-midX, spec.wheelRadius - wheelY, -midZ);
+  update();
+  c = centers();
+
+  // Pivôs de esterço/giro (mesma convenção do modelo procedural); FL = lado esquerdo (x < 0)
+  const sorted = { FL: null, FR: null, RL: null, RR: null };
+  const fronts = [['FL', c.FL], ['FR', c.FR]].sort((a, b) => a[1].x - b[1].x);
+  const rears = [['RL', c.RL], ['RR', c.RR]].sort((a, b) => a[1].x - b[1].x);
+  sorted.FL = fronts[0][0]; sorted.FR = fronts[1][0]; sorted.RL = rears[0][0]; sorted.RR = rears[1][0];
+  const wheels = {};
+  for (const key of ['FL', 'FR', 'RL', 'RR']) {
+    const node = wheelNodes[sorted[key]];
+    const pos = c[sorted[key]];
+    const pivot = new TransformNode(`wheel_${key}`, scene);
+    pivot.parent = root;
+    pivot.position.set(pos.x, pos.y, pos.z);
+    const spin = new TransformNode(`wheelSpin_${key}`, scene);
+    spin.parent = pivot;
+    node.setParent(spin);
+    // Pinça de freio não gira com a roda
+    for (const m of node.getChildMeshes(false)) if (/brakepad/i.test(strip(m.name, prefix))) m.setParent(pivot);
+    if (detail === 'lite') {
+      for (const m of node.getChildMeshes(false)) if (/rim/i.test(strip(m.name, prefix))) m.addLODLevel?.(30, null);
+    }
+    wheels[key] = { pivot, spin };
+  }
+
+  // Olho do piloto (cockpit): atrás do volante do modelo, se existir
+  let roofY = 0;
+  for (const m of meshes) {
+    if (!m.isEnabled() || m.getTotalVertices() === 0) continue;
+    m.computeWorldMatrix(true);
+    roofY = Math.max(roofY, m.getBoundingInfo().boundingBox.maximumWorld.y);
+  }
+  let driverEye = new Vector3(-0.36, Math.max(0.8, roofY - 0.16), -0.25);
+  const steer = nodes.find((n) => !n.isDisposed?.() && /steering(cylinder|wheel)/i.test(strip(n.name, prefix).replace(/[\s_-]/g, '')));
+  if (steer && detail !== 'lite') {
+    steer.computeWorldMatrix(true);
+    const sp = steer.getAbsolutePosition();
+    driverEye = new Vector3(sp.x, Math.min(sp.y + 0.3, roofY - 0.14), sp.z - 0.6);
+  }
+
+  // Funde as peças da carroceria por material (menos draw calls).
+  // Antes, solta cada peça da hierarquia original (mantendo a posição no mundo)
+  // para que descartar um "pai" fundido não apague peças ainda não fundidas.
+  update();
+  const wheelSet = new Set();
+  for (const w of Object.values(wheels)) for (const m of w.pivot.getChildMeshes(false)) wheelSet.add(m);
+  for (const m of meshes) {
+    if (!wheelSet.has(m) && !m.isDisposed()) m.setParent(root);
+  }
+  const groups = new Map();
+  for (const m of meshes) {
+    if (wheelSet.has(m) || !m.isEnabled() || !m.material || m.getTotalVertices() === 0) continue;
+    const key = m.material.uniqueId;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(m);
+  }
+  let deckY = 0, minZ = Infinity, maxY = 0;
+  const bodyMeshes = [];
+  for (const list of groups.values()) {
+    let target = list;
+    if (list.length > 1) {
+      try {
+        const merged = Mesh.MergeMeshes(list, true, true, undefined, false, false);
+        if (merged) { merged.parent = root; target = [merged]; }
+      } catch { /* atributos diferentes: mantém separado */ }
+    }
+    bodyMeshes.push(...target);
+    for (const m of target) {
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      minZ = Math.min(minZ, bb.minimumWorld.z);
+      maxY = Math.max(maxY, bb.maximumWorld.y);
+    }
+  }
+  // Altura da tampa traseira (para o aerofólio)
+  for (const m of bodyMeshes) {
+    {
+      const pos = m.getVerticesData?.('position');
+      if (!pos) continue;
+      const wm = m.getWorldMatrix();
+      const v = new Vector3();
+      for (let i = 0; i < pos.length; i += 9) {
+        Vector3.TransformCoordinatesFromFloatsToRef(pos[i], pos[i + 1], pos[i + 2], wm, v);
+        if (v.z < minZ + 0.45 && v.y > deckY) deckY = v.y;
+      }
+    }
+  }
+  // Limpa nós vazios que sobraram da hierarquia original
+  for (const n of nodes) if (!n.isDisposed() && !n.getChildren().length && typeof n.getTotalVertices !== 'function') n.dispose();
+
+  // Aerofólio (carros de pista/super/hiper ou melhoria aerodinâmica)
+  const st = STYLE[spec.style] ?? STYLE.gt;
+  const wingLevel = Math.max(st.wing, spec.wing ?? 0, spec.upgrades?.aero ?? 0);
+  if (wingLevel >= 1 && deckY > 0) {
+    const wingMat = new PBRMaterial('wingCarbon', scene);
+    wingMat.albedoColor = new Color3(0.03, 0.03, 0.035);
+    wingMat.metallic = 0.3; wingMat.roughness = 0.35;
+    const span = spec.dims.width * (wingLevel >= 2 ? 0.9 : 0.78);
+    const h = wingLevel >= 2 ? 0.3 : 0.17;
+    const wing = MeshBuilder.CreateBox('wing', { width: span, height: 0.035, depth: wingLevel >= 2 ? 0.36 : 0.26 }, scene);
+    wing.position.set(0, deckY + h, minZ + 0.32);
+    wing.rotation.x = -0.12;
+    wing.parent = root; wing.material = wingMat;
+    for (const sx of [-1, 1]) {
+      const post = MeshBuilder.CreateBox('wingPost', { width: 0.04, height: h + 0.02, depth: 0.1 }, scene);
+      post.position.set(sx * span * 0.3, deckY + h / 2, minZ + 0.34);
+      post.parent = root; post.material = wingMat;
+      const plate = MeshBuilder.CreateBox('endplate', { width: 0.02, height: 0.15, depth: 0.4 }, scene);
+      plate.position.set(sx * span / 2, deckY + h, minZ + 0.32);
+      plate.parent = root; plate.material = mats.paint ?? wingMat;
+    }
+  }
+
+  return {
+    root, wheels, steeringWheel: null, dashTexture: null, brakeLights: [], headlights: [], spoiler: null,
+    materials: mats, driverEye, source: 'glb',
+    /** Descarta o carro sem apagar as texturas compartilhadas do GLB. */
+    dispose() {
+      const used = new Set();
+      for (const m of root.getChildMeshes(false)) if (m.material) used.add(m.material);
+      root.dispose(false, false);
+      for (const mat of used) mat.dispose(false, false);
+    },
+  };
+}
+
+/**
+ * Carrega o modelo do carro. Ordem: public/assets/cars/<id>.glb (modelo
+ * próprio do carro) → public/assets/cars/concept.glb (modelo realista
+ * padrão) → modelo procedural. Convenções de GLB no README.
+ * @param {object} opts { detail: 'full' | 'lite' }
+ */
+export async function loadCarModel(scene, spec, materials, opts = {}) {
+  const detail = opts.detail ?? 'full';
+  const candidates = spec.model === null ? [] : [`${spec.id}.glb`, 'concept.glb'];
+  for (const file of candidates) {
+    const url = `assets/cars/${file}`;
+    if (!(await glbExists(url))) continue;
     try {
-      const res = await SceneLoader.ImportMeshAsync('', 'assets/cars/', file, scene);
-      const root = new TransformNode(`car_${spec.id}_glb`, scene);
-      for (const m of res.meshes) if (!m.parent) m.parent = root;
-      const find = (re) => res.transformNodes.concat(res.meshes).find((n) => re.test(n.name));
-      const wheels = {};
-      for (const k of ['FL', 'FR', 'RL', 'RR']) {
-        const node = find(new RegExp(`wheel[_ -]?${k}`, 'i'));
-        if (!node) throw new Error(`GLB sem nó wheel_${k}`);
-        const pivot = new TransformNode(`wheel_${k}`, scene);
-        pivot.parent = root;
-        node.computeWorldMatrix(true);
-        pivot.position.copyFrom(node.getAbsolutePosition());
-        const spin = new TransformNode(`wheelSpin_${k}`, scene);
-        spin.parent = pivot;
-        node.setParent(spin);
-        wheels[k] = { pivot, spin };
+      const model = await buildFromGlb(scene, spec, url, detail);
+      // Cor/acabamento escolhidos na garagem → pintura do modelo
+      const gp = model.materials.paint, pp = materials.paint;
+      if (gp && pp) {
+        gp.albedoColor = pp.albedoColor.clone();
+        gp.albedoTexture = null; // a cor vem do jogador
+        gp.metallic = pp.metallic;
+        gp.roughness = pp.roughness;
+        if (gp.clearCoat) gp.clearCoat.isEnabled = pp.clearCoat.isEnabled;
       }
-      const sw = find(/steering[_ -]?wheel/i);
-      const steeringWheel = sw ? sw : new TransformNode('steeringWheel', scene);
-      if (!sw) steeringWheel.parent = root;
-      const brakeLights = res.meshes.filter((m) => /brake[_ -]?light/i.test(m.name));
-      for (const m of res.meshes) {
-        if (m.material && /paint|body|carpaint/i.test(m.material.name) && materials.paint) m.material = materials.paint;
-      }
-      return {
-        root, wheels, steeringWheel, dashTexture: null, brakeLights, headlights: [], spoiler: null, materials,
-        driverEye: new Vector3(-0.38, 1.05, -0.2), source: 'glb',
-      };
+      if (model.materials.rim && materials.rim) model.materials.rim.albedoColor = materials.rim.albedoColor.clone();
+      // Completa materiais ausentes com os procedurais (luzes, aro, pintura)
+      model.materials = { ...materials, ...model.materials };
+      return model;
     } catch (e) {
       console.warn(`[CarModel] ${file} inválido, usando modelo procedural:`, e?.message || e);
     }

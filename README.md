@@ -258,3 +258,17 @@ testados em Node; o Havok entra pela "ponte" em `vehicles/Vehicle.js`.
 - ~~**Etapa 3**~~ — concluída: Desert Speedway completa (cânion, oásis, miragens, tempestade de areia), 3 carros novos (incluindo um elétrico) e setup completo na garagem.
 - ~~**Etapa 4**~~ — concluída: replays com câmeras de TV, fantasma salvo, conquistas e suporte a sons gravados.
 - **Etapa 5** — otimização final por aparelho, ícone/tela de abertura, publicação do APK/AAB.
+
+---
+
+## Créditos de terceiros
+
+- **Modelo 3D dos carros** — "Car Concept", de Eric Chadwick / Darmstadt Graphics Group,
+  publicado no repositório glTF-Sample-Assets do Khronos Group sob a licença
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Arquivo: `public/assets/cars/concept.glb`.
+  Alterações feitas pelo jogo: pintura trocada pela cor escolhida na garagem, vidros sem refração,
+  placa, emblema e palhetas ocultos, texturas com logotipos (que não fazem parte da licença) trocadas por texturas neutras, interior removido nos adversários, rodas reposicionadas para a
+  física e aerofólio adicionado nos carros de pista.
+- Um GLB próprio por carro pode ser colocado em `public/assets/cars/<id>.glb` (ex.: `vortex.glb`);
+  ele tem prioridade sobre o modelo padrão. Convenção: nós de roda chamados `wheel_FL`, `wheel_FR`,
+  `wheel_RL`, `wheel_RR` (ou `WheelFrontL` etc.) e material da pintura com "Paint" ou "Body" no nome.

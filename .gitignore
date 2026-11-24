@@ -4,3 +4,5 @@ android
 .DS_Store
 EXTREME-RACING*.apk
 EXTREME-RACING.aab
+visual-dist/
+visual-out/

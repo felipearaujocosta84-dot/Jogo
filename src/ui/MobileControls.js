@@ -46,9 +46,12 @@ export class MobileControls {
     this.el.innerHTML = '';
     // ---------- Direção ----------
     if (mode === 'wheel') {
+      // Área grande de toque (metade esquerda inferior); o volante desenhado fica dentro dela
+      this.steerZone = h('div', { class: 'steer-zone' });
       this.wheel = h('div', { class: 'ctl wheel', html: WHEEL_SVG });
-      this.el.appendChild(this.wheel);
-      this._bindWheel(this.wheel);
+      this.steerZone.appendChild(this.wheel);
+      this.el.appendChild(this.steerZone);
+      this._bindWheel(this.steerZone, this.wheel);
     } else if (mode === 'buttons') {
       const left = h('div', { class: 'ctl steer-btn steer-left' }, '◀');
       const right = h('div', { class: 'ctl steer-btn steer-right' }, '▶');
@@ -126,47 +129,56 @@ export class MobileControls {
   }
 
   /** Volante virtual: o ângulo do dedo em torno do centro gira o volante. */
-  _bindWheel(el) {
-    let pid = null, startAngle = 0, startWheel = 0;
-    const svg = el.querySelector('svg');
-    const angleOf = (e) => {
-      const r = el.getBoundingClientRect();
-      return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+  /**
+   * Volante por arrasto horizontal: encoste o dedo em qualquer ponto da área
+   * e arraste para os lados. Distância total = ~22% da largura da tela
+   * (menor com sensibilidade maior). O desenho do volante gira junto.
+   */
+  _bindWheel(zone, wheelEl) {
+    let pid = null, startX = 0;
+    const svg = wheelEl.querySelector('svg');
+    const setVisual = (steer) => {
+      this.wheelAngle = steer * 1.75; // ±100° visuais
+      svg.style.transform = `rotate(${this.wheelAngle}rad)`;
     };
-    el.addEventListener('pointerdown', (e) => {
+    zone.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (pid !== null) return;
       pid = e.pointerId;
-      try { el.setPointerCapture(pid); } catch { /* ok */ }
-      startAngle = angleOf(e);
-      startWheel = this.wheelAngle;
-      el.classList.add('active');
+      try { zone.setPointerCapture(pid); } catch { /* ok */ }
+      startX = e.clientX;
+      svg.style.transition = '';
+      wheelEl.classList.add('active');
       this.state.steerActive = true;
+      this.state.steer = 0;
     });
-    el.addEventListener('pointermove', (e) => {
+    zone.addEventListener('pointermove', (e) => {
       if (e.pointerId !== pid) return;
-      let d = angleOf(e) - startAngle;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      this.wheelAngle = Math.max(-2.4, Math.min(2.4, startWheel + d));
-      // ±1 a ±100° (ajustado pela sensibilidade)
-      const range = (100 * Math.PI) / 180 / (this.settings.steeringSensitivity || 1);
-      this.state.steer = Math.max(-1, Math.min(1, this.wheelAngle / range));
-      svg.style.transform = `rotate(${this.wheelAngle}rad)`;
+      e.preventDefault();
+      const full = (window.innerWidth * 0.22) / (this.settings.steeringSensitivity || 1);
+      let steer = (e.clientX - startX) / full;
+      // Se passar do limite, "arrasta" o ponto de partida: voltar o dedo já esterça para o outro lado
+      if (steer > 1) { startX = e.clientX - full; steer = 1; }
+      if (steer < -1) { startX = e.clientX + full; steer = -1; }
+      // Pequena zona morta e resposta um pouco progressiva no centro
+      const a = Math.abs(steer);
+      const shaped = a < 0.03 ? 0 : Math.sign(steer) * Math.pow((a - 0.03) / 0.97, 1.25);
+      this.state.steer = shaped;
+      setVisual(shaped);
     });
     const release = (e) => {
       if (e.pointerId !== pid) return;
       pid = null;
-      el.classList.remove('active');
+      wheelEl.classList.remove('active');
       this.state.steerActive = false;
       this.state.steer = 0;
-      this.wheelAngle = 0;
       svg.style.transition = 'transform 0.18s ease-out';
-      svg.style.transform = 'rotate(0rad)';
+      setVisual(0);
       setTimeout(() => { svg.style.transition = ''; }, 200);
     };
-    el.addEventListener('pointerup', release);
-    el.addEventListener('pointercancel', release);
+    zone.addEventListener('pointerup', release);
+    zone.addEventListener('pointercancel', release);
+    zone.addEventListener('lostpointercapture', release);
   }
 
   /** Inclinação do aparelho (modo horizontal). */

@@ -134,14 +134,21 @@ export class ShowroomScene {
 
   /** Troca o carro exibido. */
   async setCar(spec, look) {
-    if (this.car) { this.car.root.dispose(false, true); this.car = null; }
+    if (this.car) { if (this.car.dispose) this.car.dispose(); else this.car.root.dispose(false, true); this.car = null; }
     const mats = createCarMaterials(this.scene, look.colors, look.finish);
+    const token = (this._carToken = (this._carToken ?? 0) + 1);
     const model = await loadCarModel(this.scene, { ...spec, rimStyle: look.rimStyle }, mats);
+    if (token !== this._carToken) { // outro carro foi pedido enquanto este carregava
+      if (model.dispose) model.dispose(); else model.root.dispose(false, true);
+      return this.car;
+    }
+    if (this.car) { if (this.car.dispose) this.car.dispose(); else this.car.root.dispose(false, true); this.car = null; }
     model.root.parent = this.turntable;
     model.root.position.y = 0.08;
     // Faróis acesos no showroom
-    mats.headlight.emissiveColor = new Color3(1, 1, 1.05);
-    mats.taillight.emissiveColor = new Color3(0.6, 0.02, 0.02);
+    const mm = model.materials;
+    mm.headlight.emissiveColor = new Color3(1, 1, 1.05);
+    mm.taillight.emissiveColor = new Color3(0.6, 0.02, 0.02);
     if (this.shadow) for (const m of model.root.getChildMeshes()) if (m.getTotalVertices() > 0) this.shadow.addShadowCaster(m, false);
     this.car = model;
     return model;
