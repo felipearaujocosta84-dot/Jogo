@@ -1,0 +1,23 @@
+{
+  "appId": "com.extremeracing.game",
+  "appName": "EXTREME RACING",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#05070b",
+    "webContentsDebuggingEnabled": true,
+    "minWebViewVersion": 79
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 4000,
+      "backgroundColor": "#05070b",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    }
+  }
+}

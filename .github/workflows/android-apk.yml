@@ -1,0 +1,52 @@
+# Gera o APK do EXTREME RACING na nuvem do GitHub (sem precisar de computador).
+# Roda a cada envio de código ou manualmente (aba Actions > Gerar APK > Run workflow).
+# O APK fica disponível em "Releases" do repositório e também como artefato da execução.
+name: Gerar APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Testes de física, pistas e IA
+        run: npm test
+
+      - name: Gerar APK
+        run: npm run apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EXTREME-RACING-apk
+          path: EXTREME-RACING.apk
+
+      - name: Publicar em Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release create "v${VERSION}-build${{ github.run_number }}" EXTREME-RACING.apk \
+            --title "EXTREME RACING ${VERSION} (build ${{ github.run_number }})" \
+            --notes "APK gerado automaticamente. No celular: baixe o arquivo EXTREME-RACING.apk e permita instalar apps desta fonte." \
+            --target "${{ github.sha }}"

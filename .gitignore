@@ -1,0 +1,6 @@
+node_modules
+dist
+android
+.DS_Store
+EXTREME-RACING*.apk
+EXTREME-RACING.aab
