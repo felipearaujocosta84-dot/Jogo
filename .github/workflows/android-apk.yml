@@ -25,8 +25,7 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
+      # O Android SDK já vem instalado nas máquinas ubuntu-latest do GitHub (ANDROID_HOME)
       - name: Instalar dependências
         run: npm install
 
