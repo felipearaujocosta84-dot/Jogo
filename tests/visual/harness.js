@@ -61,8 +61,8 @@ async function main() {
   await scene.whenReadyAsync();
   log('pronto para fotos');
   const shots = [
-    ['frente34', -0.6, 1.25, 9.5, new Vector3(0, 0.6, 0)],
-    ['traseira34', 2.3, 1.25, 9.5, new Vector3(0, 0.6, 0)],
+    ['traseira34b', -0.6, 1.25, 9.5, new Vector3(0, 0.6, 0)],
+    ['dianteira34', 2.3, 1.25, 9.5, new Vector3(0, 0.6, 0)],
     ['lado', Math.PI, 1.45, 8.5, new Vector3(0, 0.6, 0)],
     ['cima', -0.6, 0.35, 10, new Vector3(0, 0.6, 0)],
     ['roda', -0.9, 1.35, 3.2, new Vector3(-1.6 + 0.8, 0.35, 1.3)],

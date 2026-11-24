@@ -538,7 +538,8 @@ async function buildFromGlb(scene, spec, url, detail) {
     if (/paint\s*1/i.test(name) || (!mats.paint && /paint|body|carpaint/i.test(name) && !/paint\s*2/i.test(name))) mats.paint ||= mat;
     if (/glass|window/i.test(name)) {
       mat.albedoColor = new Color3(0.02, 0.025, 0.03);
-      mat.alpha = 0.38;
+      // Sem interior (adversários), vidro mais escuro para não ver "através" do carro
+      mat.alpha = detail === 'lite' ? 0.92 : 0.38;
       mat.metallic = 0.1;
       mat.roughness = 0.05;
       if (mat.subSurface) mat.subSurface.isRefractionEnabled = false;
@@ -573,12 +574,22 @@ async function buildFromGlb(scene, spec, url, detail) {
   if (frontZ < rearZ) fit.rotation.y = Math.PI;
   // Escala: raio do pneu do modelo = raio físico
   update();
+  // Raio real do pneu: maior distância dos vértices ao centro da roda no plano
+  // vertical (y, z) — a caixa alinhada aos eixos superestima rodas giradas.
   let tireR = 0;
-  for (const n of Object.values(wheelNodes)) {
+  {
+    const v = new Vector3();
+    const n = wheelNodes.FL;
+    const cc = n.getAbsolutePosition();
     for (const m of n.getChildMeshes(false)) {
-      m.refreshBoundingInfo?.();
-      const bb = m.getBoundingInfo().boundingBox;
-      tireR = Math.max(tireR, (bb.maximumWorld.y - bb.minimumWorld.y) / 2);
+      const pos = m.getVerticesData?.('position');
+      if (!pos) continue;
+      const wm = m.computeWorldMatrix(true);
+      for (let i = 0; i < pos.length; i += 3) {
+        Vector3.TransformCoordinatesFromFloatsToRef(pos[i], pos[i + 1], pos[i + 2], wm, v);
+        const d = Math.hypot(v.y - cc.y, v.z - cc.z);
+        if (d > tireR) tireR = d;
+      }
     }
   }
   const s = tireR > 0.05 ? spec.wheelRadius / tireR : 1;
@@ -623,11 +634,17 @@ async function buildFromGlb(scene, spec, url, detail) {
     roofY = Math.max(roofY, m.getBoundingInfo().boundingBox.maximumWorld.y);
   }
   let driverEye = new Vector3(-0.36, Math.max(0.8, roofY - 0.16), -0.25);
-  const steer = nodes.find((n) => !n.isDisposed?.() && /steering(cylinder|wheel)/i.test(strip(n.name, prefix).replace(/[\s_-]/g, '')));
-  if (steer && detail !== 'lite') {
-    steer.computeWorldMatrix(true);
-    const sp = steer.getAbsolutePosition();
-    driverEye = new Vector3(sp.x, Math.min(sp.y + 0.3, roofY - 0.14), sp.z - 0.6);
+  // Centro do volante do modelo (pela caixa dos vértices; o nó pode estar na origem)
+  const steerMeshes = meshes.filter((m) => /^InteriorSteeringWheel/i.test(strip(m.name, prefix)) && m.getTotalVertices() > 0);
+  if (steerMeshes.length && detail !== 'lite') {
+    const mn = new Vector3(Infinity, Infinity, Infinity), mx = new Vector3(-Infinity, -Infinity, -Infinity);
+    for (const m of steerMeshes) {
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      mn.minimizeInPlace(bb.minimumWorld); mx.maximizeInPlace(bb.maximumWorld);
+    }
+    const sp = mn.add(mx).scale(0.5);
+    driverEye = new Vector3(sp.x, Math.min(sp.y + 0.3, roofY - 0.12), sp.z - 0.55);
   }
 
   // Funde as peças da carroceria por material (menos draw calls).
