@@ -628,6 +628,7 @@ async function buildFromGlb(scene, spec, url, detail) {
 
   // Olho do piloto (cockpit): atrás do volante do modelo, se existir
   let roofY = 0;
+  let steeringPivot = null;
   for (const m of meshes) {
     if (!m.isEnabled() || m.getTotalVertices() === 0) continue;
     m.computeWorldMatrix(true);
@@ -645,6 +646,11 @@ async function buildFromGlb(scene, spec, url, detail) {
     }
     const sp = mn.add(mx).scale(0.5);
     driverEye = new Vector3(sp.x, Math.min(sp.y + 0.3, roofY - 0.12), sp.z - 0.55);
+    // Volante do modelo gira com o esterço (pivô no centro do aro)
+    steeringPivot = new TransformNode('steeringPivot', scene);
+    steeringPivot.parent = root;
+    steeringPivot.position.copyFrom(sp);
+    for (const m of steerMeshes) m.setParent(steeringPivot);
   }
 
   // Funde as peças da carroceria por material (menos draw calls).
@@ -653,6 +659,7 @@ async function buildFromGlb(scene, spec, url, detail) {
   update();
   const wheelSet = new Set();
   for (const w of Object.values(wheels)) for (const m of w.pivot.getChildMeshes(false)) wheelSet.add(m);
+  if (steeringPivot) for (const m of steeringPivot.getChildMeshes(false)) wheelSet.add(m);
   for (const m of meshes) {
     if (!wheelSet.has(m) && !m.isDisposed()) m.setParent(root);
   }
@@ -721,7 +728,7 @@ async function buildFromGlb(scene, spec, url, detail) {
   }
 
   return {
-    root, wheels, steeringWheel: null, dashTexture: null, brakeLights: [], headlights: [], spoiler: null,
+    root, wheels, steeringWheel: steeringPivot, dashTexture: null, brakeLights: [], headlights: [], spoiler: null,
     materials: mats, driverEye, source: 'glb',
     /** Descarta o carro sem apagar as texturas compartilhadas do GLB. */
     dispose() {

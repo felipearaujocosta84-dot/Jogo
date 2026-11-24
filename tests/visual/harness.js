@@ -44,6 +44,7 @@ async function main() {
       if (k[0] === 'F') w.pivot.rotation.y = 0.35;
       w.spin.rotation.x = 1.0;
     }
+    if (model.steeringWheel) model.steeringWheel.rotation.z = -0.6;
     let tris = 0, meshes = 0;
     for (const m of model.root.getChildMeshes(false)) {
       if (!m.isEnabled() || !m.isVisible || !m.getTotalIndices) continue;
