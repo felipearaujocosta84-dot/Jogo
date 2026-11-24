@@ -19,6 +19,7 @@ import { PAINT_COLORS } from '../garage/GarageManager.js';
 import { mulberry32, clamp, smoothStep } from '../utils/MathUtils.js';
 import { formatTime } from './RaceManager.js';
 import { SkidMarks } from '../vehicles/SkidMarks.js';
+import { DebugLog } from '../utils/DebugLog.js';
 import { ReplayRecorder } from './ReplaySystem.js';
 import { ReplayPlayer } from './ReplayPlayer.js';
 import { GhostLap } from './GhostLap.js';
@@ -204,10 +205,33 @@ export class RaceSession {
     // Executa imediatamente antes de cada passo do Havok (60 Hz fixos)
     this._physObservable = scene.onBeforePhysicsObservable ?? scene.onBeforeStepObservable;
     this._physObs = this._physObservable.add(() => this._fixedStep());
-    progress(0.95, 'Pronto!');
-    // Compila shaders antes de mostrar
-    await scene.whenReadyAsync();
+    progress(0.95, 'Preparando gráficos…');
+    // Compila shaders antes de mostrar — mas nunca espera para sempre:
+    // se algo não ficar pronto em 8 s, registra o diagnóstico e segue.
+    const ready = await Promise.race([
+      scene.whenReadyAsync().then(() => true),
+      new Promise((r) => setTimeout(() => r(false), 8000)),
+    ]);
+    if (!ready) this._logNotReady();
     progress(1, 'Largada!');
+  }
+
+  /** Diagnóstico: o que impediu a cena de ficar pronta (vai para o LOG). */
+  _logNotReady() {
+    const scene = this.scene;
+    const engine = scene.getEngine();
+    const info = [];
+    try {
+      info.push(`WebGL ${engine.webGLVersion} • ${engine.getGlInfo()?.renderer ?? '?'} • preset ${this.preset.label}`);
+      const meshes = scene.meshes.filter((m) => m.isEnabled() && m.subMeshes?.length && !m.isReady(true));
+      info.push(`malhas não prontas (${meshes.length}): ${meshes.slice(0, 20).map((m) => `${m.name}[${m.material?.name ?? '-'}]`).join(', ')}`);
+      const ps = scene.particleSystems.filter((p) => !p.isReady());
+      if (ps.length) info.push(`partículas não prontas: ${ps.map((p) => p.name).join(', ')}`);
+      if (!engine.areAllEffectsReady()) info.push('shaders ainda compilando');
+      if (scene.getWaitingItemsCount?.()) info.push(`itens aguardando: ${scene.getWaitingItemsCount()}`);
+    } catch (e) { info.push(`falha no diagnóstico: ${e.message}`); }
+    console.warn('[Corrida] cena não ficou pronta em 8 s —', info.join(' | '));
+    DebugLog.showBadge();
   }
 
   _setupPipeline() {

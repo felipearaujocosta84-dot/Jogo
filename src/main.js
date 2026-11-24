@@ -2,6 +2,9 @@
 // EXTREME RACING — ponto de entrada
 // =============================================================
 import { Game } from './core/Game.js';
+import { DebugLog } from './utils/DebugLog.js';
+
+DebugLog.install();
 
 const canvas = document.getElementById('renderCanvas');
 const uiRoot = document.getElementById('ui-root');

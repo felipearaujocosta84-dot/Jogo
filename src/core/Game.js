@@ -19,6 +19,7 @@ import { h } from '../ui/dom.js';
 import { reportOptionalAssets } from './AssetManager.js';
 import { Achievements } from '../systems/Achievements.js';
 import { NativeBridge } from './NativeBridge.js';
+import { DebugLog } from '../utils/DebugLog.js';
 import { toast } from '../ui/dom.js';
 
 const CHAMP_POINTS = [25, 18, 15, 12, 10, 8, 6, 4];
@@ -39,6 +40,11 @@ export class Game {
     this.sceneManager = new SceneManager(this.canvas);
     this.save = new SaveSystem();
     this.graphics = new GraphicsSettings(this.sceneManager.engine, this.save);
+    try {
+      const e = this.sceneManager.engine;
+      DebugLog.info(`Aparelho: ${navigator.userAgent}`);
+      DebugLog.info(`WebGL ${e.webGLVersion} • ${e.getGlInfo()?.renderer} • qualidade ${this.graphics.preset.label} (detectado: ${this.graphics.detected})`);
+    } catch { /* ok */ }
     this.audio = new AudioManager(this.save.settings);
     this.garage = new GarageManager(this.save);
     this._initAchievements();

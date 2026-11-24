@@ -15,6 +15,19 @@ export const OPTIONAL_ASSETS = {
 const cache = new Map();
 
 /** Verifica se o arquivo existe (e não é o index.html devolvido pelo servidor). */
+// Assinaturas (primeiros bytes) de cada formato. No APK, o servidor interno do
+// Capacitor pode devolver o index.html com status 200 para um arquivo que não
+// existe — por isso o conteúdo é sempre conferido, nunca só o status.
+const MAGIC = {
+  jpg: [[0xff, 0xd8, 0xff]],
+  jpeg: [[0xff, 0xd8, 0xff]],
+  png: [[0x89, 0x50, 0x4e, 0x47]],
+  ogg: [[0x4f, 0x67, 0x67, 0x53]],
+  mp3: [[0x49, 0x44, 0x33], [0xff, 0xfb], [0xff, 0xf3], [0xff, 0xf2]],
+  glb: [[0x67, 0x6c, 0x54, 0x46]],
+};
+
+/** Verifica se o arquivo existe de verdade (status, tipo e assinatura). */
 export async function assetExists(url, magic = null) {
   const key = `${url}|${magic ?? ''}`;
   if (cache.has(key)) return cache.get(key);
@@ -23,10 +36,12 @@ export async function assetExists(url, magic = null) {
     const res = await fetch(url, { cache: 'force-cache' });
     if (res.ok) {
       const type = res.headers.get('content-type') || '';
+      const ext = url.split('?')[0].split('.').pop().toLowerCase();
+      const sigs = magic ? [magic] : MAGIC[ext];
       if (type.includes('text/html')) ok = false;
-      else if (magic) {
+      else if (sigs) {
         const buf = new Uint8Array(await res.arrayBuffer());
-        ok = magic.every((b, i) => buf[i] === b);
+        ok = buf.length > 16 && sigs.some((sig) => sig.every((b, i) => buf[i] === b));
       } else ok = true;
     }
   } catch {

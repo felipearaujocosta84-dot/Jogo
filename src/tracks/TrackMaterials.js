@@ -82,7 +82,9 @@ export class TrackMaterials {
   _photoTex(key, uScale = 1, vScale = 1) {
     const url = this.photo[key];
     if (!url) return null;
-    const t = new Texture(url, this.scene);
+    const t = new Texture(url, this.scene, false, true, Texture.TRILINEAR_SAMPLINGMODE, null, (msg) => {
+      console.warn(`[Textura] falha ao carregar ${url}:`, msg);
+    });
     t.wrapU = Texture.WRAP_ADDRESSMODE;
     t.wrapV = Texture.WRAP_ADDRESSMODE;
     t.uScale = uScale;

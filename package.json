@@ -1,7 +1,7 @@
 {
   "name": "extreme-racing",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "EXTREME RACING — jogo de corrida 3D para Android (Babylon.js + Havok + Capacitor)",
   "type": "module",
   "scripts": {
