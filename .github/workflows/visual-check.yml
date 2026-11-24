@@ -23,7 +23,7 @@ jobs:
         run: npx vite build --config tests/visual/vite.config.js
       - name: Fotografar carros
         run: |
-          npx vite preview --config tests/visual/vite.config.js --outDir visual-dist --port 4173 &
+          npx vite preview --config tests/visual/vite.config.js --port 4173 &
           sleep 4
           node tests/visual/run.mjs http://localhost:4173/
       - name: Publicar fotos
