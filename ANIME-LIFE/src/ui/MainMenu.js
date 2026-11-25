@@ -3,9 +3,9 @@ import { h, showEl, hideEl } from './dom.js';
 import { SakuraPetals } from './SakuraPetals.js';
 import { Characters } from '../characters/CharacterRegistry.js';
 import { audio } from '../audio/AudioManager.js';
+import { CHAPTERS } from '../story/chapters/index.js';
 
-const VERSION = 'v0.1.0 — base jogável';
-// personagens oficiais exibidos no menu (somente os que têm recorte transparente)
+const VERSION = 'v0.2.0 — visual novel';
 const LINEUP = [
   { id: 'character_07', left: '0%', h: '86%' },
   { id: 'character_01', left: '30%', h: '94%' },
@@ -16,17 +16,17 @@ export class MainMenu {
   constructor(ui) {
     this.ui = ui;
     this.splash = h(`<div id="splash" class="screen sky hidden"><div class="city"></div>
-      <div class="logo" style="text-align:center"><div class="t1">ANIME LIFE</div><div class="t2">MINHA VIDA</div></div>
+      <div class="logo center"><div class="t1">ANIME LIFE</div><div class="t2">MINHA VIDA</div></div>
       <div class="tap">TOQUE PARA COMEÇAR</div></div>`);
     this.el = h(`<div id="menu" class="screen sky hidden"><div class="city"></div>
       <div class="lineup"></div>
       <div class="left">
         <div class="logo"><div class="t1">ANIME LIFE</div><div class="t2">MINHA VIDA</div></div>
         <div class="menu-list">
+          <button class="mbtn" data-a="continue">Continuar<small></small></button>
           <button class="mbtn" data-a="new">Novo jogo</button>
-          <button class="mbtn" data-a="continue" disabled>Continuar<small></small></button>
-          <button class="mbtn" data-a="settings">Configurações</button>
-          <button class="mbtn" data-a="credits">Créditos</button>
+          <button class="mbtn" data-a="load">Carregar</button>
+          <div class="mrow"><button class="mbtn sm" data-a="gallery">Galeria</button><button class="mbtn sm" data-a="settings">Ajustes</button><button class="mbtn sm" data-a="credits">Créditos</button></div>
         </div>
       </div><div class="ver">${VERSION}</div></div>`);
     ui.root.append(this.splash, this.el);
@@ -37,16 +37,14 @@ export class MainMenu {
       audio.sfx('confirm');
       ui.menuAction(b.dataset.a);
     });
-    this.el.querySelectorAll('.mbtn').forEach((b) => b.addEventListener('pointerenter', () => audio.sfx('click')));
   }
 
   showSplash() {
     showEl(this.splash); this.petalsA.start();
     return new Promise((resolve) => {
       this.splash.addEventListener('pointerup', async () => {
-        audio.unlock();
-        audio.sfx('sparkle');
-        // tela cheia + travar paisagem (alguns navegadores nunca respondem: limite de 600 ms)
+        audio.unlock(); audio.sfx('sparkle');
+        // tela cheia + paisagem (alguns navegadores nunca respondem: limite de 600 ms)
         const tryIt = (fn) => Promise.race([Promise.resolve().then(fn).catch(() => {}), new Promise((r) => setTimeout(r, 600))]);
         await tryIt(() => document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }));
         await tryIt(() => screen.orientation?.lock?.('landscape'));
@@ -57,10 +55,14 @@ export class MainMenu {
     });
   }
 
-  async show(saveInfo) {
+  async show(auto) {
     const cont = this.el.querySelector('[data-a=continue]');
-    cont.disabled = !saveInfo;
-    cont.querySelector('small').textContent = saveInfo ? `${saveInfo.protagonist.displayName} · Dia ${saveInfo.time.day}` : 'nenhum jogo salvo';
+    cont.classList.toggle('hidden', !auto);
+    if (auto) {
+      const ch = CHAPTERS.find((c) => c.id === auto.pos.chapter);
+      const sc = ch?.scenes.find((s) => s.id === auto.pos.scene);
+      cont.querySelector('small').textContent = `${auto.protagonist.displayName} · Cap. ${ch?.number ?? '?'} — ${sc?.title ?? ''}`;
+    }
     this.loadLineup();
     audio.playMusic('menu');
     await showEl(this.el); this.petals.start();
@@ -74,7 +76,6 @@ export class MainMenu {
       img.alt = Characters.name(c.id); img.decoding = 'async';
       img.style.left = c.left; img.style.height = c.h; img.style.zIndex = i === 1 ? 2 : 1;
       img.onload = () => setTimeout(() => img.classList.add('in'), 150 + i * 220);
-      img.onerror = () => console.error('[Menu] falha ao carregar', img.src);
       img.src = Characters.fullImage(c.id);
       box.appendChild(img);
     });

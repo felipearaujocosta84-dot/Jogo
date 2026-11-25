@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "assets": "python3 tools/process_characters.py",
-    "test": "node tools/dialogue-check.mjs && vite build && node tools/smoke-test.cjs",
+    "test": "node tools/story-check.mjs && vite build && node tools/smoke-test.cjs",
     "android:sync": "vite build && npx cap sync android",
     "android:open": "npx cap open android"
   },

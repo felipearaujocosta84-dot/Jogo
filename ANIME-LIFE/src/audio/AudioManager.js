@@ -12,6 +12,16 @@ const THEMES = {
     chords: [[57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62]], // Am7 Fmaj7 G7 Em7
     melody: [76, null, 74, 72, null, 69, 71, null, 72, null, 74, 76, 79, null, 76, null],
   },
+  cafe: {
+    bpm: 84,
+    chords: [[50, 53, 57, 60], [55, 59, 62, 65], [48, 52, 55, 59], [45, 48, 52, 55]], // Dm7 G7 Cmaj7 Am7
+    melody: [69, 72, 74, null, 72, null, 69, 67, 65, null, 67, 69, null, 72, null, null],
+  },
+  noite: {
+    bpm: 56,
+    chords: [[52, 55, 59, 62], [48, 52, 55, 59], [53, 57, 60, 64], [55, 59, 62, 66]], // Em7 Cmaj7 Fmaj7 G
+    melody: [71, null, null, 67, null, null, 69, null, 64, null, null, null, 67, null, 66, null],
+  },
   home: {
     bpm: 66,
     chords: [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [55, 59, 62, 65]], // Fmaj7 Em7 Dm7 G7

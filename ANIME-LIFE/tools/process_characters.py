@@ -119,10 +119,6 @@ def process(cid, cfg):
     if rgba.height > maxh:
         rgba = rgba.resize((round(rgba.width * maxh / rgba.height), maxh), Image.LANCZOS)
     rgba.save(os.path.join(d, 'full.webp'), 'WEBP', quality=86, method=6)
-    # versão para o mapa (personagem estático no cenário): 220px de altura
-    wh = 220
-    rgba.resize((max(1, round(rgba.width * wh / rgba.height)), wh), Image.LANCZOS).save(
-        os.path.join(d, 'world.webp'), 'WEBP', quality=88, method=6)
     # retrato: topo da figura (≈ 30% da altura), quadrado centrado na cabeça
     hx = cfg.get('headX', 0.5); top = cfg.get('portraitTop', 0.0); size = cfg.get('portraitSize', 0.30)
     s = int(rgba.height * size)

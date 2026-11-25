@@ -1,5 +1,5 @@
 {
-  "_comment": "Registro dos personagens oficiais. Nomes são provisórios e editáveis. 'traits' descreve a identidade visual que QUALQUER sprite futuro deve preservar. A referência original fica em public/assets/characters/<id>/reference/original.jpg e nunca deve ser sobrescrita.",
+  "_comment": "Registro dos personagens oficiais. Nomes provisórios e editáveis. 'traits' = identidade visual que qualquer arte nova deve preservar. A ilustração original (reference/original.jpg) é reutilizada em todas as cenas e nunca deve ser sobrescrita. Romance: somente personagens adultos com romanceable=true.",
   "characters": [
     {
       "id": "character_01",
@@ -39,7 +39,12 @@
           57,
           14.3
         ]
-      ]
+      ],
+      "age": 22,
+      "occupation": "Estudante de design gráfico (último ano)",
+      "romanceable": true,
+      "color": "#7aa7ff",
+      "bio": "Reservada, sarcástica e mais gentil do que admite. Vive de madrugada, desenhando cartazes para bandas que ninguém conhece."
     },
     {
       "id": "character_02",
@@ -64,7 +69,13 @@
       "processing": {
         "headX": 0.5,
         "portraitSize": 0.26
-      }
+      },
+      "age": 23,
+      "occupation": "Ilustradora freelancer",
+      "role": "Vizinha · apto 205",
+      "romanceable": true,
+      "color": "#a98fd6",
+      "bio": "Calma, observadora e leal até demais. Era a melhor amiga da antiga moradora do 201."
     },
     {
       "id": "character_03",
@@ -98,7 +109,13 @@
           505
         ]
       },
-      "licenseWarning": "A imagem enviada contém marca d'água do Shutterstock (imagem não licenciada)."
+      "licenseWarning": "A imagem enviada contém marca d'água do Shutterstock (imagem não licenciada).",
+      "age": null,
+      "occupation": "—",
+      "role": "",
+      "romanceable": false,
+      "color": "#f1a8c4",
+      "bio": "Ainda não aparece na história. Usa uniforme escolar: nunca será usada em rotas de romance."
     },
     {
       "id": "character_04",
@@ -124,7 +141,13 @@
       "processing": {
         "headX": 0.42,
         "portraitSize": 0.25
-      }
+      },
+      "age": null,
+      "occupation": "—",
+      "role": "",
+      "romanceable": false,
+      "color": "#e89aa8",
+      "bio": "Ainda não aparece na história. Usa uniforme escolar: nunca será usada em rotas de romance."
     },
     {
       "id": "character_05",
@@ -152,7 +175,13 @@
         "portraitTop": 0.02
       },
       "licenseWarning": "A imagem enviada traz o nome 'Honami' e assinatura de outro artista; pode ser fan-art de personagem existente.",
-      "cutout": false
+      "cutout": false,
+      "age": null,
+      "occupation": "—",
+      "role": "",
+      "romanceable": false,
+      "color": "#f4a9c2",
+      "bio": "Fora da história até a imagem ser licenciada (ver aviso)."
     },
     {
       "id": "character_06",
@@ -180,7 +209,13 @@
       "processing": {
         "headX": 0.5,
         "portraitSize": 0.22
-      }
+      },
+      "age": 27,
+      "occupation": "Fotógrafa",
+      "role": "Irmã da antiga moradora",
+      "romanceable": true,
+      "color": "#ff8a6a",
+      "bio": "Direta, intensa e cansada de procurar respostas. Faz um ano que a irmã caçula sumiu sem se despedir."
     },
     {
       "id": "character_07",
@@ -207,7 +242,13 @@
         "headX": 0.42,
         "portraitSize": 0.24,
         "holeMinArea": 1000000000
-      }
+      },
+      "age": 24,
+      "occupation": "Entregador de bicicleta",
+      "role": "Vizinho · apto 203",
+      "romanceable": true,
+      "color": "#ff6a4a",
+      "bio": "Barulhento, generoso e sempre organizando alguma coisa. Conhece cada rua de Hoshizora — e cada encomenda."
     },
     {
       "id": "character_08",
@@ -232,7 +273,13 @@
       "processing": {
         "headX": 0.5,
         "portraitSize": 0.24
-      }
+      },
+      "age": 21,
+      "occupation": "Universitário · meio período no Café Hoshi",
+      "role": "Colega de trabalho",
+      "romanceable": true,
+      "color": "#8fb98a",
+      "bio": "Tímido, curioso e apaixonado por astronomia. Fala pouco, mas sempre a coisa certa."
     },
     {
       "id": "character_09",
@@ -257,7 +304,13 @@
       "processing": {
         "headX": 0.5,
         "portraitSize": 0.22
-      }
+      },
+      "age": null,
+      "occupation": "—",
+      "role": "",
+      "romanceable": false,
+      "color": "#a8a48e",
+      "bio": "Ainda não aparece na história (pode ser o mesmo personagem do character_08 — aguardando confirmação)."
     },
     {
       "id": "character_10",
@@ -283,7 +336,13 @@
       "processing": {
         "headX": 0.5,
         "portraitSize": 0.22
-      }
+      },
+      "age": 26,
+      "occupation": "Gerente do Café Hoshi",
+      "role": "Seu novo chefe",
+      "romanceable": true,
+      "color": "#9a9ab8",
+      "bio": "Elegante, metódico e difícil de ler. Guarda o café — e a si mesmo — com muito cuidado."
     },
     {
       "id": "character_11",
@@ -307,7 +366,13 @@
       "processing": {
         "headX": 0.5,
         "portraitSize": 0.22
-      }
+      },
+      "age": null,
+      "occupation": "—",
+      "role": "",
+      "romanceable": false,
+      "color": "#888",
+      "bio": "Ainda não aparece na história."
     }
   ]
 }

@@ -1,124 +1,154 @@
-// Orquestra as telas (DOM) e o motor (Phaser): título → menu → criação → jogo.
+// Orquestra telas (HTML) e palco (Phaser): título → menu → novo jogo → história.
 import { h, wait } from './dom.js';
 import { bus } from '../core/EventBus.js';
-import { game, createNewState } from '../core/GameState.js';
+import { game, newState } from '../core/GameState.js';
 import { saves } from '../save/SaveManager.js';
 import { audio } from '../audio/AudioManager.js';
 import { MainMenu } from './MainMenu.js';
-import { CharacterCreation } from './CharacterCreation.js';
-import { HUD } from './HUD.js';
-import { DialogueBox } from './DialogueBox.js';
-import { openSettings, openCredits, openPause, openPhone, openInventory, openConfirm } from './Panels.js';
-import { InputController } from '../controls/InputController.js';
+import { NewGame } from './NewGame.js';
+import { DialogueUI } from './DialogueUI.js';
+import { PhoneUI } from './PhoneUI.js';
+import { Cards } from './Cards.js';
+import { openSettings, openCredits, openPause, openBacklog, openGallery, openSaveLoad, openConfirm } from './Panels.js';
+
+const GALLERY_KEY = 'anime-life.gallery'; // galeria vale para todas as partidas
 
 export class UIManager {
-  constructor(root, gameRoot) {
-    this.root = root; this.gameRoot = gameRoot;
+  constructor(root, stageRoot) {
+    this.root = root; this.stageRoot = stageRoot;
     this.menu = new MainMenu(this);
-    this.create = new CharacterCreation(this);
-    this.hud = new HUD(this);
-    this.dialogue = new DialogueBox(this);
+    this.newGame = new NewGame(this);
+    this.dialogue = new DialogueUI(this);
+    this.phone = new PhoneUI(this);
+    this.cards = new Cards(this);
     this.fade = h('<div id="fade"></div>');
     this.toastEl = h('<div id="toast"></div>');
-    this.loading = h('<div id="loading" class="hidden"><div></div></div>');
-    root.append(this.fade, this.toastEl, this.loading);
-    this.input = new InputController(this.hud.joystick);
+    root.append(this.fade, this.toastEl);
     this.modals = 0;
-    bus.on('load:progress', (p) => { this.loading.firstChild.style.width = `${Math.round(p * 100)}%`; });
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.scene && !this.modals && !this.dialogue.runner) openPause(this);
-    });
-    // salva ao minimizar o app (Android)
-    document.addEventListener('visibilitychange', () => { if (document.hidden && this.scene && game.state) { this.scene.snapshotLocation(); this.save(); } });
+    bus.on('gallery:unlocked', (sc) => { this.rememberGallery(sc.id); this.toast(`🖼️ Cena desbloqueada na galeria: ${sc.title}`); });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.story && !this.modals) openPause(this); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && this.story && game.state && !game.replay) this.autosave(); });
   }
 
-  async boot() {
-    await this.menu.showSplash();
-    await this.showMenu();
-  }
+  get skipping() { return this.dialogue.skipping; }
 
-  async showMenu() {
-    const save = await saves.load();
-    await this.menu.show(save);
-  }
+  async boot() { await this.menu.showSplash(); await this.showMenu(); }
+
+  async showMenu() { await this.menu.show(await saves.load('auto')); }
 
   async menuAction(a) {
     if (a === 'settings') return openSettings(this);
     if (a === 'credits') return openCredits(this);
+    if (a === 'gallery') return openGallery(this, { fromMenu: true, unlocked: this.galleryList() });
+    if (a === 'load') return openSaveLoad(this, 'load');
+    if (a === 'continue') return this.loadFrom('auto');
     if (a === 'new') {
-      if (await saves.has() && !(await openConfirm(this, 'Começar um novo jogo vai substituir o jogo salvo. Continuar?', 'Novo jogo'))) return;
+      if (await saves.has('auto') && !(await openConfirm(this, 'Começar uma nova história substitui o salvamento automático (os espaços manuais continuam guardados). Continuar?', 'Nova história'))) return;
       await this.menu.hide();
-      const protagonist = await this.create.open();
-      await this.create.close();
+      const protagonist = await this.newGame.open();
+      await this.newGame.close();
       if (!protagonist) return this.showMenu();
-      game.set(createNewState(protagonist));
-      await this.save();
-      return this.startWorld();
-    }
-    if (a === 'continue') {
-      const s = await saves.load();
-      if (!s) return this.toast('Nenhum jogo salvo');
-      game.set(s);
-      await this.menu.hide();
-      return this.startWorld();
+      game.set(newState(protagonist));
+      await this.autosave();
+      return this.startStory();
     }
   }
 
-  async startWorld() {
+  async ensureEngine() {
+    if (this.engine) return this.engine;
+    const [{ createEngine }, { StoryEngine }] = await Promise.all([import('../core/Engine.js'), import('../story/StoryEngine.js')]);
+    this.engine = await createEngine(this.stageRoot);
+    this.StoryEngine = StoryEngine;
+    return this.engine;
+  }
+
+  async startStory() {
     this.fade.classList.add('on');
-    this.loading.classList.remove('hidden');
-    const { createGame, ApartmentScene } = await import('../core/Game.js'); // Phaser só carrega aqui
-    if (!this.engine) this.engine = createGame(this.gameRoot);
-    const data = { ui: this, input: this.input };
-    const ready = new Promise((r) => bus.once('scene:ready', r));
-    if (this.engine.scene.getScene('Apartment')) this.engine.scene.start('Apartment', data);
-    else this.engine.scene.add('Apartment', ApartmentScene, true, data);
-    await ready;
-    this.scene = this.engine.scene.getScene('Apartment');
-    this.loading.classList.add('hidden');
-    this.hud.show();
+    await this.ensureEngine();
+    this.story?.stop();
+    this.story = new this.StoryEngine(this, this.engine.stage);
+    this.dialogue.show();
+    const run = this.story.resume();
+    await wait(300);
     this.fade.classList.remove('on');
-    if (game.state.time.day === 1 && !game.flag('tutorial.visto')) {
-      game.setFlag('tutorial.visto');
-      await wait(700);
-      this.toast('Use o joystick para andar. Chegue perto das coisas para interagir.', 5000);
-    }
+    const story = this.story;
+    run.then(() => { if (this.story === story && !game.replay) this.backToTitle(); }).catch((e) => console.error('[Story]', e));
   }
 
-  async backToTitle() {
-    if (this.scene) { this.scene.snapshotLocation(); await this.save(); }
+  /** Fecha todas as janelas abertas (pausa, galeria, etc.). */
+  async closeModals() { await Promise.all([...(this.openModals || [])].map((m) => m.close())); }
+
+  async loadFrom(slot) {
+    await this.closeModals();
+    const s = await saves.load(slot);
+    if (!s) return this.toast('Nenhum jogo salvo aqui');
+    this.story?.stop(); this.dialogue.abort();
+    game.set(s);
+    if (!this.menu.el.classList.contains('hidden')) await this.menu.hide();
+    if (slot !== 'auto') await saves.save(s, 'auto');
+    return this.startStory();
+  }
+
+  async replayScene(sceneId, fromMenu) {
+    await this.closeModals();
+    if (fromMenu) {
+      const base = (await saves.load('auto')) || newState({ name: 'Você', displayName: 'Você', pronouns: 'ele' });
+      game.set(base);
+      await this.menu.hide();
+    }
     this.fade.classList.add('on');
-    await wait(600);
-    this.hud.hide();
-    this.engine?.scene.stop('Apartment');
-    this.scene = null;
+    await this.ensureEngine();
+    this.story?.stop(); this.dialogue.abort();
+    const replayer = new this.StoryEngine(this, this.engine.stage);
+    this.story = replayer;
+    this.dialogue.show();
+    this.fade.classList.remove('on');
+    this.toast('🖼️ Revendo cena (nada será salvo)');
+    await replayer.replay(sceneId);
+    if (this.story !== replayer) return;
+    if (fromMenu) return this.backToTitle(true);
+    return this.startStory();
+  }
+
+  async backToTitle(skipSave = false) {
+    await this.closeModals();
+    if (this.story && !skipSave && !game.replay) await this.autosave();
+    this.story?.stop(); this.story = null;
+    this.fade.classList.add('on');
+    await wait(500);
+    this.dialogue.abort(); this.dialogue.hide();
+    this.engine?.stage.clearAll();
+    this.cards.hideCover();
     this.fade.classList.remove('on');
     await this.showMenu();
   }
 
-  /** Transição com tela preta (ex.: dormir). */
-  async transition(work, text = '') {
-    this.fade.textContent = text;
-    this.fade.classList.add('on');
-    await wait(700);
-    await work();
-    await wait(900);
-    this.fade.classList.remove('on');
-    await wait(600);
-    this.fade.textContent = '';
+  // ---------- interface usada pelo StoryEngine ----------
+  say(line, opts) { return this.dialogue.say(line, opts); }
+  choose(options) { return this.dialogue.choose(options); }
+  chapterCard(ch) { return this.cards.chapter(ch); }
+  sceneCard(ch, sc, i) { return this.cards.scene(ch, sc, i); }
+  timeCard(t) { return this.cards.timeCard(t); }
+  chapterEnd(ch, next) { this.dialogue.abort(); return game.replay ? Promise.resolve() : this.cards.chapterEnd(ch, next); }
+  toBeContinued() { return this.cards.toBeContinued(); }
+
+  async autosave() {
+    if (!game.state || game.replay) return false;
+    this.rememberGallery(...game.state.gallery);
+    return saves.save(game.state, 'auto');
+  }
+  async saveTo(slot) { await this.autosave(); return saves.save(game.state, slot); }
+
+  galleryList() { try { return JSON.parse(localStorage.getItem(GALLERY_KEY) || '[]'); } catch { return game.state?.gallery || []; } }
+  rememberGallery(...ids) {
+    try { const s = new Set(this.galleryList()); ids.forEach((i) => s.add(i)); localStorage.setItem(GALLERY_KEY, JSON.stringify([...s])); } catch {}
   }
 
-  save() { return game.state ? saves.save(game.state) : Promise.resolve(false); }
-
-  modalCount(d) {
-    this.modals = Math.max(0, this.modals + d);
-    bus.emit('ui:modal', this.modals > 0);
-    this.input.setEnabled(this.modals === 0);
-  }
+  modalCount(d) { this.modals = Math.max(0, this.modals + d); bus.emit('ui:modal', this.modals > 0); }
 
   openPause() { openPause(this); }
-  openPhone() { openPhone(this); }
-  openInventory() { openInventory(this); }
+  openBacklog() { openBacklog(this); }
+  openSaveLoad(mode) { openSaveLoad(this, mode); }
 
   toast(msg, ms = 2600) {
     this.toastEl.textContent = msg;

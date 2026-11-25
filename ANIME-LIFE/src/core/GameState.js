@@ -1,42 +1,40 @@
-// Estado da partida (tudo o que é salvo). Nenhum sistema guarda progresso fora daqui.
-export const SAVE_VERSION = 1;
+// Estado completo da partida. Tudo o que influencia a história mora aqui e é salvo.
+export const SAVE_VERSION = 2;
 
-export function createNewState(protagonist) {
+export function newState(protagonist) {
   return {
     version: SAVE_VERSION,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    protagonist, // { name, displayName, pronouns, appearance }
-    location: { scene: 'apartment', x: null, y: null, facing: 'down' },
-    time: { day: 1, minutes: 9 * 60 + 30 }, // Dia 1, 09:30
-    flags: {},
-    decisions: [], // registro de escolhas de diálogo
-    relationships: {}, // characterId -> { affinity, met, talks }
-    inventory: [{ id: 'phone', qty: 1 }, { id: 'apartment_key', qty: 1 }],
-    contacts: [],
+    createdAt: Date.now(), updatedAt: Date.now(), playtime: 0,
+    protagonist, // { name, displayName, pronouns: 'ele'|'ela'|'elu' }
+    pos: { chapter: 'ch1', scene: null, pc: 0 }, // onde a história está (passo exato)
+    stage: { bg: null, chars: [], music: null }, // o que está na tela (para continuar idêntico)
+    flags: {}, // variáveis da história
+    rel: {}, // personagem -> { amizade, confianca, afinidade, romance, met }
+    routes: {}, // personagem -> 'insinuada' | 'aberta' | 'fechada'
+    decisions: [], // histórico de escolhas
+    log: [], // histórico de falas (últimas 400)
+    read: {}, // passos já lidos (para "Pular")
+    gallery: [], // cenas desbloqueadas
+    chapters: {}, // ch -> { started, done }
+    phone: { contacts: [], convos: {}, posts: [], liked: [], unread: 0 },
   };
 }
 
-/** Estado vivo da partida atual. */
 export const game = {
   state: null,
+  replay: false, // revendo cena pela galeria: nada é salvo
   set(s) { this.state = s; },
   get p() { return this.state?.protagonist; },
   flag(k) { return this.state?.flags[k]; },
-  setFlag(k, v = true) { if (this.state) this.state.flags[k] = v; },
-  clockText() {
-    const m = this.state?.time.minutes ?? 0;
-    return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-  },
-  period() {
-    const h = Math.floor((this.state?.time.minutes ?? 600) / 60) % 24;
-    if (h >= 5 && h < 12) return 'manhã';
-    if (h >= 12 && h < 18) return 'tarde';
-    return 'noite';
-  },
-  advance(minutes) {
-    const t = this.state.time;
-    t.minutes += minutes;
-    while (t.minutes >= 24 * 60) { t.minutes -= 24 * 60; t.day += 1; }
-  },
+  setFlag(k, v = true) { this.state.flags[k] = v; },
 };
+
+/** Troca marcadores do texto: {nome}, {nomecompleto}, {g:o/a/e} (concordância pelos pronomes). */
+export function fmt(text) {
+  const p = game.p || { name: '', displayName: '', pronouns: 'ele' };
+  const gi = { ele: 0, ela: 1, elu: 2 }[p.pronouns] ?? 0;
+  return String(text)
+    .replace(/\{nome\}/g, p.displayName || p.name)
+    .replace(/\{nomecompleto\}/g, p.name)
+    .replace(/\{g:([^}]*)\}/g, (_m, opts) => { const o = opts.split('/'); return o[gi] ?? o[0]; });
+}

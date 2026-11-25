@@ -4,7 +4,8 @@ const DEFAULTS = {
   music: 0.6,
   sfx: 0.8,
   textSpeed: 'normal', // lenta | normal | rapida | instantanea
-  movement: 'livre', // livre (analógico) | quatro (só 4 direções)
+  autoSpeed: 'normal', // modo automático: lento | normal | rapido
+  skipUnread: false, // "Pular" também pula texto ainda não lido
   quality: 'auto', // auto | alta | economica
 };
 
@@ -18,6 +19,7 @@ export const settings = {
     this.data[k] = v;
     try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch {}
   },
+  autoDelay() { return { lento: 2600, normal: 1700, rapido: 1000 }[this.data.autoSpeed] ?? 1700; },
   textDelay() {
     return { lenta: 45, normal: 26, rapida: 12, instantanea: 0 }[this.data.textSpeed] ?? 26;
   },
