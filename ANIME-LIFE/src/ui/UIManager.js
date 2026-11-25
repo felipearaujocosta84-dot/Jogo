@@ -8,7 +8,7 @@ import { MainMenu } from './MainMenu.js';
 import { CharacterCreation } from './CharacterCreation.js';
 import { HUD } from './HUD.js';
 import { DialogueBox } from './DialogueBox.js';
-import { openSettings, openCredits, openPause, openPhone, openInventory } from './Panels.js';
+import { openSettings, openCredits, openPause, openPhone, openInventory, openConfirm } from './Panels.js';
 import { InputController } from '../controls/InputController.js';
 
 export class UIManager {
@@ -46,7 +46,7 @@ export class UIManager {
     if (a === 'settings') return openSettings(this);
     if (a === 'credits') return openCredits(this);
     if (a === 'new') {
-      if (await saves.has() && !confirm('Começar um novo jogo vai substituir o jogo salvo. Continuar?')) return;
+      if (await saves.has() && !(await openConfirm(this, 'Começar um novo jogo vai substituir o jogo salvo. Continuar?', 'Novo jogo'))) return;
       await this.menu.hide();
       const protagonist = await this.create.open();
       await this.create.close();

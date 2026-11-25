@@ -134,3 +134,15 @@ export function openInventory(ui) {
   });
   const m = new Modal(ui, p); m.open(); return m;
 }
+
+/** Confirmação dentro do jogo (window.confirm é bloqueado em alguns navegadores/iframes). */
+export function openConfirm(ui, text, yes = 'Sim', no = 'Cancelar') {
+  return new Promise((resolve) => {
+    let answer = false;
+    const p = h(`<div class="panel" style="width:min(380px,90vw)"><h2>✿ Atenção</h2><p style="font-weight:700;margin:0 0 14px">${esc(text)}</p>
+      <div class="create-actions"><button class="pbtn alt" data-a="no">${esc(no)}</button><button class="pbtn" data-a="yes">${esc(yes)}</button></div></div>`);
+    const m = new Modal(ui, p, { onClose: () => resolve(answer) });
+    p.addEventListener('click', (e) => { const a = e.target.closest('button')?.dataset.a; if (!a) return; answer = a === 'yes'; m.close(); });
+    m.open();
+  });
+}
