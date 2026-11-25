@@ -1,0 +1,313 @@
+{
+  "_comment": "Registro dos personagens oficiais. Nomes são provisórios e editáveis. 'traits' descreve a identidade visual que QUALQUER sprite futuro deve preservar. A referência original fica em public/assets/characters/<id>/reference/original.jpg e nunca deve ser sobrescrita.",
+  "characters": [
+    {
+      "id": "character_01",
+      "name": "Rin Kuroha",
+      "displayName": "Rin",
+      "pronoun": "ela",
+      "traits": [
+        "cabelo preto muito longo com franja reta",
+        "olhos azuis",
+        "presilha no cabelo (lado direito)",
+        "brinco de argola",
+        "gargantilha preta com pingente",
+        "moletom preto oversized com capuz e cordões",
+        "meias pretas",
+        "tênis preto de cano alto com sola branca"
+      ],
+      "palette": {
+        "hair": "#1d1b22",
+        "eyes": "#4f8fe0",
+        "outfit": "#2e2a2c",
+        "accent": "#e9e9ee",
+        "skin": "#fbe3d6"
+      },
+      "processing": {
+        "headX": 0.52,
+        "portraitSize": 0.27,
+        "holeMinArea": 30,
+        "holeMaxY": 0.45
+      },
+      "role": "Vizinha · apto 202",
+      "cheeks": [
+        [
+          41,
+          14.3
+        ],
+        [
+          57,
+          14.3
+        ]
+      ]
+    },
+    {
+      "id": "character_02",
+      "name": "Mei Asano",
+      "displayName": "Mei",
+      "pronoun": "ela",
+      "traits": [
+        "cabelo castanho escuro na altura do ombro, franja",
+        "olhos castanho-arroxeados",
+        "moletom preto oversized com capuz",
+        "mãos nos bolsos",
+        "calça jeans azul clara rasgada nos joelhos",
+        "tênis branco"
+      ],
+      "palette": {
+        "hair": "#4a3530",
+        "eyes": "#6b5a7a",
+        "outfit": "#22252d",
+        "accent": "#7d9bc4",
+        "skin": "#fbe6da"
+      },
+      "processing": {
+        "headX": 0.5,
+        "portraitSize": 0.26
+      }
+    },
+    {
+      "id": "character_03",
+      "name": "Hina Sakurai",
+      "displayName": "Hina",
+      "pronoun": "ela",
+      "traits": [
+        "cabelo castanho com rabo de cavalo lateral",
+        "prendedor verde-água no cabelo",
+        "olhos castanhos",
+        "casaco rosa com capuz e broche de estrela",
+        "laço vermelho",
+        "saia cinza pregueada",
+        "meias azul-marinho",
+        "sapato marrom escolar"
+      ],
+      "palette": {
+        "hair": "#5a3c2c",
+        "eyes": "#7a4a30",
+        "outfit": "#f1a8c4",
+        "accent": "#8c8f96",
+        "skin": "#fbe6da"
+      },
+      "processing": {
+        "headX": 0.5,
+        "portraitSize": 0.26,
+        "crop": [
+          0,
+          0,
+          363,
+          505
+        ]
+      },
+      "licenseWarning": "A imagem enviada contém marca d'água do Shutterstock (imagem não licenciada)."
+    },
+    {
+      "id": "character_04",
+      "name": "Momo Hanazawa",
+      "displayName": "Momo",
+      "pronoun": "ela",
+      "traits": [
+        "cabelo rosa com cachos laterais (twin drills) e laços pretos",
+        "olhos verde-amarelados",
+        "blazer marrom com brasão",
+        "gravata vermelha",
+        "saia xadrez azul",
+        "meias brancas acima do joelho",
+        "mocassim preto"
+      ],
+      "palette": {
+        "hair": "#e89aa8",
+        "eyes": "#b5c23a",
+        "outfit": "#5a3528",
+        "accent": "#3a5a8c",
+        "skin": "#fbe6da"
+      },
+      "processing": {
+        "headX": 0.42,
+        "portraitSize": 0.25
+      }
+    },
+    {
+      "id": "character_05",
+      "name": "Airi Shiraishi",
+      "displayName": "Airi",
+      "pronoun": "ela",
+      "traits": [
+        "cabelo rosa muito longo e liso",
+        "olhos azuis",
+        "blusa creme com babados e laço grande",
+        "saia azul-marinho de cintura alta",
+        "sapato de salto creme"
+      ],
+      "palette": {
+        "hair": "#f4a9c2",
+        "eyes": "#4f7fd0",
+        "outfit": "#f3ece0",
+        "accent": "#232a52",
+        "skin": "#fde9de"
+      },
+      "processing": {
+        "headX": 0.45,
+        "portraitSize": 0.3,
+        "keepBackground": true,
+        "portraitTop": 0.02
+      },
+      "licenseWarning": "A imagem enviada traz o nome 'Honami' e assinatura de outro artista; pode ser fan-art de personagem existente.",
+      "cutout": false
+    },
+    {
+      "id": "character_06",
+      "name": "Akane Tachibana",
+      "displayName": "Akane",
+      "pronoun": "ela",
+      "traits": [
+        "cabelo laranja-rosado muito longo",
+        "tiara/faixa listrada preta e amarela",
+        "olhos vermelhos",
+        "brincos dourados",
+        "colar com pingente dourado",
+        "suéter de tricô cinza-claro gola alta",
+        "sobretudo cinza-escuro",
+        "short cinza",
+        "bota preta com fivelas"
+      ],
+      "palette": {
+        "hair": "#ee9a7a",
+        "eyes": "#c8323a",
+        "outfit": "#4a4d58",
+        "accent": "#d9d6d0",
+        "skin": "#fbe6da"
+      },
+      "processing": {
+        "headX": 0.5,
+        "portraitSize": 0.22
+      }
+    },
+    {
+      "id": "character_07",
+      "name": "Kaito Hayami",
+      "displayName": "Kaito",
+      "pronoun": "ele",
+      "traits": [
+        "cabelo preto curto e bagunçado",
+        "olhos castanhos",
+        "moletom vermelho e branco com capuz na cabeça",
+        "mangas pretas",
+        "mochila preta com alças",
+        "bermuda preta com detalhes vermelhos",
+        "sandália preta"
+      ],
+      "palette": {
+        "hair": "#1e1e24",
+        "eyes": "#8a6a4a",
+        "outfit": "#ef4a2e",
+        "accent": "#202024",
+        "skin": "#f6dccb"
+      },
+      "processing": {
+        "headX": 0.42,
+        "portraitSize": 0.24,
+        "holeMinArea": 1000000000
+      }
+    },
+    {
+      "id": "character_08",
+      "name": "Haru Mizuno",
+      "displayName": "Haru",
+      "pronoun": "ele",
+      "traits": [
+        "cabelo castanho escuro bagunçado",
+        "óculos de armação fina",
+        "moletom cinza oversized",
+        "pequena luz verde na mão",
+        "calça jeans azul",
+        "tênis branco"
+      ],
+      "palette": {
+        "hair": "#3a2a24",
+        "eyes": "#4a3a30",
+        "outfit": "#b9b8bb",
+        "accent": "#3d5a8a",
+        "skin": "#f8e0d0"
+      },
+      "processing": {
+        "headX": 0.5,
+        "portraitSize": 0.24
+      }
+    },
+    {
+      "id": "character_09",
+      "name": "Sora Kirishima",
+      "displayName": "Sora",
+      "pronoun": "ele",
+      "traits": [
+        "cabelo castanho bagunçado",
+        "óculos redondos",
+        "moletom bege/cáqui oversized",
+        "lança escura com ponta de cristal azul",
+        "calça azul-marinho",
+        "tênis escuro"
+      ],
+      "palette": {
+        "hair": "#5a3a26",
+        "eyes": "#6a5a4a",
+        "outfit": "#a8a48e",
+        "accent": "#232a4a",
+        "skin": "#f3d6c2"
+      },
+      "processing": {
+        "headX": 0.5,
+        "portraitSize": 0.22
+      }
+    },
+    {
+      "id": "character_10",
+      "name": "Kyo Amagiri",
+      "displayName": "Kyo",
+      "pronoun": "ele",
+      "traits": [
+        "cabelo preto-azulado médio cobrindo um olho",
+        "olhos acinzentados",
+        "camisa social preta com mangas dobradas",
+        "gravata preta",
+        "relógio no pulso esquerdo",
+        "calça preta justa",
+        "sapato social preto"
+      ],
+      "palette": {
+        "hair": "#1a1a2a",
+        "eyes": "#6a6a80",
+        "outfit": "#2a2632",
+        "accent": "#141418",
+        "skin": "#f6e2d6"
+      },
+      "processing": {
+        "headX": 0.5,
+        "portraitSize": 0.22
+      }
+    },
+    {
+      "id": "character_11",
+      "name": "Yuu Kageyama",
+      "displayName": "Yuu",
+      "pronoun": "ele",
+      "traits": [
+        "cabelo preto bagunçado cobrindo os olhos",
+        "camiseta preta de manga longa",
+        "pulseiras no pulso",
+        "calça preta justa",
+        "tênis preto com sola clara"
+      ],
+      "palette": {
+        "hair": "#1a1818",
+        "eyes": "#3a3030",
+        "outfit": "#242226",
+        "accent": "#d0d0d0",
+        "skin": "#f3dccd"
+      },
+      "processing": {
+        "headX": 0.5,
+        "portraitSize": 0.22
+      }
+    }
+  ]
+}

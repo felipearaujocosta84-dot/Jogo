@@ -1,0 +1,9 @@
+{
+  "appId": "com.animelife.minhavida",
+  "appName": "Anime Life",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#1b1530",
+    "allowMixedContent": false
+  }
+}

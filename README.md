@@ -1,5 +1,7 @@
 # STREET FOOTBALL 3D
 
+> Este repositório também contém **ANIME LIFE — MINHA VIDA** (jogo 2D em Phaser) na pasta [`ANIME-LIFE/`](ANIME-LIFE/README.md).
+
 Futebol de rua 3D (3 contra 3) feito com **Babylon.js + JavaScript + Vite**, pensado para rodar no navegador de celulares Android.
 
 ## Estado atual — ETAPA 2 concluída
