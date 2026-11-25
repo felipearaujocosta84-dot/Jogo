@@ -1,7 +1,7 @@
 {
   "name": "anime-life",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "ANIME LIFE — MINHA VIDA: simulador de vida anime 2D (Phaser 3) para navegador e Android (Capacitor)",
   "type": "module",
   "scripts": {

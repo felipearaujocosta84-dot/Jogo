@@ -5,6 +5,15 @@ Feita com **Phaser 3 + JavaScript modular + Vite**, empacotável como app Androi
 
 > A versão anterior (exploração livre com joystick e mapa) foi removida a pedido. O código dela continua no histórico do git.
 
+## Novidade da v0.3.0: personagens animados em 2D
+Os personagens continuam sendo as ilustrações originais, agora com vida:
+- piscar, boca acompanhando a fala, cabeça, respiração e cabelo;
+- pequenos movimentos de corpo e entrada e saída animadas;
+- expressões que seguem as falas: neutro, feliz, triste, envergonhado, surpreso, irritado e apaixonado, entre outras.
+
+A câmera também ficou cinematográfica: zoom suave, close-up nos momentos importantes, plano por cima do ombro e movimento lateral.
+Detalhes, limites e a lista de imagens que deixariam a animação perfeita estão em [ANIMACAO_2D.md](ANIMACAO_2D.md).
+
 ## O que tem nesta versão (v0.2.0)
 
 - **Menu principal:** Continuar, Novo jogo, Carregar, Galeria, Ajustes e Créditos, com música ambiente e transições.
@@ -40,8 +49,8 @@ Os personagens 03 e 04 usam uniforme escolar e **nunca** terão romance.
 O 05 está fora da história até a imagem ser licenciada.
 O 09 (talvez o mesmo personagem do 08) e o 11 ainda não aparecem.
 
-**Expressões:** só existe a arte neutra de cada personagem. Por enquanto, a expressão é mostrada com animação, balão (♪ ! ? 💢 💧) e rubor sobre a ilustração original.
-Para trocar por arte própria, veja `public/assets/characters/<id>/expressions/README.md`.
+**Expressões:** só existe a arte neutra de cada personagem. A expressão aparece animando a própria ilustração: olhos semicerrados ou arregalados, rubor, cabeça, respiração e balão (veja [ANIMACAO_2D.md](ANIMACAO_2D.md)).
+Para usar arte própria por expressão, veja `public/assets/characters/<id>/expressions/README.md`.
 
 ## Como executar
 ```bash
@@ -61,11 +70,12 @@ npm run android:open   # Android Studio → Run ou Build APK (app travado em pai
 - **Cenas:** ficam em `src/story/chapters/chN.js`. Cada cena é uma lista de passos:
   ```js
   { bg: 'cafe' }  { music: 'cafe' }  { card: 'Segunda-feira, 15h' }
-  { show: R, at: 'left', e: 'happy' }  { hide: R }
+  { show: R, at: 'left', e: 'happy' }  { hide: R }  { shot: 'wide' }
   { n: 'narração' }  { th: 'pensamento' }  { p: 'fala do protagonista' }  { c: R, e: 'sad', t: 'fala' }
   { id: 'decisao', choice: [{ t: 'texto', value: 'x', do: [rel(R, { amizade: 2 }), flag('k', 'v')], go: 'rotulo', if: (c) => ..., lockIf: (c) => ..., lock: 'motivo' }] }
   { label: 'rotulo' }  { if: (c) => c.flag('k') === 'v', go: 'rotulo' }  { phone: 'conversa' }  { end: true }
   ```
+- **Câmera e emoção por fala:** `cam: 'close'` força o plano; `big: true` marca uma revelação. Sem `e`, a emoção é deduzida do texto.
 - **Marcadores de texto:** `{nome}` para o nome de exibição e `{g:o/a/e}` para a concordância com os pronomes.
 - **Celular:** conversas ficam em `src/story/phone/conversations.js` e publicações em `src/story/phone/posts.js`.
 - **Verificação:** `node tools/story-check.mjs` percorre todos os caminhos e acusa rótulos quebrados, becos sem saída e romance inválido.
@@ -73,7 +83,9 @@ npm run android:open   # Android Studio → Run ou Build APK (app travado em pai
 ## Estrutura do código
 ```
 src/core/            Engine.js (Phaser), GameState.js (estado salvo + textos), EventBus, assets
-src/scenes/          StageScene.js (palco: cenário, personagens, transições), backgrounds.js (cenários pintados)
+src/scenes/          StageScene.js (palco: cenário, personagens, câmera, transições), backgrounds.js (cenários pintados)
+src/animation/       LivingSprite.js + livingShader.js (anima a ilustração original), CharacterAnimator.js
+src/cinematic/       Emotions.js (emoção de cada fala), Director.js (planos de câmera), LipSync.js (boca pelo texto)
 src/story/           StoryEngine.js (intérprete), chapters/ (capítulos), phone/ (conversas e posts), dsl.js
 src/choices/         ChoiceSystem.js (condições, bloqueios, efeitos, registro de decisões)
 src/characters/      characters.json + CharacterRegistry.js
@@ -86,5 +98,6 @@ tools/               story-check.mjs, smoke-test.cjs, process_characters.py
 
 ## Ainda não feito
 - Capítulo 2 além da abertura, rotas completas e finais diferentes. As variáveis que vão decidir os finais já são registradas desde o Capítulo 1.
-- Arte de expressões e cenários desenhados à mão (os atuais são pintados por código).
+- Camadas desenhadas (olhos fechados, boca aberta) para um piscar completo e uma boca bem aberta. Veja o pedido de recursos em ANIMACAO_2D.md.
+- Cenários desenhados à mão (os atuais são pintados por código).
 - APK compilado (precisa do Android Studio).

@@ -5,7 +5,7 @@ import { Characters } from '../characters/CharacterRegistry.js';
 import { audio } from '../audio/AudioManager.js';
 import { CHAPTERS } from '../story/chapters/index.js';
 
-const VERSION = 'v0.2.0 — visual novel';
+const VERSION = 'v0.3.0 — personagens animados';
 const LINEUP = [
   { id: 'character_07', left: '0%', h: '86%' },
   { id: 'character_01', left: '30%', h: '94%' },

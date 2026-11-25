@@ -1,5 +1,5 @@
 {
-  "_comment": "Registro dos personagens oficiais. Nomes provisórios e editáveis. 'traits' = identidade visual que qualquer arte nova deve preservar. A ilustração original (reference/original.jpg) é reutilizada em todas as cenas e nunca deve ser sobrescrita. Romance: somente personagens adultos com romanceable=true.",
+  "_comment": "Registro dos personagens oficiais. Nomes provisórios e editáveis. 'traits' = identidade visual que qualquer arte nova deve preservar. A ilustração original (reference/original.jpg) é reutilizada em todas as cenas e nunca deve ser sobrescrita. Romance: somente personagens adultos com romanceable=true. 'face' = centro do rosto na ilustração (% da largura, % da altura), usado pela câmera para close-ups. 'rig' = posições medidas na ilustração (olhos, boca, mechas) para animar os próprios pixels: piscar, boca, cabelo. 'layers' (opcional) = camadas desenhadas a partir da referência (olhos fechados, boca aberta) que substituem a animação por deslocamento.",
   "characters": [
     {
       "id": "character_01",
@@ -30,21 +30,59 @@
         "holeMaxY": 0.45
       },
       "role": "Vizinha · apto 202",
-      "cheeks": [
-        [
-          41,
-          14.3
-        ],
-        [
-          57,
-          14.3
-        ]
-      ],
       "age": 22,
       "occupation": "Estudante de design gráfico (último ano)",
       "romanceable": true,
       "color": "#7aa7ff",
-      "bio": "Reservada, sarcástica e mais gentil do que admite. Vive de madrugada, desenhando cartazes para bandas que ninguém conhece."
+      "bio": "Reservada, sarcástica e mais gentil do que admite. Vive de madrugada, desenhando cartazes para bandas que ninguém conhece.",
+      "face": [
+        50,
+        13
+      ],
+      "rig": {
+        "eyes": [
+          [
+            42.4,
+            12.8,
+            6.6,
+            1.8
+          ],
+          [
+            56.2,
+            11.7,
+            5.5,
+            1.8
+          ]
+        ],
+        "mouth": [
+          50.9,
+          15.75,
+          3.2
+        ],
+        "hair": [
+          [
+            2,
+            14,
+            32,
+            52,
+            1
+          ],
+          [
+            68,
+            12,
+            99,
+            50,
+            1
+          ],
+          [
+            30,
+            3,
+            72,
+            10,
+            0.4
+          ]
+        ]
+      }
     },
     {
       "id": "character_02",
@@ -75,7 +113,55 @@
       "role": "Vizinha · apto 205",
       "romanceable": true,
       "color": "#a98fd6",
-      "bio": "Calma, observadora e leal até demais. Era a melhor amiga da antiga moradora do 201."
+      "bio": "Calma, observadora e leal até demais. Era a melhor amiga da antiga moradora do 201.",
+      "face": [
+        35,
+        11
+      ],
+      "rig": {
+        "eyes": [
+          [
+            29.2,
+            10.6,
+            5.7,
+            1.5
+          ],
+          [
+            40.6,
+            9.7,
+            6.4,
+            1.6
+          ]
+        ],
+        "mouth": [
+          35.5,
+          13.7,
+          2.6
+        ],
+        "hair": [
+          [
+            8,
+            8,
+            28,
+            24,
+            0.7
+          ],
+          [
+            42,
+            5,
+            62,
+            20,
+            0.5
+          ],
+          [
+            18,
+            1,
+            55,
+            7,
+            0.4
+          ]
+        ]
+      }
     },
     {
       "id": "character_03",
@@ -215,7 +301,55 @@
       "role": "Irmã da antiga moradora",
       "romanceable": true,
       "color": "#ff8a6a",
-      "bio": "Direta, intensa e cansada de procurar respostas. Faz um ano que a irmã caçula sumiu sem se despedir."
+      "bio": "Direta, intensa e cansada de procurar respostas. Faz um ano que a irmã caçula sumiu sem se despedir.",
+      "face": [
+        46,
+        9
+      ],
+      "rig": {
+        "eyes": [
+          [
+            41.0,
+            8.5,
+            3.8,
+            1.3
+          ],
+          [
+            50.3,
+            7.4,
+            5.3,
+            1.1
+          ]
+        ],
+        "mouth": [
+          46.5,
+          11.1,
+          2.4
+        ],
+        "hair": [
+          [
+            0,
+            10,
+            33,
+            55,
+            1
+          ],
+          [
+            62,
+            8,
+            100,
+            52,
+            1
+          ],
+          [
+            32,
+            1,
+            64,
+            6,
+            0.4
+          ]
+        ]
+      }
     },
     {
       "id": "character_07",
@@ -248,7 +382,41 @@
       "role": "Vizinho · apto 203",
       "romanceable": true,
       "color": "#ff6a4a",
-      "bio": "Barulhento, generoso e sempre organizando alguma coisa. Conhece cada rua de Hoshizora — e cada encomenda."
+      "bio": "Barulhento, generoso e sempre organizando alguma coisa. Conhece cada rua de Hoshizora — e cada encomenda.",
+      "face": [
+        40,
+        10.5
+      ],
+      "rig": {
+        "eyes": [
+          [
+            33.1,
+            9.5,
+            6.0,
+            1.0
+          ],
+          [
+            44.4,
+            8.2,
+            6.7,
+            1.1
+          ]
+        ],
+        "mouth": [
+          41.8,
+          13.0,
+          4.0
+        ],
+        "hair": [
+          [
+            24,
+            1,
+            58,
+            8,
+            0.5
+          ]
+        ]
+      }
     },
     {
       "id": "character_08",
@@ -279,7 +447,41 @@
       "role": "Colega de trabalho",
       "romanceable": true,
       "color": "#8fb98a",
-      "bio": "Tímido, curioso e apaixonado por astronomia. Fala pouco, mas sempre a coisa certa."
+      "bio": "Tímido, curioso e apaixonado por astronomia. Fala pouco, mas sempre a coisa certa.",
+      "face": [
+        52,
+        10.5
+      ],
+      "rig": {
+        "eyes": [
+          [
+            46.4,
+            9.3,
+            5.1,
+            0.9
+          ],
+          [
+            57.4,
+            9.05,
+            5.1,
+            0.9
+          ]
+        ],
+        "mouth": [
+          53.7,
+          12.3,
+          2.4
+        ],
+        "hair": [
+          [
+            30,
+            1,
+            74,
+            8,
+            0.5
+          ]
+        ]
+      }
     },
     {
       "id": "character_09",
@@ -342,7 +544,42 @@
       "role": "Seu novo chefe",
       "romanceable": true,
       "color": "#9a9ab8",
-      "bio": "Elegante, metódico e difícil de ler. Guarda o café — e a si mesmo — com muito cuidado."
+      "bio": "Elegante, metódico e difícil de ler. Guarda o café — e a si mesmo — com muito cuidado.",
+      "face": [
+        40,
+        9.5
+      ],
+      "rig": {
+        "eyes": [
+          [
+            43.1,
+            7.9,
+            5.5,
+            0.8
+          ]
+        ],
+        "mouth": [
+          42.5,
+          12.2,
+          3.0
+        ],
+        "hair": [
+          [
+            20,
+            1,
+            62,
+            9,
+            0.6
+          ],
+          [
+            24,
+            9,
+            34,
+            18,
+            0.6
+          ]
+        ]
+      }
     },
     {
       "id": "character_11",

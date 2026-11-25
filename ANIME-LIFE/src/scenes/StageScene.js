@@ -1,13 +1,20 @@
 // Palco da visual novel (Phaser 3): cenário em tela cheia, personagens em destaque,
 // entrada/saída, foco em quem fala, expressões e transições.
-// Os personagens são SEMPRE a ilustração original (full.webp, recorte da referência).
+// Os personagens são SEMPRE a ilustração original (full.webp, recorte da referência), animada
+// pelo LivingSprite (piscar, boca, cabeça, respiração, cabelo, expressões) quando há WebGL.
 import Phaser from 'phaser';
 import { paintBackground, BG_W, BG_H, FILES } from './backgrounds.js';
 import { Characters } from '../characters/CharacterRegistry.js';
-import { asset } from '../core/assets.js';
+import { asset, characterAsset } from '../core/assets.js';
+import { EMOTIONS } from '../cinematic/Emotions.js';
+import { LivingSprite, canAnimate } from '../animation/LivingSprite.js';
+import { CharacterAnimator } from '../animation/CharacterAnimator.js';
+import { settings } from '../save/Settings.js';
 
 const SLOTS = { farleft: 0.14, left: 0.27, center: 0.5, right: 0.73, farright: 0.86 };
-const EMOTES = { happy: '♪', surprised: '!', curious: '?', angry: '💢', sad: '💧', embarrassed: '///', serious: '…' };
+const EMOTE_COLORS = { happy: '#ff6fa8', surprised: '#ffb020', curious: '#9a7aff', angry: '#ff4060', sad: '#5aa0ff', hurt: '#5aa0ff', embarrassed: '#ff5a7a', serious: '#ffffff', love: '#ff5a9a' };
+// planos de câmera (2D): zoom e altura do rosto na tela (fração da altura)
+const FRAMING = { wide: { z: 1, f: null }, medium: { z: 1.32, f: 0.3 }, close: { z: 1.95, f: 0.34 }, extreme: { z: 2.8, f: 0.37 }, ots: { z: 1.6, f: 0.33 }, side: { z: 1.5, f: 0.32 }, two: { z: 1.2, f: 0.3 }, choice: { z: 1.3, f: 0.3 } };
 
 export class StageScene extends Phaser.Scene {
   constructor() { super('Stage'); }
@@ -16,8 +23,9 @@ export class StageScene extends Phaser.Scene {
     this.bgA = this.add.image(0, 0, '__DEFAULT').setOrigin(0.5).setVisible(false).setDepth(0);
     this.bgB = this.add.image(0, 0, '__DEFAULT').setOrigin(0.5).setVisible(false).setDepth(1);
     this.chars = new Map(); // id -> { img, at, blush, emote }
-    this.vignette = this.add.graphics().setDepth(50);
-    this.scale.on('resize', () => this.layout());
+    this.vignette = this.add.graphics().setDepth(50).setScrollFactor(0);
+    this.camProxy = { x: 0, y: 0, z: 1 };
+    this.scale.on('resize', () => { this.layout(); if (this.currentShot) this.shot(this.currentShot, { instant: true }); });
     this.layout();
     this.events.emit('stage-ready');
     this.game.events.emit('stage-ready', this);
@@ -27,6 +35,8 @@ export class StageScene extends Phaser.Scene {
   get H() { return this.scale.height; }
 
   layout() {
+    this.cameras.main.setBounds(0, 0, this.W, this.H);
+    if (!this.currentShot) { this.camProxy = { x: this.W / 2, y: this.H / 2, z: 1 }; this.applyCam(); }
     for (const bg of [this.bgA, this.bgB]) this.cover(bg);
     for (const [, c] of this.chars) this.place(c, false);
     this.vignette.clear();
@@ -82,28 +92,60 @@ export class StageScene extends Phaser.Scene {
     else c.img.setPosition(x, y).setScale(s);
   }
 
+  /** Camadas opcionais desenhadas a partir da referência (characters.json → layers). */
+  async loadLayers(id) {
+    const L = Characters.get(id)?.layers || {};
+    const out = {};
+    for (const [k, file] of Object.entries(L)) {
+      try { await this.loadImage(`layer_${id}_${k}`, characterAsset(id, file)); out[k] = `layer_${id}_${k}`; } catch (e) { console.warn('[Stage] camada não carregou', file); }
+    }
+    return out;
+  }
+
+  makeSprite(id, key, at) {
+    const data = Characters.get(id);
+    if (canAnimate(this, data) && settings.data.animations !== 'off') {
+      const img = new LivingSprite(this, this.W * SLOTS[at], 0, key, this.layerKeys?.[id] || {});
+      img.setOrigin(0.5, 0).setDepth(10);
+      const anim = new CharacterAnimator(img, data, { side: SLOTS[at] < 0.5 ? 1 : -1 });
+      anim.level = settings.data.animations || 'completa';
+      return { img, anim };
+    }
+    return { img: this.add.image(this.W * SLOTS[at], 0, key).setOrigin(0.5, 0).setDepth(10), anim: null };
+  }
+
   async show(id, at = 'center', expr = 'neutral') {
     const key = `char_${id}`;
     await this.loadImage(key, Characters.expressionImage(id, expr));
+    (this.layerKeys ||= {})[id] ||= await this.loadLayers(id);
     const existing = this.chars.get(id);
-    if (existing) { existing.at = at; this.place(existing, !this.instant); this.express(id, expr); return; }
-    const img = this.add.image(this.W * SLOTS[at], 0, key).setOrigin(0.5, 0).setDepth(10);
-    const c = { id, img, at };
+    if (existing) {
+      existing.at = at; this.place(existing, !this.instant); this.express(id, expr);
+      if (existing.anim) existing.anim.side = SLOTS[at] < 0.5 ? 1 : -1;
+      return;
+    }
+    const { img, anim } = this.makeSprite(id, key, at);
+    const c = { id, img, at, anim };
+    anim?.setEmotion(expr);
     this.chars.set(id, c);
     this.place(c, false);
     if (this.instant) return;
+    // entrada: desliza do lado, sobe um pouco e aparece; leve "respiro" de escala no fim
     const fromX = img.x + (at === 'right' ? 50 : at === 'left' ? -50 : 0);
     img.setAlpha(0).setX(fromX).setY(c.baseY + 14);
-    await new Promise((r) => this.tweens.add({ targets: img, alpha: 1, x: this.W * SLOTS[at], y: c.baseY, duration: 420, ease: 'Cubic.easeOut', onComplete: r }));
+    img.setScale(c.baseScale * 0.97);
+    await new Promise((r) => this.tweens.add({ targets: img, alpha: 1, x: this.W * SLOTS[at], y: c.baseY, scale: c.baseScale, duration: 520, ease: 'Cubic.easeOut', onComplete: r }));
   }
 
   async hide(id) {
     const c = this.chars.get(id);
     if (!c) return;
     this.chars.delete(id);
-    c.emote?.destroy(); c.blush?.destroy();
+    c.emote?.destroy();
     if (this.instant) { c.img.destroy(); return; }
-    await new Promise((r) => this.tweens.add({ targets: c.img, alpha: 0, y: c.baseY + 16, duration: 300, onComplete: () => { c.img.destroy(); r(); } }));
+    // saída: vira levemente para o lado da tela, desce e some
+    const dir = SLOTS[c.at] < 0.5 ? -1 : 1;
+    await new Promise((r) => this.tweens.add({ targets: c.img, alpha: 0, y: c.baseY + 18, x: c.img.x + dir * 40, duration: 380, ease: 'Sine.easeIn', onComplete: () => { c.img.destroy(); r(); } }));
   }
 
   async hideAll() { await Promise.all([...this.chars.keys()].map((id) => this.hide(id))); }
@@ -121,8 +163,12 @@ export class StageScene extends Phaser.Scene {
   express(id, expr) {
     const c = this.chars.get(id);
     if (!c || !expr) return;
+    c.anim?.setEmotion(expr);
     if (Characters.hasExpressionArt(id, expr)) {
-      this.loadImage(`char_${id}_${expr}`, Characters.expressionImage(id, expr)).then(() => c.img.setTexture(`char_${id}_${expr}`));
+      const k = `char_${id}_${expr}`;
+      this.loadImage(k, Characters.expressionImage(id, expr)).then(() => {
+        if (c.anim) c.img.setSampler2D('iChannel0', k, 0, { wrapS: 'clamp_to_edge', wrapT: 'clamp_to_edge' }); else c.img.setTexture(k);
+      });
       return;
     }
     if (this.instant) return;
@@ -136,29 +182,20 @@ export class StageScene extends Phaser.Scene {
     if (expr === 'curious') this.tweens.add({ targets: img, angle: -1.5, duration: 300, ease: 'Sine.easeOut' });
     // balão
     c.emote?.destroy();
-    if (EMOTES[expr]) {
-      const t = this.add.text(img.x + img.displayWidth * 0.18, y0 + this.charHeight() * 0.04, EMOTES[expr], {
+    const emote = EMOTIONS[expr]?.emote;
+    if (expr === 'love') this.tweens.add({ targets: img, angle: 1.2, duration: 900, yoyo: true, ease: 'Sine.easeInOut' });
+    if (expr === 'shy') this.tweens.add({ targets: img, y: y0 + 6, duration: 400, ease: 'Sine.easeOut' });
+    if (expr === 'lookaway') this.tweens.add({ targets: img, angle: c.at === 'right' ? 2 : -2, x: img.x + (c.at === 'right' ? 10 : -10), duration: 500, ease: 'Sine.easeOut' });
+    if (expr === 'hurt') this.tweens.add({ targets: img, y: y0 + 8, duration: 600, ease: 'Sine.easeOut' });
+    if (emote) {
+      const t = this.add.text(img.x + img.displayWidth * 0.18, y0 + this.charHeight() * 0.04, emote, {
         fontFamily: '"M PLUS Rounded 1c", sans-serif', fontSize: `${Math.round(this.H * 0.08)}px`, fontStyle: 'bold',
-        color: { happy: '#ff6fa8', surprised: '#ffb020', curious: '#9a7aff', angry: '#ff4060', sad: '#5aa0ff', embarrassed: '#ff5a7a', serious: '#ffffff' }[expr],
+        color: EMOTE_COLORS[expr] || '#ffffff',
         stroke: '#ffffff', strokeThickness: 6,
       }).setOrigin(0.5).setDepth(20).setScale(0.3).setAlpha(0);
       c.emote = t;
       this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' });
       this.tweens.add({ targets: t, alpha: 0, delay: 1600, duration: 400, onComplete: () => t.destroy() });
-    }
-    // rubor (só onde as bochechas foram medidas na ilustração)
-    c.blush?.destroy(); c.blush = null;
-    const cheeks = Characters.get(id)?.cheeks;
-    if (expr === 'embarrassed' && cheeks) {
-      const g = this.add.graphics().setDepth(img.depth + 0.5);
-      const s = c.baseScale;
-      for (const [px, py] of cheeks) {
-        const x = img.x - img.displayWidth / 2 + (px / 100) * img.displayWidth, y = y0 + (py / 100) * img.displayHeight;
-        for (let k = 3; k > 0; k--) g.fillStyle(0xff6e8c, 0.12).fillEllipse(x, y, 22 * s * k, 9 * s * k);
-      }
-      c.blush = g; g.setAlpha(0);
-      this.tweens.add({ targets: g, alpha: 1, duration: 300 });
-      this.tweens.add({ targets: g, alpha: 0, delay: 2600, duration: 600, onComplete: () => { g.destroy(); if (c.blush === g) c.blush = null; } });
     }
   }
 
@@ -177,5 +214,106 @@ export class StageScene extends Phaser.Scene {
     } finally { this.instant = false; }
   }
 
-  clearAll() { this.instant = true; this.hideAll(); this.instant = false; this.bgA.setVisible(false); this.bgB.setVisible(false); this.bgKey = null; }
+  clearAll() {
+    this.instant = true; this.hideAll(); this.instant = false;
+    this.bgA.setVisible(false); this.bgB.setVisible(false); this.bgKey = null;
+    this.currentShot = null; this.clearShoulder(); this.camProxy = { x: this.W / 2, y: this.H / 2, z: 1 }; this.applyCam();
+  }
+
+  // ------------------------------------------------------------------
+  // Câmera cinematográfica (2D): enquadra o rosto da ilustração original.
+  // ------------------------------------------------------------------
+  /** Centro do rosto (coordenadas do mundo), a partir de characters.json → face. */
+  facePoint(id) {
+    const c = this.chars.get(id);
+    if (!c) return null;
+    const [fx, fy] = Characters.get(id)?.face || [50, 12];
+    const dispW = c.img.width * c.baseScale, dispH = c.img.height * c.baseScale;
+    return { x: this.W * SLOTS[c.at] - dispW / 2 + (fx / 100) * dispW, y: c.baseY + (fy / 100) * dispH };
+  }
+
+  applyCam() {
+    const cam = this.cameras.main, p = this.camProxy;
+    cam.setZoom(p.z);
+    cam.centerOn(p.x, p.y);
+  }
+
+  /** Calcula o enquadramento { x, y, z } de um plano. */
+  framing(shot) {
+    const W = this.W, H = this.H;
+    const F = FRAMING[shot.type] || FRAMING.medium;
+    const face = shot.subject && this.facePoint(shot.subject);
+    if (!face || shot.type === 'wide') return { x: W / 2, y: H / 2, z: 1 };
+    if (shot.type === 'two' && shot.partner && this.facePoint(shot.partner)) {
+      const o = this.facePoint(shot.partner);
+      const dx = Math.abs(face.x - o.x);
+      const z = Math.max(1, Math.min(1.45, (W * 0.62) / Math.max(1, dx)));
+      return { x: (face.x + o.x) / 2, y: (face.y + o.y) / 2 + (0.5 - F.f) * H / z, z };
+    }
+    let z = F.z;
+    let sx = 0.5; // posição horizontal do rosto na tela
+    if (shot.type === 'ots') sx = this.slotOf(shot.subject) <= this.slotOf(shot.partner) ? 0.4 : 0.6;
+    if (shot.type === 'side') sx = this.slotOf(shot.subject) < 0.5 ? 0.42 : 0.58;
+    if (shot.type === 'choice') sx = 0.25; // personagem no terço esquerdo; opções à direita
+    return { x: face.x + (0.5 - sx) * W / z, y: face.y + (0.5 - F.f) * H / z, z };
+  }
+
+  slotOf(id) { const c = this.chars.get(id); return c ? SLOTS[c.at] : 0.5; }
+
+  /** Aplica um plano do Diretor: corte seco ou movimento suave, com aproximação lenta. */
+  shot(shot, { instant = false } = {}) {
+    if (!shot) return;
+    this.currentShot = shot;
+    const target = this.framing(shot);
+    this.tweens.killTweensOf(this.camProxy);
+    this.clearShoulder();
+    const quick = instant || this.instant || this.skipping;
+    if (quick || shot.cut) Object.assign(this.camProxy, target);
+    const settle = () => {
+      if (shot.type === 'ots') this.showShoulder(shot);
+      if (quick) return;
+      // movimento contínuo durante a fala: aproximação/afastamento lento ou travelling lateral
+      if (shot.push === 'in') this.tweens.add({ targets: this.camProxy, z: target.z * 1.07, duration: 6000, ease: 'Sine.easeOut', onUpdate: () => this.applyCam() });
+      if (shot.push === 'out') this.tweens.add({ targets: this.camProxy, z: Math.max(1, target.z / 1.05), duration: 6000, ease: 'Sine.easeOut', onUpdate: () => this.applyCam() });
+      if (shot.type === 'side') this.tweens.add({ targets: this.camProxy, x: target.x + this.W * 0.05 / target.z, duration: 7000, ease: 'Sine.easeInOut', onUpdate: () => this.applyCam() });
+    };
+    if (quick || shot.cut) { this.applyCam(); settle(); return; }
+    this.tweens.add({ targets: this.camProxy, x: target.x, y: target.y, z: target.z, duration: 650, ease: 'Sine.easeInOut', onUpdate: () => this.applyCam(), onComplete: settle });
+  }
+
+  /** "Por cima do ombro": o outro personagem aparece desfocado e escuro em primeiro plano. */
+  showShoulder(shot) {
+    const p = this.chars.get(shot.partner);
+    if (!p) return;
+    const z = this.camProxy.z;
+    const left = this.slotOf(shot.partner) <= this.slotOf(shot.subject);
+    const cam = this.cameras.main;
+    const sx = cam.worldView.x + (left ? 0.06 : 0.94) * cam.worldView.width;
+    const img = this.add.image(sx, cam.worldView.y + cam.worldView.height * 0.3, p.img.sourceKey || p.img.texture.key).setOrigin(0.5, 0).setDepth(40)
+      .setScale(p.baseScale * 1.5).setTint(0x2a2238).setAlpha(0);
+    if (img.preFX) img.preFX.addBlur(2, 2, 2, 1.4);
+    this.shoulder = img;
+    this.tweens.add({ targets: img, alpha: 0.93, duration: 300 });
+  }
+
+  clearShoulder() { this.shoulder?.destroy(); this.shoulder = null; }
+
+  /** Personagem falando: boca acompanha o texto (LivingSprite); sem WebGL, só um leve movimento de corpo. */
+  speak(id, text, msPerChar) {
+    const c = this.chars.get(id);
+    if (!c || this.instant) return;
+    if (c.anim) { c.anim.speak(text, msPerChar); return; }
+    const ms = text.length * msPerChar;
+    this.tweens.add({ targets: c.img, scaleY: c.baseScale * 1.006, duration: 260, yoyo: true, repeat: Math.max(0, Math.floor(ms / 520) - 1), ease: 'Sine.easeInOut' });
+  }
+
+  stopSpeaking() { for (const c of this.chars.values()) c.anim?.stopSpeaking(); }
+
+  setAnimationLevel(level) { for (const c of this.chars.values()) if (c.anim) c.anim.level = level; }
+
+  update(_t, dtMs) {
+    const dt = Math.min(0.05, dtMs / 1000);
+    for (const c of this.chars.values()) c.anim?.update(dt);
+  }
+
 }

@@ -11,7 +11,8 @@ import { POSTS } from '../src/story/phone/posts.js';
 
 const chars = JSON.parse(readFileSync(new URL('../src/characters/characters.json', import.meta.url))).characters;
 const byId = Object.fromEntries(chars.map((c) => [c.id, c]));
-const EXPR = ['neutral', 'happy', 'sad', 'surprised', 'angry', 'embarrassed', 'curious', 'serious'];
+const EXPR = ['neutral', 'happy', 'sad', 'surprised', 'angry', 'embarrassed', 'curious', 'serious', 'shy', 'hurt', 'love', 'lookaway'];
+const CAMS = ['wide', 'medium', 'close', 'extreme', 'two', 'ots', 'side'];
 const BGS = ['apartamento', 'apartamento_noite', 'cafe', 'terraco_tarde', 'terraco_noite', 'corredor_noite'];
 let errors = 0, paths = 0;
 const err = (m) => { errors++; console.error('❌ ' + m); };
@@ -50,6 +51,8 @@ function checkStep(s, where) {
   if (s.bg && !BGS.includes(s.bg)) err(`${where}: cenário inexistente ${s.bg}`);
   if (s.phone && !CONVERSATIONS[s.phone]) err(`${where}: conversa inexistente ${s.phone}`);
   if (s.c && !s.t) err(`${where}: fala sem texto`);
+  if (s.cam && !CAMS.includes(s.cam)) err(`${where}: plano de câmera desconhecido "${s.cam}"`);
+  if (s.shot && !CAMS.includes(s.shot)) err(`${where}: plano de câmera desconhecido "${s.shot}"`);
 }
 
 // percorre uma lista de passos; devolve os estados finais possíveis

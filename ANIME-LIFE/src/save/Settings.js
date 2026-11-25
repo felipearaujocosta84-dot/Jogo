@@ -5,7 +5,9 @@ const DEFAULTS = {
   sfx: 0.8,
   textSpeed: 'normal', // lenta | normal | rapida | instantanea
   autoSpeed: 'normal', // modo automático: lento | normal | rapido
-  skipUnread: false, // "Pular" também pula texto ainda não lido
+  skipUnread: false,
+  cinema: true, // câmera cinematográfica (zoom, planos, movimentos)
+  animations: 'completa', // animação dos personagens: completa | leve | off // "Pular" também pula texto ainda não lido
   quality: 'auto', // auto | alta | economica
 };
 

@@ -49,6 +49,8 @@ export function openSettings(ui) {
     <div class="row">Velocidade do texto ${seg('textSpeed', [['lenta', 'Lenta'], ['normal', 'Normal'], ['rapida', 'Rápida'], ['instantanea', 'Instant.']])}</div>
     <div class="row">Modo automático ${seg('autoSpeed', [['lento', 'Lento'], ['normal', 'Normal'], ['rapido', 'Rápido']])}</div>
     <div class="row">“Pular” também pula texto não lido ${seg('skipUnread', [[false, 'Não'], [true, 'Sim']])}</div>
+    <div class="row">Câmera cinematográfica ${seg('cinema', [[true, 'Ligada'], [false, 'Fixa']])}</div>
+    <div class="row">Animação dos personagens ${seg('animations', [['completa', 'Completa'], ['leve', 'Leve'], ['off', 'Desligada']])}</div>
     <div class="row">Gráficos ${seg('quality', [['economica', 'Econômico'], ['auto', 'Auto'], ['alta', 'Alta']])}</div>
     <div class="row">Tela cheia <button class="pbtn alt" data-a="fs">Alternar</button></div>`);
   p.querySelectorAll('input[type=range]').forEach((r) => r.addEventListener('input', () => { settings.set(r.dataset.k, Number(r.value)); audio.applyVolumes(); }));
@@ -58,6 +60,7 @@ export function openSettings(ui) {
     settings.set(s.dataset.k, v); audio.sfx('click');
     s.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     if (s.dataset.k === 'quality') ui.engine?.game.refit?.();
+    if (s.dataset.k === 'animations') ui.engine?.stage.setAnimationLevel(v);
     bus.emit('settings:changed', s.dataset.k);
   }));
   p.querySelector('[data-a=fs]').addEventListener('click', async () => {

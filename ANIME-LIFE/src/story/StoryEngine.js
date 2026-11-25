@@ -8,6 +8,8 @@
 //   { n:'narração' }  { th:'pensamento' }  { p:'fala do protagonista' }  { c:'character_01', e:'happy', t:'fala' }
 //   { choice:[{ t, do, go, if, lockIf, lock, value }], id:'decisao' }
 //   { phone:'idDaConversa' }  { end:true }
+//   Em qualquer fala: cam:'close'|'extreme'|'medium'|'two'|'ots'|'side'|'wide' força o plano; big:true marca uma revelação.
+//   Sem "e", a expressão é deduzida do texto (cinematic/Emotions.js).
 import { game, fmt } from '../core/GameState.js';
 import { bus } from '../core/EventBus.js';
 import { CHAPTERS } from './chapters/index.js';
@@ -16,6 +18,9 @@ import { Relationships } from '../relationships/RelationshipManager.js';
 import { runConversation } from '../smartphone/PhoneSystem.js';
 import { Characters } from '../characters/CharacterRegistry.js';
 import { audio } from '../audio/AudioManager.js';
+import { Director } from '../cinematic/Director.js';
+import { emotionFor } from '../cinematic/Emotions.js';
+import { settings } from '../save/Settings.js';
 
 const LOG_MAX = 400;
 
@@ -28,7 +33,7 @@ export function findScene(sceneId) {
 }
 
 export class StoryEngine {
-  constructor(ui, stage) { this.ui = ui; this.stage = stage; this.token = 0; }
+  constructor(ui, stage) { this.ui = ui; this.stage = stage; this.token = 0; this.director = new Director(); }
 
   /** Começa (ou continua) a partir da posição salva no estado. */
   async resume() {
@@ -91,6 +96,7 @@ export class StoryEngine {
     if (s.hideAll) { st.chars = []; await this.stage.hideAll(); pos.pc++; return; }
     if (s.wait) { await new Promise((r) => setTimeout(r, this.ui.skipping ? 0 : s.wait)); pos.pc++; return; }
     if (s.fx) { this.stage.effect(s.fx); pos.pc++; return; }
+    if (s.shot) { this.stage.shot?.(this.director.shotFor({ cam: s.shot, cast: st.chars })); pos.pc++; return; }
     if (s.card) { await this.ui.timeCard(fmt(s.card)); pos.pc++; return; }
 
     // ---- passos exibidos: salva antes, para poder continuar exatamente daqui ----
@@ -107,6 +113,10 @@ export class StoryEngine {
     if (s.choice) {
       await this.save();
       const opts = prepareOptions(s.choice);
+      // enquadra quem está em cena à esquerda, deixando as opções livres à direita
+      const cast = game.state.stage.chars.map((c) => c.id);
+      const who = cast.includes(this.director.lastSpeaker) ? this.director.lastSpeaker : cast[0];
+      if (who && settings.data.cinema !== false) this.stage.shot?.({ type: 'choice', subject: who, push: 'in' }, { instant: this.ui.skipping });
       const i = await this.ui.choose(opts.map((o) => ({ text: fmt(o.t), locked: o.locked, lock: o.lock })));
       if (!alive()) return;
       const o = opts[i];
@@ -120,16 +130,26 @@ export class StoryEngine {
       const line = s.c ? { speaker: s.c, expr: s.e || null, text: fmt(s.t) }
         : s.p ? { speaker: 'player', text: fmt(s.p) }
           : s.th ? { speaker: 'thought', text: fmt(s.th) } : { speaker: null, text: fmt(s.n) };
-      if (s.c && s.e) {
-        const ch = st.chars.find((x) => x.id === s.c); if (ch) ch.e = s.e;
-        this.stage.express(s.c, s.e);
+      // emoção: a do roteiro ou deduzida da fala
+      let emo = null;
+      if (s.c) {
+        emo = emotionFor(s.e, line.text);
+        const ch = st.chars.find((x) => x.id === s.c);
+        if (ch && ch.e !== emo.emotion) { ch.e = emo.emotion; this.stage.express(s.c, emo.emotion); }
+        else if (s.e) this.stage.express(s.c, emo.emotion);
       }
       this.stage.focus(s.c || null);
+      // câmera cinematográfica
+      const shot = this.director.shotFor({ speaker: line.speaker, emotion: emo?.emotion, intensity: emo?.intensity ?? 0.5, text: line.text, cast: st.chars, cam: s.cam, revelation: s.big });
+      if (this.stage.shot) this.stage.shot(settings.data.cinema === false ? { type: 'wide' } : shot, { instant: this.ui.skipping });
+      // boca acompanha a fala no ritmo do texto
+      if (s.c && !this.ui.skipping) this.stage.speak?.(s.c, line.text, settings.textDelay() || 38);
       const key = `${info.scene.id}:${pos.pc}`;
       const wasRead = !!game.state.read[key];
       await this.save();
       this.log({ kind: 'line', who: line.speaker, t: line.text });
       await this.ui.say(line, { read: wasRead });
+      this.stage.stopSpeaking?.();
       if (!alive()) return;
       if (!game.replay) game.state.read[key] = 1;
       pos.pc++; return;
@@ -155,6 +175,8 @@ export class StoryEngine {
     if (info.index === 0 && !info.scene.noChapterCard) await this.ui.chapterCard(info.chapter);
     await this.stage.hideAll();
     st.stage.chars = [];
+    this.director.reset();
+    this.stage.shot?.({ type: 'wide' }, { instant: true });
     await this.ui.sceneCard(info.chapter, info.scene, info.index);
     this.log({ kind: 'scene', t: `— ${info.chapter.title} · ${info.scene.title} —` });
   }

@@ -84,7 +84,7 @@ const s1 = {
     { label: 'envelope' },
     { n: 'Um envelope de Kamakura. A mesma letra caprichada da caixa.' },
     { n: 'Mas, desta vez, o destinatário não é a Yuki, nem a Akane, nem a Mei.' },
-    { n: '“Para quem estiver morando no meu apartamento.”' },
+    { n: '“Para quem estiver morando no meu apartamento.”', cam: 'wide' },
     { th: 'Ela sabe que tem alguém aqui. Como ela sabe?' },
     { id: 'c2_envelope', choice: [
       { t: 'Abrir agora, na frente de quem está comigo.', value: 'abrir_junto', do: [flag('c2.envelope', 'junto')], go: 'e1' },

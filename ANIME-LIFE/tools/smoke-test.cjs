@@ -81,13 +81,26 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond, extr
     const chars = await G(() => [...window.__ANIME_LIFE__.ui.engine.stage.chars.keys()]);
     ok('Personagem oficial em destaque (Rin, ilustração original)', chars.includes('character_01'));
     await shot('05-escolha');
+    // ---- animação 2D da ilustração original ----
+    const animInfo = await G(() => { const c = window.__ANIME_LIFE__.ui.engine.stage.chars.get('character_01'); return { type: c.img.type, anim: !!c.anim, key: c.img.sourceKey }; });
+    ok('Rin animada pelo shader sobre a ilustração original', animInfo.type === 'Shader' && animInfo.anim && animInfo.key === 'char_character_01', JSON.stringify(animInfo));
+    let blinked = false;
+    for (let i = 0; i < 80 && !blinked; i++) { blinked = await G(() => window.__ANIME_LIFE__.ui.engine.stage.chars.get('character_01').anim.snapshot().blinking); await page.waitForTimeout(100); }
+    ok('Piscar automático acontece sozinho', blinked);
     const opts = await page.locator('.choices button').allTextContents();
     ok('Três opções de resposta', opts.length === 3, opts.map((o) => o.slice(1, 30)).join(' | '));
     ok('Nome do protagonista no texto', opts[0].includes('Aiko'));
     await tap('.choices button:nth-child(3)');
-    await page.waitForTimeout(400);
+    // boca abre enquanto a fala é digitada
+    let maxMouth = 0;
+    for (let i = 0; i < 12; i++) { maxMouth = Math.max(maxMouth, await G(() => window.__ANIME_LIFE__.ui.engine.stage.chars.get('character_01').anim.snapshot().mouth)); await page.waitForTimeout(60); }
+    const emo = await G(() => window.__ANIME_LIFE__.ui.engine.stage.chars.get('character_01').anim.snapshot().emotion);
+    ok('Boca se move durante a fala', maxMouth > 0.25, `abertura máx. ${maxMouth}`);
+    ok('Expressão acompanha a fala (feliz)', emo === 'happy', emo);
     await tap('.dl-box'); await page.waitForTimeout(100);
     const reply = await text();
+    await page.waitForTimeout(1200);
+    ok('Boca fecha quando a fala termina', (await G(() => window.__ANIME_LIFE__.ui.engine.stage.chars.get('character_01').anim.snapshot().mouth)) < 0.05);
     ok('Reação coerente à escolha 3', reply.includes('sofá'), reply);
     const s1 = await st();
     ok('Afinidade com a Rin mudou (+3)', s1.rel.character_01.afinidade === 3 && s1.rel.character_01.amizade === 1, JSON.stringify(s1.rel.character_01));
@@ -108,6 +121,11 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond, extr
     ok('Continua exatamente na mesma fala', after === before && posAfter.pc === posBefore.pc, `pc ${posBefore.pc}→${posAfter.pc}`);
     ok('Rin restaurada em cena após carregar', (await G(() => [...window.__ANIME_LIFE__.ui.engine.stage.chars.keys()])).includes('character_01'));
 
+    // câmera cinematográfica: acompanha os planos até a pergunta da caixa
+    let maxZoom = 1;
+    await until(async () => { maxZoom = Math.max(maxZoom, await G(() => window.__ANIME_LIFE__.ui.engine.stage.camProxy.z)); return hasChoices(); });
+    ok('Câmera aproxima nos momentos importantes (close-up)', maxZoom >= 1.5, `zoom máx. ${maxZoom.toFixed(2)}`);
+    await shot('05b-close');
     // escolha do pacote: abrir junto
     await until(hasChoices);
     const q2 = await text();
@@ -131,6 +149,10 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond, extr
     await page.touchscreen.tap(400, 150); await page.waitForTimeout(300);
     ok('Ocultar interface e voltar com um toque', hidden && !(await G(() => document.getElementById('vn').classList.contains('ui-off'))));
 
+    // ajuste: animação leve/desligada chega aos personagens
+    await G(() => { window.__ANIME_LIFE__.settings.set('animations', 'off'); window.__ANIME_LIFE__.ui.engine.stage.setAnimationLevel('off'); });
+    ok('Ajuste "Animação desligada" aplicado', await G(() => window.__ANIME_LIFE__.ui.engine.stage.chars.get('character_01').anim.level === 'off'));
+    await G(() => { window.__ANIME_LIFE__.settings.set('animations', 'completa'); window.__ANIME_LIFE__.ui.engine.stage.setAnimationLevel('completa'); });
     // salvar manualmente
     await tap('[data-q=save]'); await page.waitForSelector('.modal.show .slots');
     await tap('.slot[data-slot=slot1]'); await page.waitForTimeout(600);
