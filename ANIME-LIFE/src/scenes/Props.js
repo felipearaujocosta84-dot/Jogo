@@ -39,6 +39,12 @@ function draw(g, name) {
       g.lineStyle(14, 0xd4ac0d).strokeCircle(130, 120, 36); g.fillStyle(0xd4ac0d).fillRect(160, 112, 140, 16).fillRect(260, 128, 14, 26).fillRect(284, 128, 14, 18); break;
     case 'celular':
       rr(120, 20, 120, 220, 18, 0x1c1a24); rr(128, 34, 104, 190, 10, 0x3a3d6b); rr(140, 60, 80, 22, 8, 0xffffff); rr(150, 96, 70, 22, 8, 0xff8fb8); break;
+    case 'camera':
+      rr(70, 70, 220, 130, 14, 0x2b2b2b); rr(70, 70, 220, 30, 10, 0x9a9a9a); g.fillStyle(0x111111).fillCircle(180, 140, 50); g.fillStyle(0x3a4a6a).fillCircle(180, 140, 34);
+      g.fillStyle(0xffffff, 0.5).fillCircle(168, 128, 9); rr(230, 52, 40, 22, 4, 0x555555); g.fillStyle(0xc0392b).fillCircle(102, 86, 6); break;
+    case 'envelope_fotos':
+      rr(70, 60, 220, 150, 6, 0xf2e3c6); rr(90, 40, 120, 90, 3, 0xffffff); rr(98, 48, 104, 70, 2, 0xc8a27a); rr(150, 30, 120, 90, 3, 0xffffff); rr(158, 38, 104, 70, 2, 0x7fa7c8);
+      g.fillStyle(0xd35400).fillRect(70, 170, 220, 14); break;
     case 'caneca':
       rr(120, 80, 110, 130, 12, 0xfdfefe); g.lineStyle(14, 0xfdfefe).strokeCircle(240, 140, 26); g.fillStyle(0x6e4b3a).fillEllipse(175, 88, 96, 18); break;
   }

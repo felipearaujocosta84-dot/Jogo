@@ -8,9 +8,9 @@ Feita com **Phaser 3 + JavaScript modular + Vite**, empacotável como app Androi
 ## Novidade da v0.6.0 beta: capítulos, vozes e expressões
 - **350 capítulos planejados** (10 volumes × 35), no painel **📚 Capítulos** (menu principal e pausa):
   - volumes, progresso, sinopse, desbloqueio e revisão de capítulos concluídos;
-  - status real de cada capítulo: **3 escritos e jogáveis, 27 roteirizados, 320 planejados**;
+  - status real de cada capítulo: **6 escritos e jogáveis e 344 roteirizados** (todos os 350 têm título e sinopse);
   - detalhes e lotes em [ROTEIRO.md](ROTEIRO.md).
-- **Capítulo 2 completo** (5 cenas) e **Capítulo 3 — O Bilhete que Kyo Guardou** (4 cenas). Novas conversas no celular, e o mistério de Sora Kirishima.
+- **Capítulo 2 completo** (5 cenas) e os capítulos **3 — O Bilhete que Kyo Guardou**, **4 — Revelação**, **5 — Domingo de Bicicleta** e **6 — Sexta-feira** (4 cenas cada). Novas conversas no celular, e o mistério de Sora Kirishima.
 - **Novas expressões**, animadas na própria ilustração:
   - sorrindo, rindo (balanço e boca no ritmo), muito triste, chorando (lágrimas desenhadas saindo dos olhos do rig);
   - com medo (tremor), irritado, ciúmes, nervoso, confuso;
@@ -81,7 +81,7 @@ Detalhes, limites e a lista de imagens que deixariam a animação perfeita estã
 - **História jogável:**
   - **Capítulo 1 — Apartamento 201:** 5 cenas completas.
   - **Capítulo 2 — Cartões-postais de Kamakura:** 5 cenas (v0.6).
-  - **Capítulo 3 — O Bilhete que Kyo Guardou:** 4 cenas (v0.6).
+  - **Capítulos 3 a 6:** 4 cenas cada (v0.6).
 - **Diálogos ramificados:** cada escolha tem reação própria, altera variáveis da história, mexe nos relacionamentos e libera ou bloqueia opções futuras. Opções bloqueadas aparecem com 🔒 e o motivo.
 - **Relacionamentos:** amizade, confiança, afinidade e romance para cada personagem. Romance só existe com personagens adultos marcados como elegíveis, e só depois de uma afinidade mínima. Momentos marcantes aparecem como "Fulano vai lembrar disso".
 - **Celular:** conversas individuais e em grupo, com respostas de escolha, convites, contatos e publicações fictícias (Hoshigram). As conversas ficam guardadas para reler.
@@ -108,7 +108,7 @@ A original fica intacta em `reference/original.jpg`. Dados de cada personagem (i
 
 Os personagens 03 e 04 usam uniforme escolar e **nunca** terão romance.
 O 05 está fora da história até a imagem ser licenciada.
-O 09 é Sora Kirishima (25 anos, sem romance): por enquanto só é descrito na história, sem aparecer em cena. O 11 ainda não aparece.
+O 09 é Sora Kirishima (25 anos, sem romance). Aparece em cena a partir do Capítulo 6, com a ilustração estática, porque ainda não foram medidos os pontos do rosto para animá-lo. O 11 ainda não aparece.
 
 **Expressões:** só existe a arte neutra de cada personagem. A expressão aparece animando a própria ilustração: olhos semicerrados ou arregalados, rubor, cabeça, respiração e balão (veja [ANIMACAO_2D.md](ANIMACAO_2D.md)).
 Para usar arte própria por expressão, veja `public/assets/characters/<id>/expressions/README.md`.
@@ -172,7 +172,7 @@ tools/               story-check.mjs, smoke-test.cjs, process_characters.py
 ```
 
 ## Ainda não feito
-- **Capítulos 4 a 350:** 27 estão roteirizados e 320 só planejados (veja ROTEIRO.md). Também faltam rotas completas e finais diferentes.
+- **Roteiros dos capítulos 7 a 350:** todos já têm título e sinopse (veja ROTEIRO.md). Também faltam rotas completas e finais diferentes.
 - **Arte das poses de braços:** sem ela, os personagens mantêm a pose original.
 - **Vozes gravadas** por dubladores: hoje só existe voz sintetizada.
 - Camadas desenhadas (olhos fechados, boca aberta) para um piscar completo e uma boca bem aberta. Veja o pedido de recursos em ANIMACAO_2D.md.

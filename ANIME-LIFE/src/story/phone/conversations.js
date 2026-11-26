@@ -1,6 +1,6 @@
 // Conversas do celular. Passos: { from, t } mensagem · { from, invite:{title,when,where}, t } convite
 // { choice:[{ t, reply?, value, do, go, if, lockIf, lock }], id } resposta do jogador · { label } { go } { if, go } { do } { end }
-import { R, M, A, K, rel, flag, post, memory } from '../dsl.js';
+import { R, M, A, K, H, rel, flag, post, memory, contact } from '../dsl.js';
 
 export const CONVERSATIONS = {
   grupo_predio: {
@@ -121,6 +121,47 @@ export const CONVERSATIONS = {
       ] },
       { label: 'r1' }, { from: K, t: 'EU SABIA. traz uma cadeira' }, { end: true },
       { label: 'r2' }, { from: K, t: 'finalmente alguém que entende o espírito da coisa 🍪' }, { end: true },
+    ],
+  },
+
+  rin_revelou: {
+    title: 'Rin Kuroha', members: [R],
+    steps: [
+      { from: R, t: 'e aí. a akane revelou?' },
+      { from: R, t: 'você prometeu me contar' },
+      { id: 'c4_rin_msg', choice: [
+        { t: 'Tem uma foto da Yuki numa estação. Com o homem do cartão.', value: 'contar', do: [rel(R, { confianca: 3 }), flag('rin.viu_estacao')], go: 'r1' },
+        { t: 'Amanhã eu te mostro pessoalmente.', value: 'amanha', do: [rel(R, { afinidade: 2 })], go: 'r2' },
+      ] },
+      { label: 'r1' }, { from: R, t: 'eu sabia.' }, { from: R, t: 'ela estava feliz na foto? fala a verdade' }, { from: R, t: 'ok. então tá. boa noite, vizinh{g:o/a/e}' }, { end: true },
+      { label: 'r2' }, { from: R, t: 'ok. vou fingir que consigo dormir' }, { end: true },
+    ],
+  },
+
+  haru_moto: {
+    title: 'Haru Mizuno', members: [H],
+    steps: [
+      { do: [contact(H)] },
+      { from: H, t: 'desculpa a hora. peguei seu número na escala do café 🙏' },
+      { from: H, t: 'o homem do cartão não veio hoje.' },
+      { from: H, t: 'mas uma moto preta passou duas vezes na frente do café. devagar.' },
+      { id: 'c4_haru_msg', choice: [
+        { t: 'Obrigad{g:o/a/e}, Haru. Se ele aparecer, me avisa?', value: 'avisa', do: [rel(H, { confianca: 2, amizade: 1 }), flag('haru.sabe')], go: 'h1' },
+        { t: 'Vai dormir, Haru. Amanhã você tem prova.', value: 'cuidar', do: [rel(H, { carinho: 2 })], go: 'h2' },
+      ] },
+      { label: 'h1' }, { from: H, t: 'aviso! eu fico de olho na porta. eu sou bom em olhar porta' }, { end: true },
+      { label: 'h2' }, { from: H, t: 'como você sabe que eu tenho prova?? 😳' }, { from: H, t: 'ok. boa noite. obrigado' }, { end: true },
+    ],
+  },
+
+  akane_sexta: {
+    title: 'Akane Tachibana', members: [A],
+    steps: [
+      { from: 'player', t: 'O homem do cartão vai estar no café às 16h hoje.' },
+      { from: A, t: 'Eu chego às 15h.' },
+      { from: A, t: 'Mesa 4. Não me pergunta por quê.' },
+      { do: [memory(A, 'Akane vai lembrar que você a chamou para o encontro com Sora.')] },
+      { end: true },
     ],
   },
 };

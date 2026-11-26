@@ -5,6 +5,7 @@ export const A = 'character_06'; // Akane Tachibana — irmã da antiga moradora
 export const K = 'character_07'; // Kaito Hayami — vizinho do 203, entregador
 export const H = 'character_08'; // Haru Mizuno — colega no Café Hoshi
 export const Y = 'character_10'; // Kyo Amagiri — gerente do Café Hoshi
+export const S = 'character_09'; // Sora Kirishima — 25 anos, ligado à Yuki (sem romance)
 
 export const rel = (id, deltas) => ({ rel: [id, deltas] });
 export const flag = (k, v = true) => ({ flag: k, v });

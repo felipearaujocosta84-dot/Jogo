@@ -48,7 +48,7 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond }); c
     // ---- Capítulos a partir do menu principal ----
     await tap('#menu [data-a=chapters]'); await page.waitForSelector('.modal.show .chap-list');
     const prog = await page.locator('.chap-progress').textContent();
-    ok('Catálogo com 350 capítulos e status real', /3 escritos/.test(prog) && /350 no total/.test(prog), prog.trim());
+    ok('Catálogo com 350 capítulos e status real', /6 escritos/.test(prog) && /344 roteirizados/.test(prog) && /350 no total/.test(prog), prog.trim());
     ok('Volume 1 lista 35 capítulos', (await page.locator('.chap').count()) === 35);
     ok('Capítulo 2 bloqueado sem concluir o 1', await page.locator('.chap').nth(1).evaluate((e) => e.classList.contains('locked')));
     await page.locator('.chap-vols [data-vol="10"]').click();
@@ -126,6 +126,19 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond }); c
     const card = await playUntil(() => G(() => window.__ANIME_LIFE__.ui.engine.stage.props.name === 'cartao'), 80);
     ok('Cap. 3: cartão de visita de Sora Kirishima', card);
     await shot('v06-04-cartao');
+
+    // ---- Cap. 4: fotos reveladas; Cap. 6: Sora Kirishima em cena (ilustração original, sem rig) ----
+    G(() => window.__ANIME_LIFE__.ui.replayScene('c4s2', false)).catch(() => {});
+    await page.waitForTimeout(1500);
+    ok('Cap. 4: fotos reveladas em cena', await playUntil(() => G(() => window.__ANIME_LIFE__.ui.engine.stage.props.name === 'foto'), 80));
+    await shot('v06-05-fotos');
+    G(() => window.__ANIME_LIFE__.ui.replayScene('c6s2', false)).catch(() => {});
+    await page.waitForTimeout(1500);
+    const sora = await playUntil(() => G(() => window.__ANIME_LIFE__.ui.engine.stage.chars.has('character_09')), 40);
+    ok('Cap. 6: Sora Kirishima aparece em cena', sora);
+    await page.waitForTimeout(800);
+    await shot('v06-06-sora');
+    await playUntil(() => G(() => (window.__ANIME_LIFE__.cueLog || []).some((c) => c.prop === 'cartao' && c.scene === 'c6s2')), 120);
 
     // ---- Pausa → Capítulos ----
     await page.locator('[data-q=menu]').click(); await page.waitForSelector('.modal.show .pause-grid');

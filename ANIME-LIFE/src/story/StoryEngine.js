@@ -65,10 +65,17 @@ export class StoryEngine {
     sandbox.pos = { chapter: findScene(sceneId).chapter.id, scene: sceneId, pc: 0 };
     sandbox.stage = { bg: null, chars: [], music: null };
     game.set(sandbox); game.replay = true;
-    try { await this.run(true, { single: true }); } finally { game.set(backup); game.replay = false; }
+    this.replayBackup = backup;
+    try { await this.run(true, { single: true }); } finally {
+      if (this.replayBackup === backup) { game.set(backup); game.replay = false; this.replayBackup = null; }
+    }
   }
 
-  stop() { this.token++; }
+  stop() {
+    this.token++;
+    // parar um "rever cena" devolve o jogo salvo na hora (antes que outra cena comece a ser revista)
+    if (this.replayBackup) { game.set(this.replayBackup); game.replay = false; this.replayBackup = null; }
+  }
 
   async run(fresh, { single = false } = {}) {
     const token = ++this.token;
