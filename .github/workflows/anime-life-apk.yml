@@ -35,6 +35,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+          cache: gradle
+          cache-dependency-path: ANIME-LIFE/android/**/*.gradle*
 
       - name: Dependências
         run: npm ci
@@ -54,7 +56,14 @@ jobs:
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: 0.6.0-beta.${{ github.run_number }}
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        # repete se o Maven Central limitar o download (erro 429, temporário)
+        run: |
+          chmod +x gradlew
+          for i in 1 2 3; do
+            ./gradlew assembleDebug --no-daemon && exit 0
+            echo "Tentativa $i falhou; aguardando para tentar de novo..."; sleep $((i * 45))
+          done
+          exit 1
 
       - name: Renomear APK
         run: |
