@@ -1,21 +1,22 @@
-# ANIME LIFE — Plano dos 3.000 capítulos
+# ANIME LIFE — Plano dos 350 capítulos
 
 Este arquivo registra o **progresso real** da produção. O jogo mostra o mesmo status no painel **📚 Capítulos**.
 
 ## Estrutura
-- **3.000 capítulos = 30 volumes × 100 capítulos.** Arcos de cada volume: `src/story/plan/volumes.js`.
+- **350 capítulos = 10 volumes × 35 capítulos.** Arcos de cada volume: `src/story/plan/volumes.js`.
+  - O plano anterior (3.000 capítulos em 30 volumes) foi reduzido a pedido. Os 30 arcos foram condensados nos 10 volumes, e nada do que já estava escrito se perdeu.
 - **Fases dentro de cada volume:**
 
   | Capítulos | Fase |
   |---|---|
-  | 1–10 | Abertura |
-  | 11–30 | Desenvolvimento |
-  | 31–50 | Complicação |
-  | 51–70 | Virada |
-  | 71–90 | Crise |
-  | 91–100 | Desfecho |
+  | 1–4 | Abertura |
+  | 5–10 | Desenvolvimento |
+  | 11–17 | Complicação |
+  | 18–24 | Virada |
+  | 25–31 | Crise |
+  | 32–35 | Desfecho |
 
-- **Catálogo:** `src/story/catalog.js` gera as 3.000 entradas, cada uma com número, volume, título, sinopse e status.
+- **Catálogo:** `src/story/catalog.js` gera as 350 entradas, cada uma com número, volume, título, sinopse e status.
 - **Desbloqueio:** o Capítulo 1 começa aberto, e cada capítulo abre quando o anterior é concluído. Capítulos concluídos podem ser revistos sem alterar o jogo salvo.
 
 ## Status de produção
@@ -24,7 +25,7 @@ Este arquivo registra o **progresso real** da produção. O jogo mostra o mesmo 
 |---|---|---|
 | **escrito** | Roteiro completo, jogável: cenas, diálogos, escolhas, consequências e gancho para o próximo capítulo | **3** |
 | **roteirizado** | Título e sinopse detalhada definidos; o roteiro ainda não foi escrito | **27** (capítulos 4–30 do Volume 1) |
-| **planejado** | Só a posição no arco do volume; título e sinopse ainda não foram escritos | **2.970** |
+| **planejado** | Só a posição no arco do volume; título e sinopse ainda não foram escritos | **320** |
 
 ### Capítulos escritos
 
@@ -63,4 +64,4 @@ Ganchos em aberto que esses capítulos precisam resolver:
 - `promessa.sora`.
 
 ## Escala (estimativa honesta)
-Um capítulo completo tem de 150 a 400 passos de roteiro. Os 3.000 capítulos somariam entre 500 mil e 1 milhão de passos. Isso exige centenas de lotes ao longo de muitas sessões. A estrutura (catálogo, desbloqueio, status e verificação) já suporta esse volume.
+Um capítulo completo tem de 150 a 400 passos de roteiro. Os 350 capítulos somariam entre 50 mil e 140 mil passos. Em lotes de 3 a 5 capítulos, são cerca de 70 a 115 lotes.

@@ -1,4 +1,4 @@
-// CATÁLOGO DOS 3.000 CAPÍTULOS (30 volumes × 100).
+// CATÁLOGO DOS 350 CAPÍTULOS (10 volumes × 35).
 // Status de produção REAL de cada capítulo:
 //   escrito      → roteiro completo em chapters/chN.js, jogável
 //   roteirizado  → título e sinopse detalhada definidos (plan/volNN.js), roteiro ainda não escrito
@@ -8,11 +8,11 @@ import { CHAPTERS } from './chapters/index.js';
 import { VOLUMES } from './plan/volumes.js';
 import { VOL01_PLAN } from './plan/vol01.js';
 
-export const TOTAL = 3000;
-export const PER_VOLUME = 100;
+export const TOTAL = 350;
+export const PER_VOLUME = 35;
 const PLANS = { 1: VOL01_PLAN };
-// fases do arco de cada volume (posição do capítulo dentro dos 100)
-const PHASES = [[10, 'Abertura'], [30, 'Desenvolvimento'], [50, 'Complicação'], [70, 'Virada'], [90, 'Crise'], [100, 'Desfecho']];
+// fases do arco de cada volume (posição do capítulo dentro dos 35)
+const PHASES = [[4, 'Abertura'], [10, 'Desenvolvimento'], [17, 'Complicação'], [24, 'Virada'], [31, 'Crise'], [35, 'Desfecho']];
 const phaseOf = (k) => PHASES.find(([end]) => k <= end)[1];
 
 const written = new Map(CHAPTERS.map((c) => [c.number, c]));
@@ -28,7 +28,7 @@ export const CATALOG = Array.from({ length: TOTAL }, (_, i) => {
   return {
     n, volume: vol, inVolume: k, phase: phaseOf(k),
     id: ch?.id || `ch${n}`,
-    title: ch?.title || plan?.title || `${V.title} — ${phaseOf(k)} (${k}/100)`,
+    title: ch?.title || plan?.title || `${V.title} — ${phaseOf(k)} (${k}/35)`,
     synopsis: ch?.synopsis || plan?.synopsis || `Planejado: fase “${phaseOf(k)}” do arco do Volume ${vol}. Sinopse ainda não escrita.`,
     status,
   };

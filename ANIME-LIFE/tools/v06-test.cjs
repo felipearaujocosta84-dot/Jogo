@@ -1,4 +1,4 @@
-// Teste da v0.6: capítulos (catálogo de 3.000), objetos de cena, novas expressões, lágrimas, poses (com e sem arte),
+// Teste da v0.6: capítulos (catálogo de 350), objetos de cena, novas expressões, lágrimas, poses (com e sem arte),
 // voz (sintetizada) com legenda sincronizada, botão de repetir fala e boca acompanhando a voz.
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
@@ -48,12 +48,12 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond }); c
     // ---- Capítulos a partir do menu principal ----
     await tap('#menu [data-a=chapters]'); await page.waitForSelector('.modal.show .chap-list');
     const prog = await page.locator('.chap-progress').textContent();
-    ok('Catálogo com 3.000 capítulos e status real', /3 escritos/.test(prog) && /3000 no total/.test(prog), prog.trim());
-    ok('Volume 1 lista 100 capítulos', (await page.locator('.chap').count()) === 100);
+    ok('Catálogo com 350 capítulos e status real', /3 escritos/.test(prog) && /350 no total/.test(prog), prog.trim());
+    ok('Volume 1 lista 35 capítulos', (await page.locator('.chap').count()) === 35);
     ok('Capítulo 2 bloqueado sem concluir o 1', await page.locator('.chap').nth(1).evaluate((e) => e.classList.contains('locked')));
-    await page.locator('.chap-vols [data-vol="30"]').click();
+    await page.locator('.chap-vols [data-vol="10"]').click();
     const last = await page.locator('.chap .num').last().textContent();
-    ok('Volume 30 termina no capítulo 3000', last.trim() === '3000');
+    ok('Volume 10 termina no capítulo 350', last.trim() === '350');
     await shot('v06-01-capitulos');
     await page.locator('.modal.show .close').click(); await page.waitForTimeout(400);
 
@@ -130,7 +130,7 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond }); c
     // ---- Pausa → Capítulos ----
     await page.locator('[data-q=menu]').click(); await page.waitForSelector('.modal.show .pause-grid');
     await page.locator('.pause-grid [data-a=chapters]').click(); await page.waitForSelector('.modal.show .chap-list');
-    ok('Capítulos também no menu de pausa', (await page.locator('.chap').count()) === 100);
+    ok('Capítulos também no menu de pausa', (await page.locator('.chap').count()) === 35);
     await G(() => window.__ANIME_LIFE__.ui.closeModals());
   } catch (e) { ok('Execução sem exceções', false, String(e).slice(0, 300)); }
 

@@ -6,10 +6,10 @@ Feita com **Phaser 3 + JavaScript modular + Vite**, empacotável como app Androi
 > A versão anterior (exploração livre com joystick e mapa) foi removida a pedido. O código dela continua no histórico do git.
 
 ## Novidade da v0.6.0 beta: capítulos, vozes e expressões
-- **3.000 capítulos planejados** (30 volumes × 100), no painel **📚 Capítulos** (menu principal e pausa):
+- **350 capítulos planejados** (10 volumes × 35), no painel **📚 Capítulos** (menu principal e pausa):
   - volumes, progresso, sinopse, desbloqueio e revisão de capítulos concluídos;
-  - status real de cada capítulo: **3 escritos e jogáveis, 27 roteirizados, 2.970 planejados**;
-  - detalhes e lotes em [ROTEIRO_3000.md](ROTEIRO_3000.md).
+  - status real de cada capítulo: **3 escritos e jogáveis, 27 roteirizados, 320 planejados**;
+  - detalhes e lotes em [ROTEIRO.md](ROTEIRO.md).
 - **Capítulo 2 completo** (5 cenas) e **Capítulo 3 — O Bilhete que Kyo Guardou** (4 cenas). Novas conversas no celular, e o mistério de Sora Kirishima.
 - **Novas expressões**, animadas na própria ilustração:
   - sorrindo, rindo (balanço e boca no ritmo), muito triste, chorando (lágrimas desenhadas saindo dos olhos do rig);
@@ -172,7 +172,7 @@ tools/               story-check.mjs, smoke-test.cjs, process_characters.py
 ```
 
 ## Ainda não feito
-- **Capítulos 4 a 3.000:** 27 estão roteirizados e 2.970 só planejados (veja ROTEIRO_3000.md). Também faltam rotas completas e finais diferentes.
+- **Capítulos 4 a 350:** 27 estão roteirizados e 320 só planejados (veja ROTEIRO.md). Também faltam rotas completas e finais diferentes.
 - **Arte das poses de braços:** sem ela, os personagens mantêm a pose original.
 - **Vozes gravadas** por dubladores: hoje só existe voz sintetizada.
 - Camadas desenhadas (olhos fechados, boca aberta) para um piscar completo e uma boca bem aberta. Veja o pedido de recursos em ANIMACAO_2D.md.

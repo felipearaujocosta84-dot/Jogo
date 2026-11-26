@@ -30,5 +30,5 @@ export const VOL01_PLAN = [
   { n: 27, title: 'Véspera', synopsis: 'A noite antes da viagem: cada personagem tem uma conversa importante com o protagonista.' },
   { n: 28, title: 'O Trem das 7h12', synopsis: 'A viagem a Kamakura. O mar aparece na janela; Akane segura a respiração.' },
   { n: 29, title: 'A Casa de Praia', synopsis: 'A casa existe. As luzes estão acesas. Alguém abre a porta.' },
-  { n: 30, title: 'Até Aqui', synopsis: 'Fim do primeiro terço do volume: o que foi encontrado em Kamakura e o que muda em Hoshizora a partir disso.' },
+  { n: 30, title: 'Até Aqui', synopsis: 'O que foi encontrado em Kamakura. As irmãs Tachibana frente a frente; os capítulos 31 a 35 fecham o volume.' },
 ];

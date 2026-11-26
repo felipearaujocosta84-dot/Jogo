@@ -222,11 +222,11 @@ export async function openSaveLoad(ui, mode) {
   return m.open();
 }
 
-/** 📚 Capítulos: os 3.000 capítulos planejados, por volume, com status real de produção. */
+/** 📚 Capítulos: os 350 capítulos planejados, por volume, com status real de produção. */
 export function openChapters(ui, { fromMenu = false, done = null } = {}) {
   const finished = new Set(done || Object.entries(game.state?.chapters || {}).filter(([, v]) => v?.done).map(([k]) => k));
   const pr = progress();
-  let vol = Math.max(1, Math.ceil(((game.state && CATALOG.find((c) => c.id === game.state.pos?.chapter)?.n) || 1) / 100));
+  let vol = Math.max(1, Math.ceil(((game.state && CATALOG.find((c) => c.id === game.state.pos?.chapter)?.n) || 1) / 35));
   const p = panel('📚 Capítulos', `<div class="chap-progress">${pr.escrito} escritos e jogáveis · ${pr.roteirizado} roteirizados · ${pr.planejado} planejados · ${CATALOG.length} no total</div>
     <div class="chap-bar"><i style="width:${(pr.escrito / CATALOG.length * 100).toFixed(2)}%"></i></div>
     <div class="chap-vols">${VOLUMES_INFO.map((v) => `<button data-vol="${v.n}">${v.n}. ${esc(v.title)}</button>`).join('')}</div>
