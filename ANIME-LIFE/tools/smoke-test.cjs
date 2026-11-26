@@ -47,7 +47,7 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond, extr
     await page.waitForSelector('#menu.show'); await page.waitForTimeout(1300);
     await shot('01-menu');
     ok('Menu: Continuar escondido sem jogo salvo', !(await visible('[data-a=continue]')));
-    ok('Menu: Novo jogo, Carregar, Galeria, Ajustes, Créditos', (await page.locator('#menu .mbtn:visible').count()) === 5);
+    ok('Menu: Novo jogo, Carregar, Capítulos, Galeria, Ajustes, Créditos', (await page.locator('#menu .mbtn:visible').count()) === 6);
     for (const a of ['settings', 'credits', 'gallery', 'load']) { await tap(`[data-a=${a}]`); await page.waitForSelector('.modal.show'); await page.waitForTimeout(250); await tap('.modal.show .close'); await page.waitForTimeout(300); }
     ok('Menu: ajustes, créditos, galeria e carregar abrem e fecham', (await page.locator('.modal').count()) === 0);
 

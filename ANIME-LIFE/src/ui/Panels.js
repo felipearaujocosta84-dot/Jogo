@@ -12,6 +12,8 @@ import { CHAPTERS } from '../story/chapters/index.js';
 import { EVENT_CHAPTER } from '../story/events/index.js';
 import { backgroundThumb } from '../scenes/backgrounds.js';
 import { AIClient, errorText } from '../smartphone/ai/AIClient.js';
+import { voice, PROFILES } from '../audio/VoiceManager.js';
+import { CATALOG, VOLUMES_INFO, chapterStatus, isUnlocked, progress } from '../story/catalog.js';
 
 export class Modal {
   constructor(ui, inner, { onClose, wide } = {}) {
@@ -55,12 +57,21 @@ export function openSettings(ui) {
     <div class="row">Animação dos personagens ${seg('animations', [['completa', 'Completa'], ['leve', 'Leve'], ['off', 'Desligada']])}</div>
     <div class="row">Gráficos ${seg('quality', [['economica', 'Econômico'], ['auto', 'Auto'], ['alta', 'Alta']])}</div>
     <div class="row">Tela cheia <button class="pbtn alt" data-a="fs">Alternar</button></div>
+    <h3>🔊 Vozes</h3>
+    <p class="hint">${voice.available ? 'As vozes são <b>sintetizadas pelo aparelho</b> (não são dublagem gravada). Falas com gravação real, quando existirem, aparecem como 🎙.' : 'Este aparelho/navegador não oferece voz sintetizada. Falas com gravação real ainda tocam.'}</p>
+    <div class="row">Vozes ${seg('voice', [[true, 'Ligadas'], [false, 'Desligadas']])}</div>
+    <div class="row">Volume das vozes <input type="range" min="0" max="1" step="0.05" data-k="voiceVolume" value="${settings.data.voiceVolume ?? 0.9}"></div>
+    <div class="voice-list">${Object.keys(PROFILES).filter((id) => Characters.get(id)).map((id) => `<div class="voice-row"><img src="${Characters.portrait(id)}" alt="">
+      <select data-voice="${id}"><option value="">Automática${voice.voiceFor(id) ? ` (${esc(voice.voiceFor(id).name)})` : ''}</option>${voice.voices.map((v) => `<option value="${esc(v.id)}" ${settings.data.voices?.[id] === v.id ? 'selected' : ''}>${esc(v.name)} · ${esc(v.lang)}</option>`).join('')}</select>
+      <button class="pbtn alt" data-vtest="${id}">▶</button></div>`).join('')}</div>
     <h3>📱 Celular e IA</h3>
     <div class="row col">Servidor de IA (deixe vazio para o modo local)
       <div class="ai-row"><input type="url" class="ai-url" placeholder="https://seu-servidor.exemplo.com" value="${esc(settings.data.aiServer || '')}" autocomplete="off"><button class="pbtn alt" data-a="test">Testar</button></div>
       <small class="ai-status">${settings.data.aiServer ? 'Servidor configurado.' : 'Modo local: respostas limitadas, sem IA real.'}</small></div>
     <div class="row">Mensagens espontâneas ${seg('spontaneous', [['off', 'Desligadas'], ['poucas', 'Poucas'], ['normal', 'Normal'], ['muitas', 'Muitas']])}</div>
     <div class="row">Limite de mensagens por dia ${seg('aiDailyCap', [[30, '30'], [80, '80'], [150, '150']])}</div>`);
+  p.querySelectorAll('select[data-voice]').forEach((sel) => sel.addEventListener('change', () => { settings.set('voices', { ...(settings.data.voices || {}), [sel.dataset.voice]: sel.value || undefined }); }));
+  p.querySelectorAll('[data-vtest]').forEach((b) => b.addEventListener('click', () => { if (!voice.test(b.dataset.vtest, `Oi, eu sou ${Characters.name(b.dataset.vtest)}. Essa é uma voz sintetizada.`)) ui.toast('Voz sintetizada indisponível neste aparelho'); }));
   p.querySelectorAll('input[type=range]').forEach((r) => r.addEventListener('input', () => { settings.set(r.dataset.k, Number(r.value)); audio.applyVolumes(); }));
   p.querySelectorAll('.seg').forEach((s) => s.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
@@ -119,6 +130,7 @@ export function openPause(ui) {
     <button class="pbtn alt" data-a="choices">🧭 Escolhas</button>
     <button class="pbtn alt" data-a="log">📜 Histórico</button>
     <button class="pbtn alt" data-a="gallery">🖼️ Galeria</button>
+    <button class="pbtn alt" data-a="chapters">📚 Capítulos</button>
     <button class="pbtn alt" data-a="settings">⚙️ Ajustes</button>
     <button class="pbtn alt" data-a="title">🏠 Menu principal</button></div>`, 'narrow');
   const m = new Modal(ui, p);
@@ -127,7 +139,7 @@ export function openPause(ui) {
     audio.sfx('click');
     if (a === 'resume') return m.close();
     if (a === 'title') { await m.close(); return ui.backToTitle(); }
-    ({ save: () => openSaveLoad(ui, 'save'), load: () => openSaveLoad(ui, 'load'), rel: () => openRelationships(ui), choices: () => openDecisions(ui), log: () => openBacklog(ui), gallery: () => openGallery(ui), settings: () => openSettings(ui) })[a]();
+    ({ save: () => openSaveLoad(ui, 'save'), load: () => openSaveLoad(ui, 'load'), rel: () => openRelationships(ui), choices: () => openDecisions(ui), log: () => openBacklog(ui), gallery: () => openGallery(ui), chapters: () => openChapters(ui), settings: () => openSettings(ui) })[a]();
   });
   return m.open();
 }
@@ -207,5 +219,37 @@ export async function openSaveLoad(ui, mode) {
       audio.sfx('confirm'); await m.close(); ui.loadFrom(slot);
     }
   }));
+  return m.open();
+}
+
+/** 📚 Capítulos: os 3.000 capítulos planejados, por volume, com status real de produção. */
+export function openChapters(ui, { fromMenu = false, done = null } = {}) {
+  const finished = new Set(done || Object.entries(game.state?.chapters || {}).filter(([, v]) => v?.done).map(([k]) => k));
+  const pr = progress();
+  let vol = Math.max(1, Math.ceil(((game.state && CATALOG.find((c) => c.id === game.state.pos?.chapter)?.n) || 1) / 100));
+  const p = panel('📚 Capítulos', `<div class="chap-progress">${pr.escrito} escritos e jogáveis · ${pr.roteirizado} roteirizados · ${pr.planejado} planejados · ${CATALOG.length} no total</div>
+    <div class="chap-bar"><i style="width:${(pr.escrito / CATALOG.length * 100).toFixed(2)}%"></i></div>
+    <div class="chap-vols">${VOLUMES_INFO.map((v) => `<button data-vol="${v.n}">${v.n}. ${esc(v.title)}</button>`).join('')}</div>
+    <p class="hint">Capítulos concluídos podem ser revistos (rever não altera seu jogo). O jogo mostra o status real de produção de cada capítulo.</p><p class="hint vol-arc"></p><div class="chap-list"></div>`, 'tall');
+  const m = new Modal(ui, p, { wide: true });
+  const list = p.querySelector('.chap-list');
+  const render = () => {
+    p.querySelectorAll('[data-vol]').forEach((b) => b.classList.toggle('on', Number(b.dataset.vol) === vol));
+    const v = VOLUMES_INFO[vol - 1];
+    p.querySelector('.vol-arc').textContent = `Volume ${v.n} (capítulos ${v.from}–${v.to}): ${v.arc}`;
+    list.innerHTML = CATALOG.slice(v.from - 1, v.to).map((c) => {
+      const st = chapterStatus(c);
+      const open = isUnlocked(c.n, finished);
+      const play = st === 'escrito' && finished.has(c.id); // rever capítulos concluídos (não altera o jogo)
+      return `<${play ? 'button' : 'div'} class="chap ${open ? '' : 'locked'}" ${play ? `data-ch="${c.id}"` : ''}>
+        <span class="num">${c.n}</span><div><b>${open || st !== 'planejado' ? esc(c.title) : '???'}</b><p>${open ? esc(c.synopsis) : '🔒 Termine o capítulo anterior para desbloquear.'}</p></div>
+        <span class="st st-${st}">${{ escrito: finished.has(c.id) ? '✔ rever' : open ? '▶ jogável' : '🔒 escrito', roteirizado: '✎ roteirizado', planejado: '… planejado' }[st]}</span></${play ? 'button' : 'div'}>`;
+    }).join('');
+    list.querySelectorAll('[data-ch]').forEach((b) => b.addEventListener('click', async () => {
+      audio.sfx('confirm'); await m.close(); ui.playChapter?.(b.dataset.ch, fromMenu);
+    }));
+  };
+  p.querySelector('.chap-vols').addEventListener('click', (e) => { const b = e.target.closest('[data-vol]'); if (!b) return; audio.sfx('click'); vol = Number(b.dataset.vol); render(); });
+  render();
   return m.open();
 }

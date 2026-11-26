@@ -53,13 +53,13 @@ jobs:
         working-directory: ANIME-LIFE/android
         env:
           VERSION_CODE: ${{ github.run_number }}
-          VERSION_NAME: 0.5.0-beta.${{ github.run_number }}
+          VERSION_NAME: 0.6.0-beta.${{ github.run_number }}
         run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
 
       - name: Renomear APK
         run: |
           mkdir -p ../apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk "../apk/AnimeLife-0.5.0-beta.${{ github.run_number }}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "../apk/AnimeLife-0.6.0-beta.${{ github.run_number }}.apk"
           ls -la ../apk
 
       - name: Guardar APK (artefato da execução)

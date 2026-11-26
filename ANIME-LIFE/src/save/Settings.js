@@ -13,6 +13,10 @@ const DEFAULTS = {
   spontaneous: 'normal', // mensagens espontâneas: off | poucas | normal | muitas
   aiDailyCap: 80, // limite de mensagens por dia neste aparelho // animação dos personagens: completa | leve | off // "Pular" também pula texto ainda não lido
   quality: 'auto', // auto | alta | economica
+  voice: true, // vozes das falas (sintetizadas, ou gravadas quando existirem)
+  voiceVolume: 0.9,
+  voices: {}, // voz escolhida por personagem (id -> voz do aparelho)
+  voiceTune: {}, // ajuste fino de tom/velocidade por personagem
 };
 
 export const settings = {

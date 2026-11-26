@@ -355,3 +355,28 @@ input[type=range] { accent-color: #e773a3; width: 46%; }
 .iv-state { font-size: 11px; opacity: .7; margin-top: 4px; font-weight: 700; }
 .p-invite { background: linear-gradient(135deg, #ff7aa8, #ff9a7a) !important; }
 .p-stage { text-align: center; font-weight: 800; color: #e05a92; font-size: 12px; margin: 8px 0 0; }
+
+/* v0.6 — voz, capítulos */
+.dl-replay { position: absolute; right: 44px; bottom: 4px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); color: #fff; border-radius: 999px; font-size: 14px; padding: 2px 8px; cursor: pointer; }
+.dl-voice { position: absolute; right: 16px; top: -22px; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(20,12,36,.75); color: #cfe6ff; pointer-events: none; }
+.voice-list { display: grid; gap: 6px; }
+.voice-row { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 8px; }
+.voice-row img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.voice-row select { max-width: 100%; background: #2a2140; color: #fff; border: 1px solid #5a4a7a; border-radius: 8px; padding: 4px; font-size: 12px; }
+.chap-vols { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; }
+.chap-vols button { flex: 0 0 auto; border-radius: 999px; border: 1px solid #5a4a7a; background: #2a2140; color: #fff; padding: 4px 10px; font-size: 12px; }
+.chap-vols button.on { background: var(--sakura); color: #2a1030; }
+.chap-progress { font-size: 12px; opacity: .85; margin: 4px 0 8px; }
+.chap-bar { height: 6px; background: #2a2140; border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+.chap-bar i { display: block; height: 100%; background: var(--sakura); }
+.chap-list { display: grid; gap: 6px; }
+.chap { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: start; text-align: left; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 8px; color: #fff; }
+.chap b { font-size: 13px; } .chap p { margin: 2px 0 0; font-size: 11px; opacity: .8; }
+.chap .num { font-weight: 800; color: var(--sakura); font-size: 13px; }
+.chap .st { font-size: 10px; border-radius: 999px; padding: 2px 6px; white-space: nowrap; }
+.st-escrito { background: #2e7d4f; } .st-roteirizado { background: #8a6d1d; } .st-planejado { background: #444; }
+.chap.locked { opacity: .55; }
+.prop-insert { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-bottom: 22vh; pointer-events: none; opacity: 0; transition: opacity .35s, transform .35s; transform: translateY(16px) scale(.92); z-index: 0; }
+.prop-insert.on { opacity: 1; transform: none; }
+.prop-insert img { height: min(46vh, 300px); filter: drop-shadow(0 8px 18px rgba(0,0,0,.45)); transform: rotate(-3deg); }
+#ui-root > .prop-insert { pointer-events: none; }

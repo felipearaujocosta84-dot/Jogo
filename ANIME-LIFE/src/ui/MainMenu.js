@@ -5,7 +5,7 @@ import { Characters } from '../characters/CharacterRegistry.js';
 import { audio } from '../audio/AudioManager.js';
 import { CHAPTERS } from '../story/chapters/index.js';
 
-const VERSION = 'v0.5.0 beta — cenas e romance';
+const VERSION = 'v0.6.0 beta — capítulos, vozes e expressões';
 const LINEUP = [
   { id: 'character_07', left: '0%', h: '86%' },
   { id: 'character_01', left: '30%', h: '94%' },
@@ -26,7 +26,7 @@ export class MainMenu {
           <button class="mbtn" data-a="continue">Continuar<small></small></button>
           <button class="mbtn" data-a="new">Novo jogo</button>
           <button class="mbtn" data-a="load">Carregar</button>
-          <div class="mrow"><button class="mbtn sm" data-a="gallery">Galeria</button><button class="mbtn sm" data-a="settings">Ajustes</button><button class="mbtn sm" data-a="credits">Créditos</button></div>
+          <div class="mrow"><button class="mbtn sm" data-a="chapters">Capítulos</button><button class="mbtn sm" data-a="gallery">Galeria</button><button class="mbtn sm" data-a="settings">Ajustes</button><button class="mbtn sm" data-a="credits">Créditos</button></div>
         </div>
       </div><div class="ver">${VERSION}</div></div>`);
     ui.root.append(this.splash, this.el);

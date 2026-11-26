@@ -14,7 +14,7 @@ O único elemento acrescentado por cima do desenho é o rubor: um brilho rosado 
 | Respiração | O tronco sobe e desce devagar. O ritmo muda com a emoção: mais rápido na surpresa e na raiva, mais lento na tristeza. |
 | Cabelo | As mechas medidas em cada ilustração ondulam, com mais movimento nas pontas e uma "rajada" quando a emoção muda bruscamente. |
 | Corpo | Pulinho de alegria, sobressalto, tremor de raiva, encolher de vergonha e balanço apaixonado. |
-| Expressões | Neutro, feliz, triste, envergonhado, surpreso, irritado e apaixonado, mais tímido, decepcionado, desviando o olhar, curioso e sério. Cada uma combina olhos semicerrados ou arregalados, rubor, cabeça, respiração e um balão (♪ ! ? 💢 💧 ♡ ///). |
+| Expressões | Neutro, feliz, triste, envergonhado, surpreso, irritado e apaixonado, mais tímido, decepcionado, desviando o olhar, curioso e sério. Na v0.6: sorrindo, rindo, muito triste, chorando (com lágrimas), com medo, irritado, ciúmes, nervoso e confuso. Cada uma combina olhos semicerrados ou arregalados, rubor, cabeça, respiração e um balão (♪ ! ? 💢 💧 ♡ ///). |
 | Entrar e sair de cena | Desliza do lado, sobe e aparece. Ao sair, desce, desliza para fora e some. |
 
 As expressões acompanham as falas sozinhas. Se o roteiro não definir a emoção, ela é deduzida do texto em `src/cinematic/Emotions.js`. Exemplos:
@@ -63,3 +63,31 @@ O código para essas camadas está pronto (mistura no shader, alinhada à ilustr
 - **Custo:** um shader por personagem em cena (no máximo 2 ou 3) e nenhum arquivo extra para baixar.
 - **Ajustes → Animação dos personagens:** *Completa*, *Leve* (sem cabelo) ou *Desligada*.
 - **Sem WebGL:** o jogo volta sozinho para as ilustrações estáticas.
+
+## Braços e gestos (v0.6): sistema pronto, falta a arte
+Braços **não podem ser movidos** deformando a ilustração: o resultado seria um desenho distorcido, e isso foi proibido.
+Por isso o jogo usa **poses desenhadas**, que são versões da ilustração original com os braços em outra posição.
+
+**O que já funciona:**
+- O roteiro e a fala escolhem a pose: `src/animation/Poses.js`.
+  - Exemplos: "oi"/"tchau" → acenar; "olha ali" → apontar; "então…" → explicar; raiva → braços cruzados; surpresa → mão na boca; objeto na mão → segurar.
+- A troca é feita com uma transição suave: `StageScene.pose`.
+  - Testada com a própria ilustração no lugar da arte (`tools/v06-test.cjs`).
+- Se a pose não tem arte, nada muda na ilustração.
+
+**Pedido de arte.** Use a ilustração original como base, com o mesmo tamanho e enquadramento de `full.webp`, fundo transparente, e o rosto e o corpo no mesmo lugar, para o piscar e a boca continuarem alinhados:
+
+| Arquivo | Pose |
+|---|---|
+| `poses/explain.webp` | uma mão aberta, explicando |
+| `poses/point.webp` | apontando |
+| `poses/arms_crossed.webp` | braços cruzados |
+| `poses/hands_hips.webp` | mãos na cintura |
+| `poses/hand_face.webp` | mão no rosto |
+| `poses/hand_mouth.webp` | mão cobrindo a boca |
+| `poses/wave.webp` | acenando |
+| `poses/hold.webp` | segurando algo na altura do peito |
+| `poses/argue.webp` | gesto de discussão |
+| `poses/romantic.webp` | mão no peito ou estendida (romântico) |
+
+Registro em `characters.json`: `"poses": { "wave": "poses/wave.webp", "arms_crossed": "poses/arms_crossed.webp" }`.

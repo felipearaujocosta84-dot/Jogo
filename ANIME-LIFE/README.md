@@ -5,6 +5,30 @@ Feita com **Phaser 3 + JavaScript modular + Vite**, empacotável como app Androi
 
 > A versão anterior (exploração livre com joystick e mapa) foi removida a pedido. O código dela continua no histórico do git.
 
+## Novidade da v0.6.0 beta: capítulos, vozes e expressões
+- **3.000 capítulos planejados** (30 volumes × 100), no painel **📚 Capítulos** (menu principal e pausa):
+  - volumes, progresso, sinopse, desbloqueio e revisão de capítulos concluídos;
+  - status real de cada capítulo: **3 escritos e jogáveis, 27 roteirizados, 2.970 planejados**;
+  - detalhes e lotes em [ROTEIRO_3000.md](ROTEIRO_3000.md).
+- **Capítulo 2 completo** (5 cenas) e **Capítulo 3 — O Bilhete que Kyo Guardou** (4 cenas). Novas conversas no celular, e o mistério de Sora Kirishima.
+- **Novas expressões**, animadas na própria ilustração:
+  - sorrindo, rindo (balanço e boca no ritmo), muito triste, chorando (lágrimas desenhadas saindo dos olhos do rig);
+  - com medo (tremor), irritado, ciúmes, nervoso, confuso;
+  - o roteiro aceita nomes em português (`e: 'bravo'`, `'irritado'`, `'chorando'`…).
+- **Objetos em cena** (`{ prop: 'carta' }`), desenhados por código: carta, bilhete, álbum, foto, cartão, cachecol, passagem, caixa, chave, celular, caneca, cartão-postal.
+  - Aparecem em plano de detalhe ou na mão de um personagem (`by`).
+- **Braços e gestos (sistema pronto, arte pendente):**
+  - o jogo escolhe a pose pela fala e pela emoção: acenar, apontar, explicar, braços cruzados, mãos na cintura, mão no rosto ou na boca, segurar objeto, discussão, romântico;
+  - a troca usa uma transição suave;
+  - **sem arte desenhada da pose, a ilustração não muda**, porque os braços não são deformados por código. Veja o pedido de arte em [ANIMACAO_2D.md](ANIMACAO_2D.md).
+- **Vozes:** **voz sintetizada pelo aparelho**, sempre indicada na tela como "🔊 voz sintetizada". Não é dublagem.
+  - Cada personagem tem um perfil próprio (tom e ritmo) e a entonação muda conforme a emoção.
+  - Há pausas nas reticências e no fim das frases.
+  - A legenda aparece no ritmo da fala, a boca acompanha cada trecho falado e o botão 🔁 repete a fala.
+  - Nos Ajustes: ligar/desligar, volume, e escolha e teste da voz de cada personagem.
+  - Funciona no navegador (Web Speech API) e no Android (plugin `@capacitor-community/text-to-speech`).
+  - Gravações reais podem ser adicionadas em `public/assets/voices/` e substituem a voz sintetizada, marcadas como "🎙 voz gravada". Hoje não há nenhuma gravação.
+
 ## Novidade da v0.5.0 beta: cenas cinematográficas e relacionamentos adultos
 - **Narração vira cena** (`src/cinematic/SceneDirector.js`). O diretor de cena lê o roteiro e mostra o que o texto descreve, sem inventar nada:
   - "alguém bate na porta" → batidas;
@@ -56,7 +80,8 @@ Detalhes, limites e a lista de imagens que deixariam a animação perfeita estã
 - **Novo jogo:** nome, nome de exibição e pronomes (ele/ela/elu). Os textos concordam com os pronomes escolhidos.
 - **História jogável:**
   - **Capítulo 1 — Apartamento 201:** 5 cenas completas.
-  - **Capítulo 2 — Cartões-postais de Kamakura:** só a abertura. Ela muda conforme o que aconteceu no Capítulo 1.
+  - **Capítulo 2 — Cartões-postais de Kamakura:** 5 cenas (v0.6).
+  - **Capítulo 3 — O Bilhete que Kyo Guardou:** 4 cenas (v0.6).
 - **Diálogos ramificados:** cada escolha tem reação própria, altera variáveis da história, mexe nos relacionamentos e libera ou bloqueia opções futuras. Opções bloqueadas aparecem com 🔒 e o motivo.
 - **Relacionamentos:** amizade, confiança, afinidade e romance para cada personagem. Romance só existe com personagens adultos marcados como elegíveis, e só depois de uma afinidade mínima. Momentos marcantes aparecem como "Fulano vai lembrar disso".
 - **Celular:** conversas individuais e em grupo, com respostas de escolha, convites, contatos e publicações fictícias (Hoshigram). As conversas ficam guardadas para reler.
@@ -83,7 +108,7 @@ A original fica intacta em `reference/original.jpg`. Dados de cada personagem (i
 
 Os personagens 03 e 04 usam uniforme escolar e **nunca** terão romance.
 O 05 está fora da história até a imagem ser licenciada.
-O 09 (talvez o mesmo personagem do 08) e o 11 ainda não aparecem.
+O 09 é Sora Kirishima (25 anos, sem romance): por enquanto só é descrito na história, sem aparecer em cena. O 11 ainda não aparece.
 
 **Expressões:** só existe a arte neutra de cada personagem. A expressão aparece animando a própria ilustração: olhos semicerrados ou arregalados, rubor, cabeça, respiração e balão (veja [ANIMACAO_2D.md](ANIMACAO_2D.md)).
 Para usar arte própria por expressão, veja `public/assets/characters/<id>/expressions/README.md`.
@@ -116,6 +141,7 @@ npm run android:open   # Android Studio → Run ou Build APK (app travado em pai
   ```js
   { bg: 'cafe' }  { music: 'cafe' }  { card: 'Segunda-feira, 15h' }
   { show: R, at: 'left', e: 'happy' }  { hide: R }  { shot: 'wide' }
+  { prop: 'carta' } { prop: 'carta', by: A } { prop: null } { c: R, pose: 'wave', t: 'Oi!' }
   { n: 'narração' }  { th: 'pensamento' }  { p: 'fala do protagonista' }  { c: R, e: 'sad', t: 'fala' }
   { id: 'decisao', choice: [{ t: 'texto', value: 'x', do: [rel(R, { amizade: 2 }), flag('k', 'v')], go: 'rotulo', if: (c) => ..., lockIf: (c) => ..., lock: 'motivo' }] }
   { label: 'rotulo' }  { if: (c) => c.flag('k') === 'v', go: 'rotulo' }  { phone: 'conversa' }  { end: true }
@@ -146,7 +172,8 @@ tools/               story-check.mjs, smoke-test.cjs, process_characters.py
 ```
 
 ## Ainda não feito
-- Capítulo 2 além da abertura, rotas completas e finais diferentes. As variáveis que vão decidir os finais já são registradas desde o Capítulo 1.
+- **Capítulos 4 a 3.000:** 27 estão roteirizados e 2.970 só planejados (veja ROTEIRO_3000.md). Também faltam rotas completas e finais diferentes.
+- **Arte das poses de braços:** sem ela, os personagens mantêm a pose original.
+- **Vozes gravadas** por dubladores: hoje só existe voz sintetizada.
 - Camadas desenhadas (olhos fechados, boca aberta) para um piscar completo e uma boca bem aberta. Veja o pedido de recursos em ANIMACAO_2D.md.
 - Cenários desenhados à mão (os atuais são pintados por código).
-- APK compilado (precisa do Android Studio).

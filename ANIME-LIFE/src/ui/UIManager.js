@@ -10,7 +10,7 @@ import { DialogueUI } from './DialogueUI.js';
 import { PhoneUI } from './PhoneUI.js';
 import { Cards } from './Cards.js';
 import { Chat } from '../smartphone/ChatSystem.js';
-import { openSettings, openCredits, openPause, openBacklog, openGallery, openSaveLoad, openConfirm } from './Panels.js';
+import { openSettings, openCredits, openPause, openBacklog, openGallery, openSaveLoad, openConfirm, openChapters } from './Panels.js';
 
 const findSceneIsEvent = (id) => typeof id === 'string' && id.startsWith('e_');
 const GALLERY_KEY = 'anime-life.gallery'; // galeria vale para todas as partidas
@@ -43,6 +43,7 @@ export class UIManager {
     if (a === 'settings') return openSettings(this);
     if (a === 'credits') return openCredits(this);
     if (a === 'gallery') return openGallery(this, { fromMenu: true, unlocked: this.galleryList() });
+    if (a === 'chapters') { const auto = await saves.load('auto'); return openChapters(this, { fromMenu: true, done: Object.entries(auto?.chapters || {}).filter(([, v]) => v?.done).map(([k]) => k) }); }
     if (a === 'load') return openSaveLoad(this, 'load');
     if (a === 'continue') return this.loadFrom('auto');
     if (a === 'new') {
@@ -110,6 +111,29 @@ export class UIManager {
     this.fade.classList.remove('on');
     this.toast('🖼️ Revendo cena (nada será salvo)');
     await replayer.replay(sceneId);
+    if (this.story !== replayer) return;
+    if (fromMenu) return this.backToTitle(true);
+    return this.startStory();
+  }
+
+  /** Revê um capítulo inteiro (cena por cena) sem alterar o jogo salvo. */
+  async playChapter(chapterId, fromMenu) {
+    const { CHAPTERS } = await import('../story/chapters/index.js');
+    const ch = CHAPTERS.find((c) => c.id === chapterId); if (!ch) return;
+    await this.closeModals();
+    if (fromMenu) {
+      const base = (await saves.load('auto')) || newState({ name: 'Você', displayName: 'Você', pronouns: 'ele' });
+      game.set(base); await this.menu.hide();
+    }
+    this.fade.classList.add('on');
+    await this.ensureEngine();
+    this.story?.stop(); this.dialogue.abort();
+    const replayer = new this.StoryEngine(this, this.engine.stage);
+    this.story = replayer;
+    this.dialogue.show();
+    this.fade.classList.remove('on');
+    this.toast(`📚 Revendo o Capítulo ${ch.number} (nada será salvo)`);
+    for (const sc of ch.scenes) { if (this.story !== replayer) return; await replayer.replay(sc.id); }
     if (this.story !== replayer) return;
     if (fromMenu) return this.backToTitle(true);
     return this.startStory();

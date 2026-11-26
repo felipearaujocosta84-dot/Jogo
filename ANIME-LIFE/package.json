@@ -1,7 +1,7 @@
 {
   "name": "anime-life",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "ANIME LIFE — MINHA VIDA: simulador de vida anime 2D (Phaser 3) para navegador e Android (Capacitor)",
   "type": "module",
   "scripts": {
@@ -9,11 +9,12 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "assets": "python3 tools/process_characters.py",
-    "test": "node tools/story-check.mjs && (cd server && node test.mjs) && vite build && node tools/smoke-test.cjs && node tools/phone-test.cjs && node tools/romance-test.cjs",
+    "test": "node tools/story-check.mjs && (cd server && node test.mjs) && vite build && node tools/smoke-test.cjs && node tools/phone-test.cjs && node tools/romance-test.cjs && node tools/v06-test.cjs",
     "android:sync": "vite build && npx cap sync android",
     "android:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^8.0.2",
     "@capacitor/android": "8.6.3",
     "@capacitor/core": "8.6.3",
     "phaser": "3.90.0"

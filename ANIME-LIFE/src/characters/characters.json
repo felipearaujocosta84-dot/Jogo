@@ -507,9 +507,9 @@
         "headX": 0.5,
         "portraitSize": 0.22
       },
-      "age": null,
-      "occupation": "—",
-      "role": "",
+      "age": 25,
+      "occupation": "Desconhecido",
+      "role": "Desconhecido — homem de óculos ligado a Yuki",
       "romanceable": false,
       "color": "#a8a48e",
       "bio": "Ainda não aparece na história (pode ser o mesmo personagem do character_08 — aguardando confirmação)."

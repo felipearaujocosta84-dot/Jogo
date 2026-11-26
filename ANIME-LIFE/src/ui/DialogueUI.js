@@ -17,6 +17,8 @@ export class DialogueUI {
         <div class="dl-name hidden"></div>
         <div class="dl-text"></div>
         <div class="dl-ind">▼</div>
+        <button class="dl-replay hidden" title="Repetir fala" aria-label="Repetir fala">🔁</button>
+        <div class="dl-voice hidden"></div>
       </div>
       <div class="quick">
         <button data-q="log" title="Histórico">📜<span>Histórico</span></button>
@@ -36,6 +38,9 @@ export class DialogueUI {
     this.nameEl = this.el.querySelector('.dl-name');
     this.textEl = this.el.querySelector('.dl-text');
     this.choicesEl = this.el.querySelector('.choices');
+    this.replayBtn = this.el.querySelector('.dl-replay');
+    this.voiceTag = this.el.querySelector('.dl-voice');
+    this.replayBtn.addEventListener('pointerup', (e) => { e.stopPropagation(); e.preventDefault(); audio.sfx('click'); this.replay(); });
     this.auto = false; this.skip = false;
     const advance = (e) => { e.preventDefault(); if (this.el.classList.contains('ui-off')) return this.setHidden(false); this.tap(); };
     this.el.querySelector('.tapzone').addEventListener('pointerup', advance);
@@ -85,7 +90,22 @@ export class DialogueUI {
   }
 
   /** Mostra uma fala; resolve quando o jogador avança. */
-  say({ speaker, text }, { read = false } = {}) {
+  set replayFn(fn) { this._replay = fn; this.replayBtn?.classList.toggle('hidden', !fn); }
+  get replayFn() { return this._replay; }
+  /** 🔁 Repete a fala atual (voz + boca + legenda). */
+  replay() {
+    if (!this._replay) return;
+    const v = this._replay();
+    this.voiceH = v || null; this.showVoiceTag(v);
+    this.type();
+  }
+  showVoiceTag(v) {
+    this.voiceTag.classList.toggle('hidden', !v);
+    if (v) this.voiceTag.textContent = v.kind === 'recorded' ? '🎙 voz gravada' : '🔊 voz sintetizada';
+  }
+
+  say({ speaker, text }, { read = false, voice = null } = {}) {
+    this.voiceH = voice; this.showVoiceTag(voice);
     clearTimeout(this.autoTimer);
     this.choicesEl.innerHTML = '';
     this.box.classList.add('show');
@@ -116,7 +136,8 @@ export class DialogueUI {
     clearInterval(this.timer);
     this.typingDone = false;
     this.el.querySelector('.dl-ind').classList.remove('on');
-    const delay = settings.textDelay();
+    // legenda sincronizada: com voz, o texto aparece no ritmo da fala
+    const delay = this.voiceH && settings.textDelay() ? Math.max(18, Math.min(110, this.voiceH.msPerChar)) : settings.textDelay();
     if (!delay) { this.textEl.textContent = this.full; return this.afterTyping(); }
     let i = 0; this.textEl.textContent = '';
     this.timer = setInterval(() => {
@@ -137,6 +158,12 @@ export class DialogueUI {
 
   scheduleAuto() {
     clearTimeout(this.autoTimer);
+    // no automático, espera a voz terminar antes de passar
+    if (this.voiceH && !this.voiceH.finished) {
+      const v = this.voiceH;
+      v.done.then(() => { v.finished = true; if (this.voiceH === v && this.auto && this.resolveLine) this.scheduleAuto(); });
+      return;
+    }
     this.autoTimer = setTimeout(() => { if (this.auto && !this.ui.modals) this.finishLine(); else if (this.auto) this.scheduleAuto(); }, settings.autoDelay() + this.full.length * 18);
   }
 
@@ -150,6 +177,7 @@ export class DialogueUI {
 
   finishLine() {
     clearTimeout(this.autoTimer);
+    this.voiceH = null; this.showVoiceTag(null);
     const r = this.resolveLine; this.resolveLine = null;
     r?.();
   }
@@ -182,6 +210,7 @@ export class DialogueUI {
   abort() {
     clearInterval(this.timer); clearTimeout(this.autoTimer);
     this.resolveLine = null; this.pickFn = null; this.choicesEl.innerHTML = '';
+    this.replayFn = null; this.showVoiceTag(null);
     this.box.classList.remove('show');
   }
 }

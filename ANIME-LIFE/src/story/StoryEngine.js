@@ -12,7 +12,8 @@
 //   Sem "e", a expressão é deduzida do texto (cinematic/Emotions.js).
 //   Direção de cena: { move:id, at } { approach:id, amount } { gesture:id, g:'nod|shake|sigh|turn|close_eyes|open_eyes' }
 //   { ambient:'cidade|cafe|vento|grilos'|null } { lights:'on' } { dim:0..1 } { glow:0..1 } { cutaway:true } { uncut:true }
-//   { fade:'black'|'white', text } { letterbox:true|false } { sfx:'knock' }   (narrações também ganham efeitos automáticos)
+//   { fade:'black'|'white', text } { letterbox:true|false } { sfx:'knock' }
+//   Objetos e braços: { prop:'carta' } { prop:'carta', by:A } { prop:null } { pose:'wave', who:R } · fala com pose: { c:R, pose:'point', t }   (narrações também ganham efeitos automáticos)
 import { game, fmt } from '../core/GameState.js';
 import { bus } from '../core/EventBus.js';
 import { CHAPTERS } from './chapters/index.js';
@@ -26,6 +27,8 @@ import { Director } from '../cinematic/Director.js';
 import { emotionFor } from '../cinematic/Emotions.js';
 import { directNarration, AMBIENT } from '../cinematic/SceneDirector.js';
 import { settings } from '../save/Settings.js';
+import { poseFor } from '../animation/Poses.js';
+import { voice } from '../audio/VoiceManager.js';
 
 const LOG_MAX = 400;
 
@@ -103,7 +106,7 @@ export class StoryEngine {
       st.bg = s.bg; await this.stage.setBackground(s.bg, s.fx || 'fade');
       this.stage.uncut?.(); // nova cena: quem continua em cena volta a aparecer
       if (!('ambient' in st) || st.ambientAuto !== false) { st.ambient = AMBIENT[s.bg] ?? null; audio.ambient(st.ambient); }
-      st.dim = 0; st.glow = 0; this.stage.dim?.(0, 0); this.stage.romanticGlow?.(0, 0);
+      st.dim = 0; st.glow = 0; st.prop = null; this.stage.showProp?.(null); this.stage.dim?.(0, 0); this.stage.romanticGlow?.(0, 0);
       pos.pc++; return;
     }
     // ---- direção de cena explícita ----
@@ -112,6 +115,14 @@ export class StoryEngine {
       await this.stage.show(s.move, s.at, ch?.e || 'neutral'); pos.pc++; return;
     }
     if (s.approach) { const ch = st.chars.find((x) => x.id === s.approach); if (ch) ch.near = s.amount ?? 1; this.stage.approach?.(s.approach, s.amount ?? 1); await this.beat(900); pos.pc++; return; }
+    if ('prop' in s && !s.n && !s.c) {
+      st.prop = s.prop ? { name: s.prop, by: s.by || null } : null;
+      if (s.prop) audio.sfx('open');
+      StoryEngine.cueLog.push({ prop: s.prop, by: s.by || null, scene: info.scene.id });
+      this.stage.showProp?.(s.prop, s.by || null);
+      await this.beat(s.prop ? 700 : 300); pos.pc++; return;
+    }
+    if (s.pose && !s.c) { this.stage.pose?.(s.who, s.pose); pos.pc++; return; }
     if (s.gesture) { this.stage.gesture?.(s.gesture, s.g); pos.pc++; return; }
     if ('ambient' in s && !s.n && !s.c) { st.ambient = s.ambient; st.ambientAuto = false; audio.ambient(s.ambient); pos.pc++; return; }
     if (s.lights) { this.stage.lightsOn?.(() => audio.sfx('clink')); await this.beat(1600); pos.pc++; return; }
@@ -176,6 +187,12 @@ export class StoryEngine {
         else if (s.e) this.stage.express(s.c, emo.emotion);
       }
       this.stage.focus(s.c || null);
+      // braços: pose escolhida pela fala/emoção (só muda se houver arte da pose)
+      if (s.c) {
+        const pose = poseFor({ explicit: s.pose, text: line.text, emotion: emo.emotion, holding: st.prop?.by === s.c });
+        const drawn = this.stage.pose?.(s.c, pose);
+        StoryEngine.cueLog.push({ pose, who: s.c, drawn: !!drawn, scene: info.scene.id });
+      }
       // narração vira cena: sons, luz, ações de quem está em cena, panorâmica; o texto vem depois de uma pausa
       if (s.n) {
         const dir = directNarration(line.text, { bg: st.bg, cast: st.chars, lastSpeaker: this.director.lastSpeaker });
@@ -190,11 +207,21 @@ export class StoryEngine {
       // câmera cinematográfica
       const shot = this.director.shotFor({ speaker: line.speaker, emotion: emo?.emotion, intensity: emo?.intensity ?? 0.5, text: line.text, cast: st.chars, cam: s.cam, revelation: s.big });
       if (this.stage.shot && !line.cinematicShot) this.stage.shot(settings.data.cinema === false ? { type: 'wide' } : shot, { instant: this.ui.skipping });
-      // boca acompanha a fala no ritmo do texto
-      if (s.c && !this.ui.skipping) this.stage.speak?.(s.c, line.text, settings.textDelay() || 38);
       await this.save();
       this.log({ kind: 'line', who: line.speaker, t: line.text });
-      await this.ui.say(line, { read: wasRead });
+      // voz (sintetizada ou gravada) + boca sincronizada; sem voz, a boca segue o ritmo do texto
+      line.voice = s.c ? { id: s.c, emotion: emo?.emotion, key: key } : null;
+      const speakNow = () => {
+        if (!s.c || this.ui.skipping) return null;
+        const v = voice.say(line.voice, line.text, { onChunk: (chunk, msPerChar) => this.stage.speak?.(s.c, chunk, msPerChar), onEnd: () => this.stage.stopSpeaking?.() });
+        if (!v) this.stage.speak?.(s.c, line.text, settings.textDelay() || 38);
+        return v;
+      };
+      this.ui.dialogue.replayFn = s.c ? () => { voice.stop(); this.stage.stopSpeaking?.(); speakNow(); } : null;
+      const v = speakNow();
+      await this.ui.say(line, { read: wasRead, voice: v });
+      voice.stop();
+      this.ui.dialogue.replayFn = null;
       this.stage.stopSpeaking?.();
       if (!alive()) return;
       if (!game.replay) game.state.read[key] = 1;

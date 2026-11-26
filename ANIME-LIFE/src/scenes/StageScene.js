@@ -6,14 +6,16 @@ import Phaser from 'phaser';
 import { paintBackground, BG_W, BG_H, FILES } from './backgrounds.js';
 import { Characters } from '../characters/CharacterRegistry.js';
 import { asset, characterAsset } from '../core/assets.js';
-import { EMOTIONS } from '../cinematic/Emotions.js';
+import { EMOTIONS, ALIASES } from '../cinematic/Emotions.js';
+import { Props } from './Props.js';
 import { LivingSprite, canAnimate } from '../animation/LivingSprite.js';
 import { CharacterAnimator } from '../animation/CharacterAnimator.js';
 import { settings } from '../save/Settings.js';
 import { AmbientFX } from './AmbientFX.js';
 
 const SLOTS = { farleft: 0.14, left: 0.27, center: 0.5, right: 0.73, farright: 0.86 };
-const EMOTE_COLORS = { happy: '#ff6fa8', surprised: '#ffb020', curious: '#9a7aff', angry: '#ff4060', sad: '#5aa0ff', hurt: '#5aa0ff', embarrassed: '#ff5a7a', serious: '#ffffff', love: '#ff5a9a' };
+const resolveExpr = (e) => ALIASES[e] || e;
+const EMOTE_COLORS = { laugh: '#ff6fa8', scared: '#5aa0ff', very_sad: '#5aa0ff', annoyed: '#ff4060', jealous: '#ff7040', nervous: '#5ac8ff', confused: '#9a7aff', happy: '#ff6fa8', surprised: '#ffb020', curious: '#9a7aff', angry: '#ff4060', sad: '#5aa0ff', hurt: '#5aa0ff', embarrassed: '#ff5a7a', serious: '#ffffff', love: '#ff5a9a' };
 // planos de câmera (2D): zoom e altura do rosto na tela (fração da altura)
 const FRAMING = { wide: { z: 1, f: null }, medium: { z: 1.32, f: 0.3 }, close: { z: 1.95, f: 0.34 }, extreme: { z: 2.8, f: 0.37 }, ots: { z: 1.6, f: 0.33 }, side: { z: 1.5, f: 0.32 }, two: { z: 1.2, f: 0.3 }, choice: { z: 1.3, f: 0.3 } };
 
@@ -27,6 +29,8 @@ export class StageScene extends Phaser.Scene {
     this.vignette = this.add.graphics().setDepth(50).setScrollFactor(0);
     this.camProxy = { x: 0, y: 0, z: 1 };
     this.ambient = new AmbientFX(this);
+    this.props = new Props(this);
+    this.tears = [];
     // camada de luz da cena (escurecer, brilho romântico, fades)
     this.veil = this.add.rectangle(0, 0, 10, 10, 0x0a0620, 0).setOrigin(0).setDepth(48).setScrollFactor(0);
     this.glow = this.add.rectangle(0, 0, 10, 10, 0xff8ab0, 0).setOrigin(0).setDepth(47).setScrollFactor(0).setBlendMode('ADD');
@@ -123,6 +127,7 @@ export class StageScene extends Phaser.Scene {
   }
 
   async show(id, at = 'center', expr = 'neutral') {
+    expr = resolveExpr(expr || 'neutral');
     const key = `char_${id}`;
     await this.loadImage(key, Characters.expressionImage(id, expr));
     (this.layerKeys ||= {})[id] ||= await this.loadLayers(id);
@@ -150,7 +155,8 @@ export class StageScene extends Phaser.Scene {
     const c = this.chars.get(id);
     if (!c) return;
     this.chars.delete(id);
-    c.emote?.destroy();
+    c.emote?.destroy(); c.poseFade?.destroy();
+    if (this.props.by === id) this.props.hide();
     if (this.instant) { c.img.destroy(); return; }
     // saída: vira levemente para o lado da tela, desce e some
     const dir = SLOTS[c.at] < 0.5 ? -1 : 1;
@@ -170,8 +176,10 @@ export class StageScene extends Phaser.Scene {
 
   /** Expressão: troca a arte se existir; senão anima a ilustração original + balão + rubor. */
   express(id, expr) {
+    expr = resolveExpr(expr);
     const c = this.chars.get(id);
     if (!c || !expr) return;
+    c.expr = expr;
     c.anim?.setEmotion(expr);
     if (Characters.hasExpressionArt(id, expr)) {
       const k = `char_${id}_${expr}`;
@@ -195,7 +203,11 @@ export class StageScene extends Phaser.Scene {
     if (expr === 'love') this.tweens.add({ targets: img, angle: 1.2, duration: 900, yoyo: true, ease: 'Sine.easeInOut' });
     if (expr === 'shy') this.tweens.add({ targets: img, y: y0 + 6, duration: 400, ease: 'Sine.easeOut' });
     if (expr === 'lookaway') this.tweens.add({ targets: img, angle: c.at === 'right' ? 2 : -2, x: img.x + (c.at === 'right' ? 10 : -10), duration: 500, ease: 'Sine.easeOut' });
-    if (expr === 'hurt') this.tweens.add({ targets: img, y: y0 + 8, duration: 600, ease: 'Sine.easeOut' });
+    if (expr === 'hurt' || expr === 'very_sad' || expr === 'crying') this.tweens.add({ targets: img, y: y0 + (expr === 'hurt' ? 8 : 12), duration: 600, ease: 'Sine.easeOut' });
+    if (expr === 'scared') this.tweens.add({ targets: img, y: y0 + 6, x: img.x + (c.at === 'right' ? 12 : -12), duration: 220, ease: 'Quad.easeOut' });
+    if (expr === 'jealous' || expr === 'annoyed') this.tweens.add({ targets: img, angle: c.at === 'right' ? 1.5 : -1.5, duration: 350, ease: 'Sine.easeOut' });
+    if (expr === 'confused') this.tweens.add({ targets: img, angle: c.at === 'right' ? -2 : 2, duration: 400, ease: 'Sine.easeOut' });
+    if (expr === 'laugh' && !c.anim) this.tweens.add({ targets: img, y: y0 - 6, duration: 110, yoyo: true, repeat: 5 });
     if (emote) {
       const t = this.add.text(img.x + img.displayWidth * 0.18, y0 + this.charHeight() * 0.04, emote, {
         fontFamily: '"M PLUS Rounded 1c", sans-serif', fontSize: `${Math.round(this.H * 0.08)}px`, fontStyle: 'bold',
@@ -220,6 +232,8 @@ export class StageScene extends Phaser.Scene {
       await this.hideAll();
       if (st?.bg) { this.bgKey = null; await this.setBackground(st.bg, 'cut'); }
       for (const c of st?.chars || []) await this.show(c.id, c.at, c.e);
+      this.props.hide(true);
+      if (st?.prop) this.showProp(st.prop.name, st.prop.by);
     } finally { this.instant = false; }
   }
 
@@ -228,6 +242,7 @@ export class StageScene extends Phaser.Scene {
     this.bgA.setVisible(false); this.bgB.setVisible(false); this.bgKey = null;
     this.currentShot = null; this.clearShoulder(); this.camProxy = { x: this.W / 2, y: this.H / 2, z: 1 }; this.applyCam();
     this.ambient.clear(); this.veil.setAlpha(0); this.glow.setAlpha(0);
+    this.props.hide(true); this.props.by = null;
   }
 
   // ------------------------------------------------------------------
@@ -379,9 +394,68 @@ export class StageScene extends Phaser.Scene {
     else if (g === 'shake') this.tweens.add({ targets: c.img, x: c.img.x + 6, duration: 90, yoyo: true, repeat: 3 });
   }
 
+  // ------------------------------------------------------------------
+  // Objetos de cena, lágrimas e poses de braços
+  // ------------------------------------------------------------------
+  /** { prop: 'carta' } no centro; { prop: 'carta', by: id } na mão do personagem; null esconde. */
+  showProp(name, by = null) {
+    if (!name) { this.props.hide(); this.props.by = null; return; }
+    this.props.show(name, { by }); this.props.by = by;
+    if (by) this.pose(by, 'hold');
+  }
+
+  /**
+   * Troca a pose dos braços. Só acontece se existir arte da pose (characters.json → poses), desenhada
+   * a partir da ilustração original, com o mesmo tamanho e alinhamento de full.webp.
+   * Sem arte: registra a pose pedida e mantém a ilustração intacta (nada é deformado).
+   */
+  pose(id, name) {
+    const c = this.chars.get(id); if (!c || !name) return false;
+    const poses = Characters.get(id)?.poses || {};
+    const file = name === 'rest' ? null : poses[name];
+    c.wantPose = name;
+    if (!file && name !== 'rest') return false;
+    if ((c.pose || 'rest') === name) return true;
+    const from = c.img.sourceKey || c.img.texture.key;
+    const key = file ? `pose_${id}_${name}` : `char_${id}`;
+    const url = file ? characterAsset(id, file) : Characters.fullImage(id);
+    this.loadImage(key, url).then(() => {
+      if (!this.chars.has(id)) return;
+      // cruzamento suave: a pose antiga some por cima da nova
+      if (!this.instant) {
+        c.poseFade?.destroy();
+        const ghost = this.add.image(c.img.x, c.img.y, from).setOrigin(0.5, 0).setScale(c.img.scaleX, c.img.scaleY).setDepth(c.img.depth + 0.5).setTint(c.img.tintTopLeft ?? 0xffffff);
+        c.poseFade = ghost;
+        this.tweens.add({ targets: ghost, alpha: 0, duration: 260, onComplete: () => { ghost.destroy(); if (c.poseFade === ghost) c.poseFade = null; } });
+      }
+      if (c.anim) { c.img.setSampler2D('iChannel0', key, 0, { wrapS: 'clamp_to_edge', wrapT: 'clamp_to_edge' }); c.img.sourceKey = key; } else c.img.setTexture(key);
+      c.pose = name;
+    }).catch(() => {});
+    return true;
+  }
+
+  /** Lágrimas desenhadas por cima da ilustração, saindo dos olhos medidos no rig (emoção 'crying'). */
+  updateTears(dt) {
+    for (const c of this.chars.values()) {
+      if (c.expr !== 'crying' || c.img.alpha < 0.5 || settings.data.animations === 'off') continue;
+      c.tearT = (c.tearT ?? 0) - dt; if (c.tearT > 0) continue;
+      c.tearT = 0.32 + Math.random() * 0.3;
+      const eyes = (Characters.get(c.id)?.rig?.eyes || []).filter(Boolean);
+      if (!eyes.length || this.tears.length > 24) continue;
+      const e = eyes[Math.floor(Math.random() * eyes.length)];
+      const x = c.img.x + (e[0] / 100 - 0.5 + (Math.random() - 0.5) * e[2] / 200) * c.img.displayWidth;
+      const y = c.img.y + (e[1] + e[3] * 0.45) / 100 * c.img.displayHeight;
+      const r = Math.max(1.5, c.img.displayWidth * 0.006);
+      const t = this.add.ellipse(x, y, r * 1.4, r * 2.2, 0xbfe6ff, 0.85).setDepth(c.img.depth + 1).setStrokeStyle(1, 0xffffff, 0.7);
+      this.tears.push(t);
+      this.tweens.add({ targets: t, y: y + c.img.displayHeight * 0.06, alpha: 0, scaleY: 1.6, duration: 1100, ease: 'Quad.easeIn', onComplete: () => { t.destroy(); this.tears.splice(this.tears.indexOf(t), 1); } });
+    }
+  }
+
   update(_t, dtMs) {
     const dt = Math.min(0.05, dtMs / 1000);
     for (const c of this.chars.values()) c.anim?.update(dt);
+    this.updateTears(dt);
   }
 
 }

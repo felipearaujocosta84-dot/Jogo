@@ -17,6 +17,15 @@ const EMO = {
   lookaway: { squint: 0.1, blush: 0.35, head: [0.008, 0.002], breath: 1 },
   curious: { squint: -0.35, blush: 0, head: [0.002, -0.002], breath: 1 },
   serious: { squint: 0.2, blush: 0, head: [0, 0.001], breath: 0.9 },
+  smile: { squint: 0.25, blush: 0.08, head: [0.001, -0.0005], breath: 1 },
+  laugh: { squint: 0.55, blush: 0.25, head: [0, -0.002], breath: 1.3, laugh: 1 },
+  very_sad: { squint: 0.3, blush: 0, head: [0, 0.009], breath: 0.7 },
+  crying: { squint: 0.45, blush: 0.35, head: [0, 0.008], breath: 1.6, sob: 1 },
+  scared: { squint: -0.8, blush: 0, head: [-0.003, 0.003], breath: 1.8, tremble: 0.0016 },
+  annoyed: { squint: 0.4, blush: 0, head: [0.004, 0.001], breath: 1.2 },
+  jealous: { squint: 0.35, blush: 0.45, head: [0.006, 0.002], breath: 1.2 },
+  nervous: { squint: -0.2, blush: 0.45, head: [0.003, 0.003], breath: 1.5, tremble: 0.0008 },
+  confused: { squint: -0.15, blush: 0, head: [0.005, 0], breath: 1 },
 };
 const MOUTH = { aa: 1, oh: 0.85, ee: 0.6, ou: 0.5, ih: 0.45 };
 
@@ -56,6 +65,8 @@ export class CharacterAnimator {
   }
 
   speak(text, msPerChar) { this.speech = { tl: buildTimeline(text, msPerChar), t: 0 }; }
+  /** Teste/depuração: lista de emoções suportadas. */
+  static get emotions() { return Object.keys(EMO); }
   stopSpeaking() { this.speech = null; }
 
   update(dt) {
@@ -106,7 +117,11 @@ export class CharacterAnimator {
     this.gust = Math.max(0, (this.gust || 0) - dt * 0.8);
     const wind = this.level === 'leve' ? 0 : 1 + this.gust * 2.5;
     this.cur.wind += (wind - this.cur.wind) * k(3);
-    const breath = Math.sin(this.t * Math.PI * 2 / 4.2 * e.breath) * 0.0019 + gb;
+    let breath = Math.sin(this.t * Math.PI * 2 / 4.2 * e.breath) * 0.0019 + gb;
+    // riso (balanço rítmico + boca), soluço do choro, tremor do medo/nervosismo
+    if (e.laugh) { const r = Math.max(0, Math.sin(this.t * 13)); gy -= r * 0.0025; breath += r * 0.0018; if (!this.speech) this.cur.mouth = Math.max(this.cur.mouth, r * 0.55); }
+    if (e.sob) { const p = (this.t % 1.9) / 1.9; const sob = p < 0.18 ? Math.sin(p / 0.18 * Math.PI) : 0; breath += sob * 0.004; gy += sob * 0.002; }
+    if (e.tremble) { gx += Math.sin(this.t * 41) * e.tremble; gy += Math.sin(this.t * 37 + 1) * e.tremble * 0.6; }
     this.apply({ blink, squint: this.cur.squint, mouth: this.cur.mouth, hx: this.cur.hx + gx, hy: this.cur.hy + gy, breath, wind: this.cur.wind, blush: this.cur.blush });
   }
 

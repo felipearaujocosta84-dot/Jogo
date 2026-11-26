@@ -1,7 +1,8 @@
 // CAPÍTULO 2 — Cartões-postais de Kamakura (abertura)
 // A primeira cena muda conforme o final da noite do Capítulo 1 (escolha.c1_final)
 // e conforme os segredos revelados (akane.sabe_postais, traiu_mei, rin.filme, kaito.domingo...).
-import { R, M, A, K, rel, flag, memory } from '../dsl.js';
+import { R, M, A, K, H, Y, rel, flag, memory, post } from '../dsl.js';
+import { compBranch } from '../helpers.js';
 
 const s1 = {
   id: 'c2s1', title: 'A manhã seguinte', thumb: { bg: 'apartamento', char: A },
@@ -15,6 +16,7 @@ const s1 = {
 
     // Akane descobriu os cartões-postais (por você)
     { label: 'akane_porta' },
+    { do: [flag('c2.comp', 'akane')] },
     { n: 'Batidas fortes. Não são três, educadas. São muitas.' },
     { show: A, at: 'center', e: 'angry' },
     { c: A, e: 'angry', t: 'A Mei mora no 205, não é?' },
@@ -35,6 +37,7 @@ const s1 = {
 
     // Final com o Kaito
     { label: 'kaito' },
+    { do: [flag('c2.comp', 'kaito')] },
     { if: (c) => !c.flag('kaito.domingo'), go: 'kaito2' },
     { n: 'Oito em ponto. Kaito está na porta com uma bicicleta, duas joelheiras e um sorriso que não combina com o horário.' },
     { show: K, at: 'center', e: 'happy' },
@@ -48,6 +51,7 @@ const s1 = {
 
     // Final com a Mei
     { label: 'mei' },
+    { do: [flag('c2.comp', 'mei')] },
     { n: 'Uma mensagem às 7h42: “Acordad{g:o/a/e}? Desculpa. Não dormi.” Dois minutos depois, a Mei está na sua porta.' },
     { show: M, at: 'center', e: 'sad' },
     { if: (c) => c.flag('mei.escrever_yuki'), go: 'mei_carta' },
@@ -60,6 +64,7 @@ const s1 = {
 
     // Ligou para a Akane, mas sem revelar os cartões
     { label: 'akane_calma' },
+    { do: [flag('c2.comp', 'akane_tel')] },
     { n: 'O celular toca às oito. Akane. Nenhuma mensagem antes — ela simplesmente liga.' },
     { show: A, at: 'center', e: 'neutral' },
     { c: A, e: 'neutral', t: 'Você me ligou ontem pra saber se eu estava bem. Então hoje eu ligo pra saber se você está.' },
@@ -69,6 +74,7 @@ const s1 = {
 
     // Final com a Rin (padrão)
     { label: 'rin' },
+    { do: [flag('c2.comp', 'rin')] },
     { if: (c) => c.flag('rin.filme'), go: 'rin_filme' },
     { n: 'Três batidas curtas, educadas. Rin, com dois cafés de máquina e o capuz na cabeça.' },
     { show: R, at: 'center', e: 'neutral' },
@@ -95,7 +101,207 @@ const s1 = {
     { label: 'e2' }, { n: 'Você guarda o envelope no bolso. Ele pesa mais do que deveria — tem algo de metal lá dentro.' }, { go: 'fim' },
     { label: 'e3' }, { n: 'Você liga. A Akane atende no primeiro toque e não diz nada por um longo tempo. Depois: “Não abre. Estou indo.”' },
     { label: 'fim' },
-    { card: 'Continua no próximo capítulo' },
+    { end: true },
+  ],
+};
+
+const COMP = { rin: R, mei: M, kaito: K, akane: A, akane_tel: A };
+const comp = (c) => c.flag('c2.comp');
+
+// ---------------------------------------------------------------- cena 2
+const s2 = {
+  id: 'c2s2', title: 'A carta', thumb: { bg: 'apartamento', char: R },
+  steps: [
+    { music: 'home' }, { bg: 'apartamento' },
+    { if: (c) => c.flag('c2.envelope') === 'sozinho', go: 'so' },
+    ...compBranch('show', comp, {
+      rin: [{ show: R, at: 'right', e: 'curious' }], mei: [{ show: M, at: 'right', e: 'neutral' }], kaito: [{ show: K, at: 'right', e: 'curious' }],
+      akane: [{ show: A, at: 'right', e: 'serious' }], akane_tel: [{ n: 'A Akane chega vinte minutos depois, com o cabelo preso de qualquer jeito e a câmera no pescoço.' }, { show: A, at: 'right', e: 'serious' }],
+    }),
+    { if: (c) => c.flag('c2.envelope') === 'akane' && c.flag('c2.comp') !== 'akane' && c.flag('c2.comp') !== 'akane_tel', go: 'chega_akane' }, { go: 'carta' },
+    { label: 'chega_akane' },
+    { n: 'Meia hora depois, Akane está na sua porta, sem fôlego. Ela veio correndo da estação.' },
+    { show: A, at: 'left', e: 'serious' }, { go: 'carta' },
+    { label: 'so' },
+    { card: 'Domingo, 14h' },
+    { n: 'Sozinh{g:o/a/e} no 201, você finalmente abre o envelope. A chave pequena cai no chão e rola até debaixo da mesa.' },
+    { label: 'carta' },
+    { prop: 'carta' },
+    { n: 'A carta tem uma letra caprichada, um pouco tremida nas curvas.', cam: 'medium' },
+    { n: '“Para quem estiver morando no meu apartamento: desculpa pela caixa. Eu escrevi o endereço antigo sem pensar — a mão ainda escreve 201 quando eu fico nervosa.”' },
+    { n: '“Atrás dos vasos do terraço tem um armário de ferro com cadeado. A chave está aqui. Dentro tem coisas que eu não consegui levar e não consegui jogar fora.”' },
+    { n: '“Não procure por mim. Entregue o que estiver lá dentro para a primeira pessoa que pensar em mim quando vir aquelas coisas. Você vai saber quem é. — Y.”' },
+    { prop: null },
+    ...compBranch('reage', comp, {
+      rin: [{ c: R, e: 'sad', t: '...ela sempre assinava "Y." até nos bilhetes da geladeira do terraço' }, { c: R, e: 'neutral', t: '"não procure por mim". clássico da yuki. diz uma coisa e manda a chave junto' }],
+      mei: [{ c: M, e: 'smile', t: '“A mão escreve 201 quando fico nervosa.” Ela está bem. Se ela ainda faz piada de si mesma, ela está bem.' }, { c: M, e: 'nervous', t: 'Mas por que mandar isso pra você e não pra mim?' }],
+      kaito: [{ c: K, e: 'surprised', t: 'Um armário no terraço?? Eu penduro lâmpada lá há dois anos e nunca vi armário nenhum!' }, { c: K, e: 'confused', t: 'Atrás dos vasos de bambu... a Mei sempre disse pra eu não mexer naqueles vasos. Hm.' }],
+      akane: [{ c: A, e: 'hurt', t: '“Não procure por mim.” Ela sabe escrever isso. Só não sabe atender um telefone.', cam: 'close' }],
+      akane_tel: [{ c: A, e: 'hurt', t: '“Não procure por mim.” Ela sabe escrever isso. Só não sabe atender um telefone.', cam: 'close' }],
+      none: [{ th: 'Não procure por mim. Mas ela mandou a chave para um completo estranho.' }],
+    }),
+    { if: (c) => c.flag('c2.envelope') === 'akane' && !['akane', 'akane_tel'].includes(c.flag('c2.comp')), go: 'akane_le' }, { go: 'decide' },
+    { label: 'akane_le' }, { c: A, e: 'crying', t: '...é a letra dela. É mesmo a letra dela.', cam: 'close' },
+    { label: 'decide' },
+    { id: 'c2_chave', choice: [
+      { t: 'Vamos ao terraço agora.', value: 'agora', if: (c) => c.flag('c2.envelope') !== 'sozinho', do: [flag('c2.terraco', 'junto')], go: 'f1' },
+      { t: 'Antes, a Akane precisa saber disso.', value: 'avisar', if: (c) => !['akane', 'akane_tel'].includes(c.flag('c2.comp')) && c.flag('c2.envelope') !== 'akane', lockIf: (c) => !c.contact(A), lock: 'Você não tem o número da Akane.', do: [flag('c2.terraco', 'junto'), flag('c2.avisou_akane'), rel(A, { confianca: 3 })], go: 'f2' },
+      { t: 'Vou abrir sozinh{g:o/a/e}, à noite. Preciso pensar primeiro.', value: 'sozinho', do: [flag('c2.terraco', 'sozinho')], go: 'f3' },
+    ] },
+    { label: 'f1' }, { n: 'Vocês sobem as escadas em silêncio. A chave pesa mais do que deveria.' }, { end: true },
+    { label: 'f2' }, { n: 'A Akane atende no primeiro toque. "Não abre sem mim." Vinte minutos depois, ela está no terraço antes de vocês.' }, { end: true },
+    { label: 'f3' },
+    ...compBranch('f3r', comp, {
+      rin: [{ c: R, e: 'annoyed', t: 'tá. entendi. você não confia em mim pra isso' }, { do: [rel(R, { confianca: -1 })] }],
+      mei: [{ c: M, e: 'sad', t: 'Tudo bem. Eu também preciso pensar.' }],
+      kaito: [{ c: K, e: 'sad', t: 'Poxa... tá bom. Mas depois me conta, hein?' }, { do: [rel(K, { confianca: -1 })] }],
+      akane: [{ c: A, e: 'angry', t: 'Pensar. Claro. Eu passei um ano pensando.' }, { do: [rel(A, { confianca: -2 })] }],
+      akane_tel: [{ c: A, e: 'angry', t: 'Pensar. Claro. Eu passei um ano pensando.' }, { do: [rel(A, { confianca: -2 })] }],
+      none: [],
+    }),
+    { end: true },
+  ],
+};
+
+// ---------------------------------------------------------------- cena 3
+const s3 = {
+  id: 'c2s3', title: 'O armário atrás dos vasos', thumb: { bg: 'terraco_tarde', char: A },
+  steps: [
+    { if: (c) => c.flag('c2.terraco') === 'sozinho', go: 'noite' },
+    { music: 'home' }, { bg: 'terraco_tarde' }, { card: 'Domingo, 15h' },
+    ...compBranch('show', comp, {
+      rin: [{ show: R, at: 'left', e: 'neutral' }], mei: [{ show: M, at: 'left', e: 'nervous' }], kaito: [{ show: K, at: 'left', e: 'happy' }],
+      akane: [{ show: A, at: 'left', e: 'serious' }], akane_tel: [{ show: A, at: 'left', e: 'serious' }],
+    }),
+    { if: (c) => c.flag('c2.avisou_akane'), go: 'akane_junto' }, { go: 'abre' },
+    { label: 'akane_junto' }, { show: A, at: 'right', e: 'serious' }, { c: A, e: 'serious', t: 'Obrigada por me chamar. Antes de abrir. Isso importa.' }, { go: 'abre' },
+    { label: 'noite' },
+    { music: 'noite' }, { bg: 'terraco_noite' }, { card: 'Domingo, 23h' },
+    { n: 'O terraço vazio à noite parece outro lugar. Só o vento e as lâmpadas tortas do Kaito, apagadas.' },
+    { label: 'abre' },
+    { n: 'Atrás dos vasos de bambu, coberto por uma lona azul desbotada, há um armário de ferro pequeno.' },
+    { sfx: 'keys' },
+    { n: 'O cadeado está enferrujado, mas a chave gira de primeira. Como se alguém tivesse lubrificado a fechadura antes de ir embora.' },
+    { prop: 'album' },
+    { n: 'Dentro: um álbum de fotos encapado com tecido, um cachecol vermelho dobrado e uma passagem de trem Hoshizora–Kamakura. Só de ida. Com a data de um ano atrás.', cam: 'medium' },
+    { n: 'Na primeira página do álbum, uma mulher dorme debruçada numa mesa de luz, cercada de negativos. É a Akane — alguns anos mais nova.' },
+    { n: 'Página após página, é sempre ela: Akane rindo, Akane brava com a câmera, Akane de costas, olhando o mar.' },
+    { prop: null },
+    { if: (c) => c.flag('c2.comp') === 'rin' && c.flag('c2.terraco') !== 'sozinho', go: 'rin_foto' },
+    { n: 'Na última página não há foto. Só a mesma letra caprichada: “Para A.”' }, { go: 'reacao' },
+    { label: 'rin_foto' },
+    { n: 'A última página é diferente. Duas garotas sentadas no parapeito deste terraço, de costas para a câmera. Uma delas é a Yuki.' },
+    { n: 'A outra, de moletom preto e capuz, é a Rin.' },
+    { c: R, e: 'surprised', t: '...eu nem sabia que ela tinha tirado essa', cam: 'close' },
+    { c: R, e: 'crying', t: 'ela colocou a gente no mesmo álbum da irmã dela. por quê. por que ela fez isso e foi embora', cam: 'extreme' },
+    { label: 'reacao' },
+    { if: (c) => c.flag('c2.terraco') === 'sozinho', go: 'decide' },
+    ...compBranch('reage', comp, {
+      mei: [{ c: M, e: 'very_sad', t: 'O cachecol vermelho... ela usou no último inverno. Eu dei pra ela.' }],
+      kaito: [{ c: K, e: 'sad', t: 'Cara... essa passagem é de um dia antes de ela sumir. Ela comprou e não usou? Ou usou outra?' }],
+      akane: [{ c: A, e: 'crying', t: 'Ela me fotografava. Esse tempo todo. Eu achava que ela odiava câmera.', cam: 'close' }],
+      akane_tel: [{ c: A, e: 'crying', t: 'Ela me fotografava. Esse tempo todo. Eu achava que ela odiava câmera.', cam: 'close' }],
+      rin: [],
+    }),
+    { label: 'decide' },
+    { th: '“Entregue para a primeira pessoa que pensar em mim quando vir estas coisas.”' },
+    { id: 'c2_album', choice: [
+      { t: 'Isso é da Akane. Tem que ir para ela.', value: 'akane', do: [flag('album', 'akane'), rel(A, { confianca: 3, afinidade: 2 })], go: 'a1' },
+      { t: 'A Mei deveria ver primeiro — é com ela que a Yuki fala.', value: 'mei', if: (c) => c.flag('sabe_postais'), do: [flag('album', 'mei'), rel(M, { confianca: 3 })], go: 'a2' },
+      { t: 'Vou guardar até entender o que a Yuki quis dizer.', value: 'guardar', do: [flag('album', 'guardado')], go: 'a3' },
+      { t: 'Rin... fica com essa foto de vocês duas.', value: 'rin_foto', if: (c) => c.flag('c2.comp') === 'rin' && c.flag('c2.terraco') !== 'sozinho', do: [flag('album', 'guardado'), flag('rin.foto_yuki'), rel(R, { confianca: 4, carinho: 2 }), memory(R, 'Rin vai lembrar que você deu a foto para ela.')], go: 'a4' },
+    ] },
+    { label: 'a1' },
+    { if: (c) => ['akane', 'akane_tel'].includes(c.flag('c2.comp')) || c.flag('c2.avisou_akane'), go: 'a1b' },
+    { n: 'Você fecha o álbum com cuidado. Amanhã a Akane vai ao café, como todo dia. Ele vai estar com você.' }, { end: true },
+    { label: 'a1b' },
+    { c: A, e: 'very_sad', t: '...obrigada. Eu não sei se eu quero ver o resto. Mas obrigada.' }, { do: [flag('album.entregue')] }, { end: true },
+    { label: 'a2' }, { n: 'Você manda uma mensagem para a Mei. Ela responde com uma única palavra: “Subindo.”' }, { end: true },
+    { label: 'a3' }, { n: 'Você guarda o álbum na estante do 201. Pela primeira vez desde a mudança, o apartamento parece ter dono — e não é você.' }, { end: true },
+    { label: 'a4' },
+    { c: R, e: 'lookaway', t: '...obrigada. eu vou colar no meu caderno de cartazes' },
+    { n: 'O resto do álbum fica com você. Por enquanto.' },
+    { end: true },
+  ],
+};
+
+// ---------------------------------------------------------------- cena 4
+const s4 = {
+  id: 'c2s4', title: 'Café amargo', thumb: { bg: 'cafe', char: Y },
+  steps: [
+    { music: 'cafe' }, { bg: 'cafe' }, { card: 'Segunda-feira, 17h30' },
+    { n: 'Cinco e meia. O sino da porta toca no horário de sempre.' },
+    { show: Y, at: 'left', e: 'neutral' }, { show: A, at: 'right', e: 'neutral' },
+    { c: A, e: 'neutral', t: 'Um americano, Kyo. Sem açúcar.' },
+    { if: (c) => c.flag('album') === 'mei', go: 'pela_mei' },
+    { if: (c) => c.flag('album') === 'akane' && !c.flag('album.entregue'), go: 'entrega' },
+    { if: (c) => c.flag('album.entregue'), go: 'ja_tem' },
+    // álbum guardado: contar ou não
+    { c: A, e: 'curious', t: '{nome}. Você está estranh{g:o/a/e}. Aconteceu alguma coisa?' },
+    { id: 'c2_contar', choice: [
+      { t: 'Encontrei uma coisa da Yuki no terraço. Um álbum. É seu.', value: 'contar', do: [flag('album', 'akane_cafe'), rel(A, { confianca: 3 })], go: 'contou' },
+      { t: 'Não. Só cansaço.', value: 'esconder', do: [flag('escondeu_album'), memory(A, 'Akane vai lembrar se descobrir que você escondeu o álbum.')], go: 'kyo' },
+    ] },
+    { label: 'contou' }, { c: A, e: 'surprised', t: 'Um álbum? A Yuki não guardava nada. Ela jogava fora até recibo.' }, { c: A, e: 'neutral', t: 'Traz amanhã. Por favor.' }, { go: 'kyo' },
+    { label: 'pela_mei' },
+    { c: A, e: 'hurt', t: 'A Mei bateu na minha porta às sete da manhã com um álbum cheio de fotos minhas.', cam: 'close' },
+    { c: A, e: 'angry', t: 'Disse que foi você que mandou ela ver primeiro. A Mei. Primeiro. Antes de mim.' },
+    { do: [rel(A, { confianca: -2 })] },
+    { c: A, e: 'very_sad', t: '...mas ela chorou mais do que eu. Então talvez você tenha razão. Eu odeio isso.' }, { go: 'kyo' },
+    { label: 'entrega' },
+    { prop: 'album' },
+    { n: 'Você coloca o álbum sobre o balcão, ao lado da xícara dela.' },
+    { c: A, e: 'surprised', t: 'Isso é...' },
+    { n: 'Ela abre a primeira página e para de respirar por um segundo inteiro.' },
+    { c: A, e: 'crying', t: 'Ela me fotografava. Esse tempo todo. Eu achava que ela odiava câmera.', cam: 'extreme' },
+    { prop: null }, { do: [rel(A, { afinidade: 4, confianca: 3, carinho: 2 }), flag('album.entregue')] }, { go: 'kyo' },
+    { label: 'ja_tem' },
+    { c: A, e: 'very_sad', t: 'Eu olhei o álbum a noite inteira. Não dormi. De novo.' },
+    { label: 'kyo' },
+    { n: 'O Kyo seca a mesma xícara pela terceira vez. Ele não costuma secar nada três vezes.' },
+    { c: Y, e: 'serious', t: 'Akane. Eu preciso te dar uma coisa.', cam: 'close' },
+    { c: Y, e: 'sad', t: 'Faz um ano que eu devia ter dado.' },
+    { prop: 'bilhete' },
+    { n: 'Ele tira do bolso do avental um envelope dobrado ao meio, amarelado nas bordas.' },
+    { c: Y, e: 'serious', t: 'A Yuki veio aqui na noite em que foi embora. Pediu um chá, que ela nunca pedia. Deixou isso.' },
+    { c: Y, e: 'nervous', t: 'Me fez prometer que eu só entregaria quando alguém novo morasse no 201. Ela disse que você ia precisar de alguém do lado quando lesse.', big: true },
+    { c: A, e: 'angry', t: 'Um ano, Kyo. Um ano inteiro me vendo sentar nesse banco todo dia.', cam: 'extreme' },
+    { id: 'c2_kyo', choice: [
+      { t: 'Kyo, por que você aceitou esconder isso?', value: 'pergunta', do: [rel(Y, { confianca: 2 })], go: 'k1' },
+      { t: 'Akane, lê agora. A gente fica aqui com você.', value: 'apoio', do: [rel(A, { confianca: 3, carinho: 2 }), flag('c2.apoiou_akane')], go: 'k2' },
+      { t: 'Isso é entre vocês dois. Vou deixar vocês sozinhos.', value: 'sair', do: [rel(A, { confianca: -1 }), rel(Y, { confianca: 2 })], go: 'k3' },
+    ] },
+    { label: 'k1' },
+    { c: Y, e: 'sad', t: 'Porque ela estava com medo. E eu sei como é ter medo de alguém da própria família descobrir uma coisa.' },
+    { c: Y, e: 'serious', t: '...não me pergunte mais nada sobre isso hoje.' }, { go: 'saida' },
+    { label: 'k2' },
+    { c: A, e: 'nervous', t: '...não aqui. Não consigo aqui.' },
+    { c: A, e: 'very_sad', t: 'Mas obrigada por dizer “a gente”.' }, { go: 'saida' },
+    { label: 'k3' },
+    { n: 'Você pega a bandeja e vai para os fundos. Pela porta da cozinha, dá para ouvir a Akane perguntar baixinho: “Ela estava bem? Naquela noite?”' },
+    { label: 'saida' },
+    { prop: null },
+    { hide: A },
+    { n: 'Ela sai com o envelope fechado na mão e deixa o café inteiro na xícara.' },
+    { c: Y, e: 'sad', t: 'Ela vai ler sozinha. Ela sempre faz tudo sozinha.' },
+    { end: true },
+  ],
+};
+
+// ---------------------------------------------------------------- cena 5
+const s5 = {
+  id: 'c2s5', title: 'Duas da manhã', thumb: { bg: 'apartamento_noite', char: A },
+  steps: [
+    { music: 'noite' }, { bg: 'apartamento_noite' }, { card: 'Terça-feira, 2h04' },
+    { n: 'O celular vibra na mesinha. Duas da manhã.' },
+    { if: (c) => c.contact(A), go: 'akane' },
+    { phone: 'mei_2h' }, { go: 'fim' },
+    { label: 'akane' },
+    { phone: 'akane_2h' },
+    { label: 'fim' },
+    { n: 'Você não consegue mais dormir. Do outro lado da parede, no 202, a luz da Rin também está acesa.' },
+    { th: '“Se o Sora aparecer...” Quem é Sora?' },
+    { card: 'Continua no Capítulo 3' },
     { end: true },
   ],
 };
@@ -103,6 +309,6 @@ const s1 = {
 export default {
   id: 'ch2', number: 2, title: 'Cartões-postais de Kamakura',
   subtitle: 'Alguém em Kamakura sabe que você existe.',
-  preview: true, // capítulo em produção: só a abertura está disponível
-  scenes: [s1],
+  synopsis: 'Um envelope endereçado "para quem estiver morando no meu apartamento" traz uma carta de Yuki e uma chave. No terraço, um armário escondido guarda o que ela não conseguiu levar. No café, Kyo admite que guardou algo por um ano.',
+  scenes: [s1, s2, s3, s4, s5],
 };

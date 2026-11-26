@@ -15,14 +15,33 @@ export const EMOTIONS = {
   lookaway:    { label: 'Desviando o olhar', vrm: { relaxed: 0.25, blush: 0.4 },        pose: 'hands_front', gaze: 'away', emote: '' },
   curious:     { label: 'Curiosa(o)',        vrm: { surprised: 0.25 },                  pose: 'hand_chin', gaze: 'partner', emote: '?' },
   serious:     { label: 'Séria(o)',          vrm: { angry: 0.2, sad: 0.15 },            pose: 'rest',      gaze: 'partner', emote: '…' },
+  // v0.6
+  smile:       { label: 'Sorrindo de leve',  vrm: { happy: 0.5 },                       pose: 'rest',      gaze: 'partner', emote: '' },
+  laugh:       { label: 'Rindo',             vrm: { happy: 1 },                         pose: 'hand_mouth', gaze: 'partner', emote: '♪♪' },
+  very_sad:    { label: 'Muito triste',      vrm: { sad: 1 },                           pose: 'hand_face', gaze: 'down', emote: '💧' },
+  crying:      { label: 'Chorando',          vrm: { sad: 1, blush: 0.3 },               pose: 'hand_face', gaze: 'down', emote: '' },
+  scared:      { label: 'Com medo',          vrm: { surprised: 0.6, sad: 0.4 },         pose: 'hand_mouth', gaze: 'away', emote: '!!' },
+  annoyed:     { label: 'Irritada(o)',       vrm: { angry: 0.5 },                       pose: 'hands_hips', gaze: 'away', emote: '💢' },
+  jealous:     { label: 'Com ciúmes',        vrm: { angry: 0.4, sad: 0.3, blush: 0.4 }, pose: 'arms_crossed', gaze: 'away', emote: '😤' },
+  nervous:     { label: 'Nervosa(o)',        vrm: { surprised: 0.3, sad: 0.2, blush: 0.3 }, pose: 'hand_face', gaze: 'away', emote: '💦' },
+  confused:    { label: 'Confusa(o)',        vrm: { surprised: 0.3 },                   pose: 'hand_face', gaze: 'partner', emote: '??' },
 };
+/** Nomes em português aceitos no roteiro (sinônimos). */
+export const ALIASES = { bravo: 'angry', irritado: 'annoyed', feliz: 'happy', triste: 'sad', surpreso: 'surprised', assustado: 'scared', envergonhado: 'embarrassed', apaixonado: 'love', ciumes: 'jealous', nervoso: 'nervous', confuso: 'confused', chorando: 'crying', sorrindo: 'smile', rindo: 'laugh', muito_triste: 'very_sad' };
 
 /** Emoções "fortes": o diretor de câmera tende a usar close-up nelas. */
-export const STRONG = new Set(['surprised', 'sad', 'hurt', 'angry', 'love', 'embarrassed', 'shy']);
+export const STRONG = new Set(['surprised', 'sad', 'hurt', 'angry', 'love', 'embarrassed', 'shy', 'very_sad', 'crying', 'scared', 'jealous']);
 
 const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const RULES = [
   // [emoção, intensidade, padrões (texto já sem acento e em minúsculas)]
+  ['crying', 1, [/\(chorando\)/, /\bsoluc/, /nao consigo parar de chorar/]],
+  ['laugh', 0.9, [/\bhahaha|\bkkk|\bhehehe|rindo/]],
+  ['scared', 0.9, [/estou com medo/, /que medo/, /socorro/, /tem alguem ai/]],
+  ['jealous', 0.9, [/quem e ela\?/, /quem e ele\?/, /com ciume/, /voce e (ela|ele) estavam/]],
+  ['nervous', 0.8, [/^e-e|^n-n|^a-a|^m-m|^v-v/, /estou nervos/]],
+  ['confused', 0.8, [/nao entendi/, /como assim\?$/, /^hein\?/, /o que isso quer dizer/]],
+  ['annoyed', 0.8, [/de novo\?/, /que saco/, /me poupe/, /\baff\b/]],
   ['shy', 0.9, [/saudade/, /senti sua falta/]],
   ['love', 1, [/gosto (muito )?de voce/, /te amo/, /meu coracao/, /estou apaixonad/]],
   ['hurt', 1, [/por que voce fez isso/, /como (voce )?pode/, /me decepcion/, /confiei em voce/, /mentiu pra mim/]],
@@ -45,6 +64,7 @@ export function inferEmotion(text) {
 
 /** Emoção final de uma fala: a do roteiro, se houver; senão, deduzida. */
 export function emotionFor(explicit, text) {
+  if (explicit && ALIASES[explicit]) explicit = ALIASES[explicit];
   if (explicit && EMOTIONS[explicit]) return { emotion: explicit, intensity: 1, inferred: false };
   return inferEmotion(text);
 }

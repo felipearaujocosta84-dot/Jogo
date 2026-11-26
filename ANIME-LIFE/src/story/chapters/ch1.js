@@ -405,5 +405,6 @@ const s5 = {
 export default {
   id: 'ch1', number: 1, title: 'Apartamento 201',
   subtitle: 'Uma caixa sem remetente para alguém que desapareceu.',
+  synopsis: 'A mudança, a caixa sem remetente endereçada a Yuki Tachibana, o primeiro dia no Café Hoshi, o grupo do prédio, a festa no terraço e o segredo dos cartões-postais.',
   scenes: [s1, s2, s3, s4, s5],
 };
