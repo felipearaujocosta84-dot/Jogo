@@ -1,4 +1,5 @@
-// Relacionamentos: amizade, confiança, afinidade e romance (0–100) por personagem.
+// Relacionamentos: amizade, confiança, carinho, afinidade e interesse romântico (0–100) por personagem,
+// mais o humor atual (das conversas no celular).
 // Romance só cresce com personagens adultos marcados como "romanceable" e depois de
 // uma afinidade mínima — antes disso, o carinho conta como afinidade.
 import { game } from '../core/GameState.js';
@@ -8,6 +9,7 @@ import { Characters } from '../characters/CharacterRegistry.js';
 export const STATS = [
   { key: 'amizade', label: 'Amizade', icon: '🤝' },
   { key: 'confianca', label: 'Confiança', icon: '🔒' },
+  { key: 'carinho', label: 'Carinho', icon: '🌸' },
   { key: 'afinidade', label: 'Afinidade', icon: '✨' },
   { key: 'romance', label: 'Romance', icon: '♥' },
 ];
@@ -16,11 +18,13 @@ export const ROMANCE_MIN_AFFINITY = 15;
 export const Relationships = {
   get(id) {
     const r = game.state.rel;
-    if (!r[id]) r[id] = { amizade: 0, confianca: 0, afinidade: 0, romance: 0, met: false };
+    if (!r[id]) r[id] = { amizade: 0, confianca: 0, carinho: 0, afinidade: 0, romance: 0, met: false };
     return r[id];
   },
   meet(id) { this.get(id).met = true; },
   value(id, stat) { return this.get(id)[stat] ?? 0; },
+  /** Humor atual (vem das conversas no celular). */
+  mood(id) { return game.state.phone?.ai?.[id]?.mood || 'neutro'; },
   /** deltas: { amizade: 2, confianca: -1, ... } */
   change(id, deltas) {
     const r = this.get(id);

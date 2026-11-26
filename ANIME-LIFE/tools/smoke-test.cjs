@@ -208,7 +208,7 @@ const ok = (name, cond, extra = '') => { results.push({ name, pass: !!cond, extr
     await tap('[data-q=menu]'); await page.waitForSelector('.modal.show .pause-grid');
     await tap('.pause-grid [data-a=rel]'); await page.waitForSelector('.rel-card'); await page.waitForTimeout(300);
     await shot('12-relacionamentos');
-    ok('Relacionamentos: personagens conhecidos com 4 barras', (await page.locator('.rel-card').count()) >= 5 && (await page.locator('.rel-card').first().locator('.bar').count()) === 4);
+    ok('Relacionamentos: personagens conhecidos com 5 barras (com carinho)', (await page.locator('.rel-card').count()) >= 5 && (await page.locator('.rel-card').first().locator('.bar').count()) === 5);
     await tap('.modal.show:last-of-type .close'); await page.waitForTimeout(300);
     await tap('.pause-grid [data-a=choices]'); await page.waitForSelector('.decisions'); await page.waitForTimeout(200);
     ok('Histórico de escolhas', (await page.locator('.dec').count()) >= 8);

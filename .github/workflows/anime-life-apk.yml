@@ -1,0 +1,70 @@
+# Compila o APK beta do ANIME LIFE (Capacitor) e guarda como artefato desta execução.
+# Não publica nada: para baixar, abra a execução em "Actions" e baixe o artefato "AnimeLife-beta-N".
+name: ANIME LIFE — APK beta
+
+on:
+  push:
+    branches: [ccr-0f4ad4da-faw85n, main]
+    paths: ['ANIME-LIFE/**', '.github/workflows/anime-life-apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anime-life-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ANIME-LIFE
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ANIME-LIFE/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Dependências
+        run: npm ci
+
+      - name: Verificar a história (todos os caminhos)
+        run: node tools/story-check.mjs
+
+      - name: Testes do servidor de IA (IA simulada, sem custo)
+        working-directory: ANIME-LIFE/server
+        run: npm ci && node test.mjs
+
+      - name: Build web + sincronizar Android
+        run: npx vite build && npx cap sync android
+
+      - name: Compilar APK (assinatura de depuração, para testes)
+        working-directory: ANIME-LIFE/android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 0.4.0-beta.${{ github.run_number }}
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: Renomear APK
+        run: |
+          mkdir -p ../apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk "../apk/AnimeLife-0.4.0-beta.${{ github.run_number }}.apk"
+          ls -la ../apk
+
+      - name: Guardar APK (artefato da execução)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimeLife-beta-${{ github.run_number }}
+          path: apk/*.apk
+          retention-days: 30

@@ -1,0 +1,13 @@
+{
+  "name": "anime-life-ai-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Servidor que intermedia o chat dos NPCs do ANIME LIFE com a IA (a chave da API fica só aqui).",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node index.mjs", "test": "node test.mjs" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.13.0",
+    "zod": "4.6.7"
+  }
+}

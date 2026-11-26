@@ -5,6 +5,19 @@ Feita com **Phaser 3 + JavaScript modular + Vite**, empacotável como app Androi
 
 > A versão anterior (exploração livre com joystick e mapa) foi removida a pedido. O código dela continua no histórico do git.
 
+## Novidade da v0.4.0 beta: celular com IA
+- **Smartphone** com Mensagens, Contatos, Perfis, Histórico, Notificações e Hoshigram, com transições entre os apps.
+- **Chat livre:** você digita o que quiser e cada personagem responde com a própria personalidade.
+  - O personagem considera a conversa, a relação, o humor, as memórias e o que ele sabe da história.
+  - A tela mostra fotos, status online/offline, horário, ✓✓ de lida, "digitando…" e reenvio quando a mensagem falha.
+- **Memória persistente:** gostos, promessas e momentos marcantes ficam salvos. As conversas antigas viram um resumo, para controlar o custo.
+- **Relacionamento:** amizade, confiança, carinho, afinidade, interesse romântico e humor. Decisões graves da história pesam: por exemplo, trair o segredo da Mei limita a recuperação da confiança dela.
+- **Mensagens espontâneas:** bom dia, "você sumiu", saudade, convites. Têm notificação e frequência ajustável.
+- **IA por servidor seguro** (pasta `server/`): a chave nunca fica no app.
+  - O servidor controla o custo (limites por aparelho, por IP e diário, mais um orçamento de tokens) e trata falhas.
+  - Sem servidor configurado, o jogo usa o **modo local**, com respostas simples e avisado na tela. Ele **não** tem a inteligência de uma IA real.
+- **APK beta:** compilado pelo GitHub Actions (`.github/workflows/anime-life-apk.yml`).
+
 ## Novidade da v0.3.0: personagens animados em 2D
 Os personagens continuam sendo as ilustrações originais, agora com vida:
 - piscar, boca acompanhando a fala, cabeça, respiração e cabelo;
@@ -61,6 +74,15 @@ npm test         # verifica a história + build + joga o Capítulo 1 no Chromium
 ```
 
 ## Android
+**APK beta:** a cada envio para o GitHub, o workflow "ANIME LIFE — APK beta" compila o APK. Para baixar:
+1. Abra a aba **Actions** do repositório.
+2. Entre na execução mais recente.
+3. Baixe o artefato **AnimeLife-beta-N**.
+
+O APK é assinado para depuração (testes). Para instalar, permita "fontes desconhecidas".
+Para a Play Store, é preciso gerar um APK/AAB assinado com a sua chave de lançamento.
+
+Para compilar no próprio computador:
 ```bash
 npm run android:sync   # build + copia para android/
 npm run android:open   # Android Studio → Run ou Build APK (app travado em paisagem)
@@ -90,7 +112,9 @@ src/story/           StoryEngine.js (intérprete), chapters/ (capítulos), phone
 src/choices/         ChoiceSystem.js (condições, bloqueios, efeitos, registro de decisões)
 src/characters/      characters.json + CharacterRegistry.js
 src/relationships/   RelationshipManager.js (4 atributos, regras de romance, rotas)
-src/smartphone/      PhoneSystem.js (contatos, conversas, posts)
+src/smartphone/      PhoneSystem.js (conversas da história, posts), ChatSystem.js (chat livre, memória, espontâneas),
+                     presence.js (online/offline), ai/ (AIClient, LocalBrain = modo local, storyFacts)
+server/              servidor seguro de IA (Node + SDK oficial da Anthropic) — veja server/README.md
 src/save/            SaveManager.js (IndexedDB: auto + 3 espaços), Settings.js
 src/ui/              UIManager, MainMenu, NewGame, DialogueUI, PhoneUI, Cards, Panels
 tools/               story-check.mjs, smoke-test.cjs, process_characters.py

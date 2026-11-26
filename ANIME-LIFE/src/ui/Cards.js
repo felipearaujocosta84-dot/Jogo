@@ -57,7 +57,7 @@ export class Cards {
         <div><h3>Suas escolhas</h3><ul>${decs.map((d) => `<li>${esc(d.text)}</li>`).join('')}</ul></div>
         <div><h3>Relacionamentos</h3>${met.map((c) => {
           const r = st.rel[c.id];
-          return `<div class="ce-rel"><img src="${Characters.portrait(c.id)}" alt=""><b>${esc(c.displayName)}</b><span>${STATS.map((s) => (s.key === 'romance' && !Characters.canRomance(c.id)) ? '' : `${s.icon}${r[s.key]}`).join(' ')}</span>${st.routes[c.id] === 'insinuada' ? '<em>♡</em>' : ''}</div>`;
+          return `<div class="ce-rel"><img src="${Characters.portrait(c.id)}" alt=""><b>${esc(c.displayName)}</b><span>${STATS.map((s) => (s.key === 'romance' && !Characters.canRomance(c.id)) ? '' : `${s.icon}${r[s.key] || 0}`).join(' ')}</span>${st.routes[c.id] === 'insinuada' ? '<em>♡</em>' : ''}</div>`;
         }).join('')}</div>
       </div>
       <div class="actions"><button class="pbtn">${next ? `Capítulo ${next.number}: ${esc(next.title)} ▶` : 'Continuar ▶'}</button></div>

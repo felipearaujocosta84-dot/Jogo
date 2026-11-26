@@ -9,6 +9,7 @@ import { NewGame } from './NewGame.js';
 import { DialogueUI } from './DialogueUI.js';
 import { PhoneUI } from './PhoneUI.js';
 import { Cards } from './Cards.js';
+import { Chat } from '../smartphone/ChatSystem.js';
 import { openSettings, openCredits, openPause, openBacklog, openGallery, openSaveLoad, openConfirm } from './Panels.js';
 
 const GALLERY_KEY = 'anime-life.gallery'; // galeria vale para todas as partidas
@@ -27,6 +28,7 @@ export class UIManager {
     this.modals = 0;
     bus.on('gallery:unlocked', (sc) => { this.rememberGallery(sc.id); this.toast(`🖼️ Cena desbloqueada na galeria: ${sc.title}`); });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.story && !this.modals) openPause(this); });
+    bus.on('chat:save', () => this.autosave());
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.story && game.state && !game.replay) this.autosave(); });
   }
 
@@ -69,6 +71,7 @@ export class UIManager {
     this.story = new this.StoryEngine(this, this.engine.stage);
     this.dialogue.show();
     const run = this.story.resume();
+    Chat.startScheduler();
     await wait(300);
     this.fade.classList.remove('on');
     const story = this.story;
@@ -114,6 +117,8 @@ export class UIManager {
     await this.closeModals();
     if (this.story && !skipSave && !game.replay) await this.autosave();
     this.story?.stop(); this.story = null;
+    Chat.stopScheduler();
+    if (this.phone.isOpen) { this.phone.locked = false; await this.phone.close(); }
     this.fade.classList.add('on');
     await wait(500);
     this.dialogue.abort(); this.dialogue.hide();

@@ -7,7 +7,11 @@ const DEFAULTS = {
   autoSpeed: 'normal', // modo automático: lento | normal | rapido
   skipUnread: false,
   cinema: true, // câmera cinematográfica (zoom, planos, movimentos)
-  animations: 'completa', // animação dos personagens: completa | leve | off // "Pular" também pula texto ainda não lido
+  animations: 'completa',
+  aiServer: '', // endereço do servidor seguro de IA (vazio = modo local)
+  aiToken: '', // token opcional do app (NÃO é a chave da API)
+  spontaneous: 'normal', // mensagens espontâneas: off | poucas | normal | muitas
+  aiDailyCap: 80, // limite de mensagens por dia neste aparelho // animação dos personagens: completa | leve | off // "Pular" também pula texto ainda não lido
   quality: 'auto', // auto | alta | economica
 };
 

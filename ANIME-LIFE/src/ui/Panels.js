@@ -10,6 +10,7 @@ import { Characters } from '../characters/CharacterRegistry.js';
 import { Relationships, STATS } from '../relationships/RelationshipManager.js';
 import { CHAPTERS } from '../story/chapters/index.js';
 import { backgroundThumb } from '../scenes/backgrounds.js';
+import { AIClient, errorText } from '../smartphone/ai/AIClient.js';
 
 export class Modal {
   constructor(ui, inner, { onClose, wide } = {}) {
@@ -34,7 +35,7 @@ export class Modal {
 }
 
 const panel = (title, body, cls = '') => h(`<div class="panel ${cls}"><button class="close" aria-label="Fechar">✕</button><h2>${title}</h2>${body}</div>`);
-const seg = (key, opts) => `<div class="seg" data-k="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${settings.data[key] === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+const seg = (key, opts) => `<div class="seg" data-k="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(settings.data[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 const fmtDate = (t) => new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 const where = (s) => {
   const ch = CHAPTERS.find((c) => c.id === s.pos.chapter);
@@ -52,17 +53,33 @@ export function openSettings(ui) {
     <div class="row">Câmera cinematográfica ${seg('cinema', [[true, 'Ligada'], [false, 'Fixa']])}</div>
     <div class="row">Animação dos personagens ${seg('animations', [['completa', 'Completa'], ['leve', 'Leve'], ['off', 'Desligada']])}</div>
     <div class="row">Gráficos ${seg('quality', [['economica', 'Econômico'], ['auto', 'Auto'], ['alta', 'Alta']])}</div>
-    <div class="row">Tela cheia <button class="pbtn alt" data-a="fs">Alternar</button></div>`);
+    <div class="row">Tela cheia <button class="pbtn alt" data-a="fs">Alternar</button></div>
+    <h3>📱 Celular e IA</h3>
+    <div class="row col">Servidor de IA (deixe vazio para o modo local)
+      <div class="ai-row"><input type="url" class="ai-url" placeholder="https://seu-servidor.exemplo.com" value="${esc(settings.data.aiServer || '')}" autocomplete="off"><button class="pbtn alt" data-a="test">Testar</button></div>
+      <small class="ai-status">${settings.data.aiServer ? 'Servidor configurado.' : 'Modo local: respostas limitadas, sem IA real.'}</small></div>
+    <div class="row">Mensagens espontâneas ${seg('spontaneous', [['off', 'Desligadas'], ['poucas', 'Poucas'], ['normal', 'Normal'], ['muitas', 'Muitas']])}</div>
+    <div class="row">Limite de mensagens por dia ${seg('aiDailyCap', [[30, '30'], [80, '80'], [150, '150']])}</div>`);
   p.querySelectorAll('input[type=range]').forEach((r) => r.addEventListener('input', () => { settings.set(r.dataset.k, Number(r.value)); audio.applyVolumes(); }));
   p.querySelectorAll('.seg').forEach((s) => s.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    const v = b.dataset.v === 'true' ? true : b.dataset.v === 'false' ? false : b.dataset.v;
+    const v = b.dataset.v === 'true' ? true : b.dataset.v === 'false' ? false : /^\d+$/.test(b.dataset.v) ? Number(b.dataset.v) : b.dataset.v;
     settings.set(s.dataset.k, v); audio.sfx('click');
     s.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     if (s.dataset.k === 'quality') ui.engine?.game.refit?.();
     if (s.dataset.k === 'animations') ui.engine?.stage.setAnimationLevel(v);
     bus.emit('settings:changed', s.dataset.k);
   }));
+  // Celular e IA: endereço do servidor seguro + teste de conexão
+  const url = p.querySelector('.ai-url'), status = p.querySelector('.ai-status');
+  url.addEventListener('keydown', (e) => e.stopPropagation());
+  url.addEventListener('change', () => { settings.set('aiServer', url.value.trim()); status.textContent = url.value.trim() ? 'Servidor configurado. Toque em Testar.' : 'Modo local: respostas limitadas, sem IA real.'; });
+  p.querySelector('[data-a=test]').addEventListener('click', async () => {
+    settings.set('aiServer', url.value.trim());
+    if (!url.value.trim()) { status.textContent = 'Modo local: respostas limitadas, sem IA real.'; return; }
+    status.textContent = 'Testando…';
+    try { const r = await AIClient.health(); status.textContent = `✅ Conectado (${r.model}).`; } catch (e) { status.textContent = `❌ ${errorText(e.code)}`; }
+  });
   p.querySelector('[data-a=fs]').addEventListener('click', async () => {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch {}
   });
@@ -145,8 +162,8 @@ export function openRelationships(ui) {
   const p = panel('💞 Relacionamentos', `<div class="rels">${met.map((c) => {
     const r = Relationships.get(c.id), route = game.state.routes[c.id];
     return `<div class="rel-card" style="--nc:${c.color}"><img src="${Characters.portrait(c.id)}" alt="">
-      <div class="rel-info"><b>${esc(c.name)}</b><small>${c.age} anos · ${esc(c.occupation)}</small>
-      ${STATS.map((s) => (s.key === 'romance' && !Characters.canRomance(c.id)) ? '' : `<div class="bar"><span>${s.icon} ${s.label}</span><div><i style="width:${Math.min(100, r[s.key] * 4)}%"></i></div><em>${r[s.key]}</em></div>`).join('')}
+      <div class="rel-info"><b>${esc(c.name)}</b><small>${c.age} anos · ${esc(c.occupation)} · humor: ${esc(Relationships.mood(c.id))}</small>
+      ${STATS.map((s) => (s.key === 'romance' && !Characters.canRomance(c.id)) ? '' : `<div class="bar"><span>${s.icon} ${s.label}</span><div><i style="width:${Math.min(100, (r[s.key] || 0) * 2)}%"></i></div><em>${r[s.key] || 0}</em></div>`).join('')}
       ${route ? `<div class="route">${ROUTE_LABEL[route]}</div>` : ''}<p>${esc(c.bio)}</p></div></div>`;
   }).join('') || '<p>Você ainda não conheceu ninguém.</p>'}</div>`, 'tall');
   return new Modal(ui, p, { wide: true }).open();
