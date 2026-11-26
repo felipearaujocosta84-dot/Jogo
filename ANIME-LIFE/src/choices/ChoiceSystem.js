@@ -11,6 +11,9 @@ export function ctx() {
     flag: (k) => s.flags[k],
     stat: (id, k) => Relationships.value(id, k),
     route: (id) => s.routes[id] || null,
+    stage: (id) => Relationships.stage(id),
+    comfort: (id) => Relationships.comfort(id),
+    mood: (id) => Relationships.mood(id),
     contact: (id) => s.phone.contacts.includes(id),
     chose: (decisionId) => [...s.decisions].reverse().find((d) => d.id === decisionId)?.value,
     pronouns: game.p?.pronouns,
@@ -36,6 +39,7 @@ export function applyEffects(list = []) {
     if (e.route) Relationships.setRoute(e.route[0], e.route[1]);
     if (e.meet) Relationships.meet(e.meet);
     if (e.memory) bus.emit('memory', e.memory[0], e.memory[1]);
+    if (e.romance) Relationships.setStage(e.romance[0], e.romance[1]);
   }
 }
 

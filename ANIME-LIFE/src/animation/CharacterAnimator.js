@@ -48,6 +48,13 @@ export class CharacterAnimator {
     if (!EMO[name]) name = 'neutral';
     if (name !== this.emotion) { this.emotion = name; this.emoAge = 0; if (name === 'surprised') this.gust = 1; }
   }
+  /** Gestos curtos por cima da animação contínua. */
+  gesture(name) {
+    if (name === 'close_eyes') { this.eyesHold = 0.85; return; }
+    if (name === 'open_eyes') { this.eyesHold = null; return; }
+    this.gest = { name, t: 0 };
+  }
+
   speak(text, msPerChar) { this.speech = { tl: buildTimeline(text, msPerChar), t: 0 }; }
   stopSpeaking() { this.speech = null; }
 
@@ -80,15 +87,27 @@ export class CharacterAnimator {
     const tx = Math.sin(this.t * 0.55) * 0.0022 + Math.sin(this.t * 1.7) * 0.0008 + e.head[0] * this.side;
     const ty = Math.sin(this.t * 0.8 + 1) * 0.0016 + talking * Math.sin(this.t * 6.2) * 0.0018 + e.head[1];
     this.cur.hx += (tx - this.cur.hx) * k(3.5); this.cur.hy += (ty - this.cur.hy) * k(3.5);
-    // olhos e rubor
-    this.cur.squint += (e.squint - this.cur.squint) * k(6);
+    // gestos (assentir, negar, suspirar, virar o rosto)
+    let gx = 0, gy = 0, gb = 0;
+    if (this.gest) {
+      const g = this.gest; g.t += dt;
+      const fade = Math.max(0, 1 - g.t / 1.1);
+      if (g.name === 'nod') gy = Math.sin(g.t * 14) * 0.004 * fade;
+      if (g.name === 'shake') gx = Math.sin(g.t * 16) * 0.005 * fade;
+      if (g.name === 'sigh') gb = Math.sin(Math.min(1, g.t / 1.4) * Math.PI) * 0.006;
+      if (g.name === 'turn') gx = 0.009 * this.side * Math.min(1, g.t * 3) * (g.t < 2.5 ? 1 : Math.max(0, 1 - (g.t - 2.5)));
+      if (g.t > 3.5) this.gest = null;
+    }
+    // olhos e rubor (olhos fechados num beijo/abraço: eyesHold)
+    const sq = this.eyesHold != null ? this.eyesHold : e.squint;
+    this.cur.squint += (sq - this.cur.squint) * k(this.eyesHold != null ? 3 : 6);
     this.cur.blush += (e.blush - this.cur.blush) * k(2.5);
     // vento no cabelo: base + rajada quando a emoção muda bruscamente
     this.gust = Math.max(0, (this.gust || 0) - dt * 0.8);
     const wind = this.level === 'leve' ? 0 : 1 + this.gust * 2.5;
     this.cur.wind += (wind - this.cur.wind) * k(3);
-    const breath = Math.sin(this.t * Math.PI * 2 / 4.2 * e.breath) * 0.0019;
-    this.apply({ blink, squint: this.cur.squint, mouth: this.cur.mouth, hx: this.cur.hx, hy: this.cur.hy, breath, wind: this.cur.wind, blush: this.cur.blush });
+    const breath = Math.sin(this.t * Math.PI * 2 / 4.2 * e.breath) * 0.0019 + gb;
+    this.apply({ blink, squint: this.cur.squint, mouth: this.cur.mouth, hx: this.cur.hx + gx, hy: this.cur.hy + gy, breath, wind: this.cur.wind, blush: this.cur.blush });
   }
 
   apply(u) {

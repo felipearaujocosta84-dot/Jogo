@@ -11,6 +11,8 @@ import { LocalBrain } from './ai/LocalBrain.js';
 import { storyFactsFor, trustCap } from './ai/storyFacts.js';
 import { CONVERSATIONS } from '../story/phone/conversations.js';
 import { isOnline } from './presence.js';
+import { EVENTS } from '../story/events/index.js';
+import { ctx as storyCtx } from '../choices/ChoiceSystem.js';
 
 const HISTORY_SENT = 12;      // mensagens recentes enviadas à IA
 const SUMMARIZE_AFTER = 24;   // acima disso, as antigas viram resumo
@@ -56,6 +58,43 @@ export const Chat = {
   },
   unreadTotal() { return this.contacts().reduce((n, id) => n + (this.phone().ai[id]?.unread || 0), 0); },
 
+  // ---------------- convites românticos (consentimento dos dois lados) ----------------
+  /** Próximo evento disponível com este personagem (adulto elegível), ou null. */
+  availableEvent(id) {
+    if (!Characters.canRomance(id)) return null;
+    const c = storyCtx();
+    return EVENTS.find((e) => e.char === id && !Relationships.eventDone(id, e.scene.id) && e.requires(c)) || null;
+  },
+
+  /** O jogador convida. O personagem decide (conforto + humor); um "não" é respeitado, sem punição. */
+  async invite(id) {
+    const ev = this.availableEvent(id); if (!ev) return null;
+    const m = this.mem(id);
+    m.history.push({ from: 'player', text: ev.inviteText, at: Date.now(), status: 'sent' });
+    bus.emit('chat:update', id);
+    await wait(900); m.history.at(-1).status = 'read'; this.setTyping(id, true);
+    await wait(1600); this.setTyping(id, false);
+    const yes = ev.accepts(storyCtx());
+    const pickLine = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    if (yes) this.deliver(id, pickLine(ev.yes), { invite: { eventId: ev.scene.id, title: ev.scene.title, by: 'player', state: 'accepted' } });
+    else { this.deliver(id, pickLine(ev.no)); Relationships.romanceData(id).declinedAt = Date.now(); }
+    bus.emit('chat:save');
+    return yes;
+  },
+
+  /** Resposta do jogador a um convite feito pelo personagem. */
+  answerInvite(id, msg, accept) {
+    const m = this.mem(id);
+    msg.invite.state = accept ? 'accepted' : 'declined';
+    m.history.push({ from: 'player', text: accept ? 'Aceito! 😊' : 'Hoje não vai dar, desculpa.', at: Date.now(), status: 'read' });
+    if (!accept) {
+      Relationships.romanceData(id).declinedAt = Date.now();
+      setTimeout(() => this.deliver(id, 'tudo bem. outro dia então'), 1400);
+    }
+    bus.emit('chat:update', id); bus.emit('chat:save');
+    return accept ? msg.invite.eventId : null;
+  },
+
   relation(id) {
     const r = Relationships.get(id);
     return { amizade: r.amizade, confianca: r.confianca, carinho: r.carinho || 0, afinidade: r.afinidade, romance: r.romance };
@@ -67,7 +106,7 @@ export const Chat = {
     return {
       characterId: id,
       player: { name: p.name.slice(0, 40), displayName: p.displayName.slice(0, 20), pronouns: p.pronouns },
-      relationship: this.relation(id), mood: m.mood,
+      relationship: this.relation(id), mood: m.mood, romanceStage: Relationships.stage(id),
       memories: m.facts.slice(-20).map((f) => f.text), storyFacts: storyFactsFor(id, game.state).slice(0, 15),
       summary: m.summary.slice(0, 1400), history: recent,
       localTime: new Date().toLocaleString('pt-BR', { weekday: 'long', hour: '2-digit', minute: '2-digit' }),
@@ -226,6 +265,16 @@ export const Chat = {
     else if (r.amizade > 20 && Math.random() < 0.4) reason = 'convite';
     else if (!m.facts.some((f) => f.kind === 'preferencia')) reason = 'sumiu';
     p.lastSpont = Date.now(); m.lastSpont = Date.now();
+    // convite romântico do personagem (só se ele quiser — mesmo critério de consentimento)
+    const ev = this.availableEvent(id);
+    const rd = Characters.canRomance(id) ? Relationships.romanceData(id) : null;
+    if (ev && ev.accepts(storyCtx()) && Date.now() - (rd?.declinedAt || 0) > 30 * 60000 && (force === 'invite' || Math.random() < 0.45)
+      && !m.history.some((x) => x.invite && x.invite.state === 'pending')) {
+      this.setTyping(id, true); await wait(1200); this.setTyping(id, false);
+      this.deliver(id, ev.npcInvite, { invite: { eventId: ev.scene.id, title: ev.scene.title, by: 'npc', state: 'pending' } });
+      bus.emit('chat:save');
+      return { id, reason: 'convite' };
+    }
     try {
       let out;
       if (this.mode() === 'ia') { if (this.usageLeft() <= 0) return null; out = await AIClient.spontaneous({ ...this.context(id), reason }); p.aiUsage.count++; }

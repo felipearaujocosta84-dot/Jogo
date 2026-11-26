@@ -10,9 +10,13 @@
 //   { phone:'idDaConversa' }  { end:true }
 //   Em qualquer fala: cam:'close'|'extreme'|'medium'|'two'|'ots'|'side'|'wide' força o plano; big:true marca uma revelação.
 //   Sem "e", a expressão é deduzida do texto (cinematic/Emotions.js).
+//   Direção de cena: { move:id, at } { approach:id, amount } { gesture:id, g:'nod|shake|sigh|turn|close_eyes|open_eyes' }
+//   { ambient:'cidade|cafe|vento|grilos'|null } { lights:'on' } { dim:0..1 } { glow:0..1 } { cutaway:true } { uncut:true }
+//   { fade:'black'|'white', text } { letterbox:true|false } { sfx:'knock' }   (narrações também ganham efeitos automáticos)
 import { game, fmt } from '../core/GameState.js';
 import { bus } from '../core/EventBus.js';
 import { CHAPTERS } from './chapters/index.js';
+import { EVENT_CHAPTER, eventById } from './events/index.js';
 import { applyEffects, prepareOptions, recordDecision, ctx } from '../choices/ChoiceSystem.js';
 import { Relationships } from '../relationships/RelationshipManager.js';
 import { runConversation } from '../smartphone/PhoneSystem.js';
@@ -20,12 +24,13 @@ import { Characters } from '../characters/CharacterRegistry.js';
 import { audio } from '../audio/AudioManager.js';
 import { Director } from '../cinematic/Director.js';
 import { emotionFor } from '../cinematic/Emotions.js';
+import { directNarration, AMBIENT } from '../cinematic/SceneDirector.js';
 import { settings } from '../save/Settings.js';
 
 const LOG_MAX = 400;
 
 export function findScene(sceneId) {
-  for (const ch of CHAPTERS) {
+  for (const ch of [...CHAPTERS, EVENT_CHAPTER]) {
     const i = ch.scenes.findIndex((s) => s.id === sceneId);
     if (i >= 0) return { chapter: ch, scene: ch.scenes[i], index: i };
   }
@@ -33,13 +38,20 @@ export function findScene(sceneId) {
 }
 
 export class StoryEngine {
+  /** Registro dos efeitos de cena executados (depuração e testes). */
+  static cueLog = [];
   constructor(ui, stage) { this.ui = ui; this.stage = stage; this.token = 0; this.director = new Director(); }
 
   /** Começa (ou continua) a partir da posição salva no estado. */
   async resume() {
     const pos = game.state.pos;
     if (!pos.scene) { pos.chapter = CHAPTERS[0].id; pos.scene = CHAPTERS[0].scenes[0].id; pos.pc = 0; return this.run(true); }
-    await this.stage.restore(game.state.stage);
+    const st = game.state.stage;
+    await this.stage.restore(st);
+    // luz, som ambiente e aproximações também voltam iguais
+    audio.ambient(st.ambient ?? AMBIENT[st.bg] ?? null);
+    this.stage.dim?.(st.dim || 0, 0); this.stage.romanticGlow?.(st.glow || 0, 0);
+    for (const c of st.chars || []) if (c.near) this.stage.approach?.(c.id, c.near);
     return this.run(pos.pc === 0);
   }
 
@@ -68,6 +80,7 @@ export class StoryEngine {
       if (!s || s.end) {
         const next = await this.finishScene(info, single);
         if (!next || !alive()) return;
+        if (next.resume) { info = next.info; labels = this.labels(info.scene); continue; } // volta de um evento
         info = next; labels = this.labels(info.scene);
         await this.enterScene(info);
         continue;
@@ -86,7 +99,29 @@ export class StoryEngine {
     if (s.if) { if (s.if(ctx())) return jump(s.go); pos.pc++; return; }
     if (s.do) { applyEffects(s.do); pos.pc++; return; }
     if (s.music) { st.music = s.music; audio.playMusic(s.music); pos.pc++; return; }
-    if (s.bg) { st.bg = s.bg; await this.stage.setBackground(s.bg, s.fx || 'fade'); pos.pc++; return; }
+    if (s.bg) {
+      st.bg = s.bg; await this.stage.setBackground(s.bg, s.fx || 'fade');
+      this.stage.uncut?.(); // nova cena: quem continua em cena volta a aparecer
+      if (!('ambient' in st) || st.ambientAuto !== false) { st.ambient = AMBIENT[s.bg] ?? null; audio.ambient(st.ambient); }
+      st.dim = 0; st.glow = 0; this.stage.dim?.(0, 0); this.stage.romanticGlow?.(0, 0);
+      pos.pc++; return;
+    }
+    // ---- direção de cena explícita ----
+    if (s.move) {
+      const ch = st.chars.find((x) => x.id === s.move); if (ch) ch.at = s.at;
+      await this.stage.show(s.move, s.at, ch?.e || 'neutral'); pos.pc++; return;
+    }
+    if (s.approach) { const ch = st.chars.find((x) => x.id === s.approach); if (ch) ch.near = s.amount ?? 1; this.stage.approach?.(s.approach, s.amount ?? 1); await this.beat(900); pos.pc++; return; }
+    if (s.gesture) { this.stage.gesture?.(s.gesture, s.g); pos.pc++; return; }
+    if ('ambient' in s && !s.n && !s.c) { st.ambient = s.ambient; st.ambientAuto = false; audio.ambient(s.ambient); pos.pc++; return; }
+    if (s.lights) { this.stage.lightsOn?.(() => audio.sfx('clink')); await this.beat(1600); pos.pc++; return; }
+    if ('dim' in s && !s.n) { st.dim = s.dim; this.stage.dim?.(s.dim); pos.pc++; return; }
+    if ('glow' in s && !s.n) { st.glow = s.glow; this.stage.romanticGlow?.(s.glow); pos.pc++; return; }
+    if (s.cutaway) { audio.sfx('whoosh'); await this.stage.cutaway?.(); pos.pc++; return; }
+    if (s.uncut) { this.stage.uncut?.(); this.stage.shot?.({ type: 'wide' }); pos.pc++; return; }
+    if (s.fade) { StoryEngine.cueLog.push({ fade: s.fade, text: s.text, scene: info.scene.id }); await this.ui.fadeScene(s.fade, s.text ? fmt(s.text) : ''); pos.pc++; return; }
+    if ('letterbox' in s && !s.n) { this.ui.letterbox(!!s.letterbox); pos.pc++; return; }
+    if (s.sfx && !s.n && !s.c) { audio.sfx(s.sfx); pos.pc++; return; }
     if (s.show) {
       const c = st.chars.filter((x) => x.id !== s.show); c.push({ id: s.show, at: s.at || 'center', e: s.e || 'neutral' }); st.chars = c;
       Relationships.meet(s.show);
@@ -130,6 +165,8 @@ export class StoryEngine {
       const line = s.c ? { speaker: s.c, expr: s.e || null, text: fmt(s.t) }
         : s.p ? { speaker: 'player', text: fmt(s.p) }
           : s.th ? { speaker: 'thought', text: fmt(s.th) } : { speaker: null, text: fmt(s.n) };
+      const key = `${info.scene.id}:${pos.pc}`;
+      const wasRead = !!game.state.read[key];
       // emoção: a do roteiro ou deduzida da fala
       let emo = null;
       if (s.c) {
@@ -139,13 +176,22 @@ export class StoryEngine {
         else if (s.e) this.stage.express(s.c, emo.emotion);
       }
       this.stage.focus(s.c || null);
+      // narração vira cena: sons, luz, ações de quem está em cena, panorâmica; o texto vem depois de uma pausa
+      if (s.n) {
+        const dir = directNarration(line.text, { bg: st.bg, cast: st.chars, lastSpeaker: this.director.lastSpeaker });
+        const cues = [...dir.cues, ...[].concat(s.cue || [])];
+        const cine = settings.data.cinema !== false;
+        if (cine) this.ui.letterbox(dir.cinematic);
+        if (cine && dir.cinematic && !wasRead && !this.ui.skipping) this.ui.dialogue.clearForBeat();
+        await this.runCues(cues, st);
+        if (cine && dir.cinematic && !wasRead) await this.beat(650);
+        if (cues.some((c) => 'pan' in c) && cine) { line.cinematicShot = true; }
+      } else this.ui.letterbox(false);
       // câmera cinematográfica
       const shot = this.director.shotFor({ speaker: line.speaker, emotion: emo?.emotion, intensity: emo?.intensity ?? 0.5, text: line.text, cast: st.chars, cam: s.cam, revelation: s.big });
-      if (this.stage.shot) this.stage.shot(settings.data.cinema === false ? { type: 'wide' } : shot, { instant: this.ui.skipping });
+      if (this.stage.shot && !line.cinematicShot) this.stage.shot(settings.data.cinema === false ? { type: 'wide' } : shot, { instant: this.ui.skipping });
       // boca acompanha a fala no ritmo do texto
       if (s.c && !this.ui.skipping) this.stage.speak?.(s.c, line.text, settings.textDelay() || 38);
-      const key = `${info.scene.id}:${pos.pc}`;
-      const wasRead = !!game.state.read[key];
       await this.save();
       this.log({ kind: 'line', who: line.speaker, t: line.text });
       await this.ui.say(line, { read: wasRead });
@@ -155,6 +201,23 @@ export class StoryEngine {
       pos.pc++; return;
     }
     console.warn('[Story] passo desconhecido', s); pos.pc++;
+  }
+
+  beat(ms) { return this.ui.skipping ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)); }
+
+  async runCues(cues, st) {
+    StoryEngine.cueLog.push(...cues.map((c) => ({ ...c, scene: game.state.pos.scene })));
+    if (StoryEngine.cueLog.length > 300) StoryEngine.cueLog.splice(0, 100);
+    for (const c of cues) {
+      if (c.sfx) audio.sfx(c.sfx);
+      if (c.shake) this.stage.effect('shake');
+      if (c.lights) { this.stage.lightsOn?.(() => audio.sfx('clink')); await this.beat(1200); }
+      if ('dim' in c) { st.dim = c.dim; this.stage.dim?.(c.dim); }
+      if (c.musicDown) audio.stopMusic();
+      if (c.approach) { const ch = st.chars.find((x) => x.id === c.approach[0]); if (ch) ch.near = c.approach[1]; this.stage.approach?.(...c.approach); }
+      if (c.gesture) this.stage.gesture?.(...c.gesture);
+      if ('pan' in c && settings.data.cinema !== false) this.stage.pan?.(c.pan ? 1 : -1);
+    }
   }
 
   where(info) {
@@ -172,9 +235,10 @@ export class StoryEngine {
     const st = game.state;
     st.pos = { chapter: info.chapter.id, scene: info.scene.id, pc: 0 };
     st.chapters[info.chapter.id] = { ...(st.chapters[info.chapter.id] || {}), started: true };
-    if (info.index === 0 && !info.scene.noChapterCard) await this.ui.chapterCard(info.chapter);
+    if (info.index === 0 && !info.scene.noChapterCard && !info.chapter.isEvents) await this.ui.chapterCard(info.chapter);
     await this.stage.hideAll();
-    st.stage.chars = [];
+    st.stage.chars = []; st.stage.dim = 0; st.stage.glow = 0; st.stage.ambientAuto = true;
+    this.stage.dim?.(0, 0); this.stage.romanticGlow?.(0, 0); this.ui.letterbox(false);
     this.director.reset();
     this.stage.shot?.({ type: 'wide' }, { instant: true });
     await this.ui.sceneCard(info.chapter, info.scene, info.index);
@@ -185,6 +249,24 @@ export class StoryEngine {
     const st = game.state;
     if (!st.gallery.includes(info.scene.id)) { st.gallery.push(info.scene.id); if (!game.replay) bus.emit('gallery:unlocked', info.scene); }
     if (single) return null;
+    // fim de um evento especial: volta exatamente para onde a história principal estava
+    if (info.chapter.isEvents) {
+      const ev = eventById(info.scene.id);
+      if (ev) Relationships.markEvent(ev.char, ev.scene.id);
+      const ret = st.eventReturn; delete st.eventReturn;
+      this.ui.letterbox(false);
+      if (!ret) return null;
+      st.pos = ret.pos; st.stage = ret.stage;
+      await this.stage.hideAll();
+      await this.stage.restore(st.stage);
+      audio.ambient(st.stage.ambient ?? AMBIENT[st.stage.bg] ?? null);
+      this.stage.dim?.(st.stage.dim || 0, 0); this.stage.romanticGlow?.(st.stage.glow || 0, 0);
+      if (st.stage.music) audio.playMusic(st.stage.music);
+      this.director.reset();
+      await this.save();
+      const back = findScene(st.pos.scene);
+      return back ? { resume: true, info: back } : null;
+    }
     // próxima cena: definida pela cena (pode depender das escolhas) ou a seguinte do capítulo
     let nextId = typeof info.scene.next === 'function' ? info.scene.next(ctx()) : info.scene.next;
     if (!nextId) nextId = info.chapter.scenes[info.index + 1]?.id;

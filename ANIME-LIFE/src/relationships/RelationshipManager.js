@@ -34,8 +34,33 @@ export const Relationships = {
       r[k] = Math.max(0, Math.min(100, (r[k] ?? 0) + d));
       applied[k] = (applied[k] || 0) + d;
     }
+    // interesse romântico nasce sozinho quando o romance começa a crescer
+    if (r.romance >= 3 && this.stage(id) === 'nenhum' && Characters.canRomance(id)) this.setStage(id, 'interesse');
     bus.emit('rel:changed', id, applied);
     return applied;
+  },
+  // ---------------- romance (somente adultos elegíveis) ----------------
+  /** nenhum → interesse → encontro → namoro */
+  stage(id) { return game.state.romance?.[id]?.stage || 'nenhum'; },
+  romanceData(id) { const r = (game.state.romance ||= {}); return (r[id] ||= { stage: 'nenhum', events: [], declinedAt: 0 }); },
+  setStage(id, stage) {
+    if (!Characters.canRomance(id)) return; // nunca com personagens não adultos / não elegíveis
+    this.romanceData(id).stage = stage;
+    if (stage === 'namoro') this.setRoute(id, 'aberta');
+    bus.emit('romance:stage', id, stage);
+  },
+  eventDone(id, eventId) { return this.romanceData(id).events.includes(eventId); },
+  markEvent(id, eventId) { const d = this.romanceData(id); if (!d.events.includes(eventId)) d.events.push(eventId); },
+  /**
+   * Conforto do personagem com o jogador: base do consentimento para convites e momentos íntimos.
+   * Não é só pontuação: o humor atual e mágoas da história também contam.
+   */
+  comfort(id) {
+    const r = this.get(id);
+    let c = r.afinidade + (r.carinho || 0) + r.confianca * 0.5 + r.romance * 1.5;
+    const mood = this.mood(id);
+    if (mood === 'irritado') c -= 15; if (mood === 'triste') c -= 8;
+    return c;
   },
   route(id) { return game.state.routes[id] || null; },
   setRoute(id, state) {

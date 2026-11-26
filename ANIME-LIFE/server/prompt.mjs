@@ -42,6 +42,8 @@ export function contextBlock(c) {
     `Relação atual com o jogador (0 a 100): amizade ${rel.amizade ?? 0}, confiança ${rel.confianca ?? 0}, carinho ${rel.carinho ?? 0}, afinidade ${rel.afinidade ?? 0}, interesse romântico ${rel.romance ?? 0}.`,
     `Seu humor atual: ${clip(c.mood || 'neutro', 20)}.`,
   ];
+  const stage = { interesse: 'Você sente um interesse romântico pelo jogador, mas ainda não disse claramente.', encontro: 'Vocês já tiveram um encontro romântico; a relação está começando.', namoro: 'Vocês estão NAMORANDO. Seja carinhos(o/a) no seu próprio estilo (saudade, apelidos, convites), sempre sem conteúdo sexual explícito.' }[c.romanceStage];
+  if (stage) lines.push(stage);
   if (c.storyFacts?.length) lines.push(`Fatos da história que você conhece:\n${c.storyFacts.map((f) => `- ${clip(f, 200)}`).join('\n')}`);
   if (c.memories?.length) lines.push(`Suas memórias sobre o jogador:\n${c.memories.map((m) => `- ${clip(m, 160)}`).join('\n')}`);
   if (c.summary) lines.push(`Resumo das conversas antigas: ${clip(c.summary, 1200)}`);

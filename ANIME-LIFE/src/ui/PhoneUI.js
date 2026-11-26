@@ -233,13 +233,30 @@ export class PhoneUI {
         const tick = x.status === 'error' ? '<em class="err">⚠ não enviada · tocar para reenviar</em>' : x.status === 'read' ? '<em class="tk read">✓✓</em>' : '<em class="tk">✓</em>';
         html += `<div class="msg out ${x.status === 'error' ? 'failed' : ''}" data-i="${i}"><div>${esc(x.text)}<span class="meta">${hhmm(x.at)} ${tick}</span></div></div>`;
       } else {
-        html += `<div class="msg in"><div>${esc(x.text)}<span class="meta">${hhmm(x.at)}${x.local ? ' · local' : ''}</span></div></div>`;
+        let card = '';
+        if (x.invite) {
+          const iv = x.invite;
+          const btns = iv.state === 'pending' ? `<div class="iv-btns"><button class="pbtn" data-acc="${i}">💗 Aceitar</button><button class="pbtn alt" data-dec="${i}">Recusar</button></div>`
+            : iv.state === 'accepted' ? `<div class="iv-btns"><button class="pbtn" data-go="${i}">Ir agora ▶</button></div>`
+              : `<div class="iv-state">${iv.state === 'declined' ? 'Convite recusado' : 'Encontro concluído 💗'}</div>`;
+          card = `<div class="invite"><div class="iv-t">💗 ${esc(iv.title)}</div>${btns}</div>`;
+        }
+        html += `<div class="msg in"><div>${esc(x.text)}${card}<span class="meta">${hhmm(x.at)}${x.local ? ' · local' : ''}</span></div></div>`;
       }
     }
     if (Chat.typing.has(id)) html += '<div class="msg in typing"><div><i></i><i></i><i></i></div></div>';
     if (!m.history.length) html = `<p class="ph-empty">Diga oi para ${esc(Characters.name(id))}! 👋</p>`;
     box.innerHTML = html;
     box.querySelectorAll('.msg.failed').forEach((b) => b.addEventListener('click', () => Chat.retry(id, m.history[Number(b.dataset.i)])));
+    const go = (msg) => {
+      const ev = msg.invite.eventId;
+      if (Relationships.eventDone(id, ev)) { msg.invite.state = 'done'; this.renderMessages(); return; }
+      msg.invite.state = 'done'; audio.sfx('sparkle');
+      this.ui.playEvent(ev);
+    };
+    box.querySelectorAll('[data-acc]').forEach((b) => b.addEventListener('click', () => { const msg = m.history[Number(b.dataset.acc)]; if (Chat.answerInvite(id, msg, true)) go(msg); }));
+    box.querySelectorAll('[data-dec]').forEach((b) => b.addEventListener('click', () => { Chat.answerInvite(id, m.history[Number(b.dataset.dec)], false); }));
+    box.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => go(m.history[Number(b.dataset.go)])));
     this.scroll(instant);
   }
 
@@ -290,8 +307,11 @@ export class PhoneUI {
       <h4>O que ${esc(c.displayName)} lembra sobre você</h4>
       ${facts.length ? `<ul class="p-facts">${facts.map((f) => `<li><span>${{ preferencia: '💛', promessa: '🤝', momento: '✨', fato: '📝' }[f.kind] || '📝'}</span>${esc(f.text)}</li>`).join('')}</ul>` : '<p class="ph-empty sm">Ainda nada. Converse para criar memórias.</p>'}
       ${Chat.contacts().includes(id) ? `<button class="pbtn p-chat">💬 Conversar</button>` : '<p class="ph-empty sm">Vocês ainda não trocaram números.</p>'}
+      ${Chat.contacts().includes(id) && Chat.availableEvent(id) ? `<button class="pbtn p-invite">💗 Convidar: ${esc(Chat.availableEvent(id).scene.title)}</button>` : ''}
+      ${Characters.canRomance(id) && Relationships.stage(id) !== 'nenhum' ? `<p class="p-stage">💗 ${({ interesse: 'Existe um interesse entre vocês', encontro: 'Vocês já tiveram um encontro', namoro: 'Vocês estão namorando' })[Relationships.stage(id)]}</p>` : ''}
     </div>`, dir);
     v.querySelector('.p-chat')?.addEventListener('click', () => this.chat(id));
+    v.querySelector('.p-invite')?.addEventListener('click', () => { audio.sfx('confirm'); this.chat(id); Chat.invite(id); });
   }
 
   // ---------- Histórico e notificações ----------

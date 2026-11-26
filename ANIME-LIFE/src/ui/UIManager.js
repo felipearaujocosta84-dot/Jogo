@@ -12,6 +12,7 @@ import { Cards } from './Cards.js';
 import { Chat } from '../smartphone/ChatSystem.js';
 import { openSettings, openCredits, openPause, openBacklog, openGallery, openSaveLoad, openConfirm } from './Panels.js';
 
+const findSceneIsEvent = (id) => typeof id === 'string' && id.startsWith('e_');
 const GALLERY_KEY = 'anime-life.gallery'; // galeria vale para todas as partidas
 
 export class UIManager {
@@ -61,6 +62,7 @@ export class UIManager {
     const [{ createEngine }, { StoryEngine }] = await Promise.all([import('../core/Engine.js'), import('../story/StoryEngine.js')]);
     this.engine = await createEngine(this.stageRoot);
     this.StoryEngine = StoryEngine;
+    window.__ANIME_LIFE__ && (window.__ANIME_LIFE__.cueLog = StoryEngine.cueLog);
     return this.engine;
   }
 
@@ -113,6 +115,19 @@ export class UIManager {
     return this.startStory();
   }
 
+  /** Começa um evento especial (encontro etc.) e depois volta para a história principal. */
+  async playEvent(sceneId) {
+    if (!game.state || game.replay) return;
+    await this.closeModals();
+    if (this.phone.isOpen) { this.phone.locked = false; await this.phone.close(); }
+    const st = game.state;
+    if (!st.eventReturn && !findSceneIsEvent(st.pos.scene)) st.eventReturn = { pos: { ...st.pos }, stage: JSON.parse(JSON.stringify(st.stage)) };
+    this.story?.stop(); this.dialogue.abort();
+    st.pos = { chapter: 'eventos', scene: sceneId, pc: 0 };
+    await this.autosave();
+    return this.startStory();
+  }
+
   async backToTitle(skipSave = false) {
     await this.closeModals();
     if (this.story && !skipSave && !game.replay) await this.autosave();
@@ -122,7 +137,8 @@ export class UIManager {
     this.fade.classList.add('on');
     await wait(500);
     this.dialogue.abort(); this.dialogue.hide();
-    this.engine?.stage.clearAll();
+    this.engine?.stage.clearAll(); this.cards.letterbox(false);
+    audio.ambient(null);
     this.cards.hideCover();
     this.fade.classList.remove('on');
     await this.showMenu();
@@ -134,6 +150,8 @@ export class UIManager {
   chapterCard(ch) { return this.cards.chapter(ch); }
   sceneCard(ch, sc, i) { return this.cards.scene(ch, sc, i); }
   timeCard(t) { return this.cards.timeCard(t); }
+  letterbox(on) { this.cards.letterbox(on); }
+  fadeScene(tone, text) { return this.cards.fadeScene(tone, text); }
   chapterEnd(ch, next) { this.dialogue.abort(); return game.replay ? Promise.resolve() : this.cards.chapterEnd(ch, next); }
   toBeContinued() { return this.cards.toBeContinued(); }
 

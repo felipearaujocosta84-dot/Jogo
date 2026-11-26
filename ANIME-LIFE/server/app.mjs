@@ -28,6 +28,7 @@ const Context = z.object({
   player: z.object({ name: str(40), displayName: str(20), pronouns: z.enum(['ele', 'ela', 'elu']) }),
   relationship: z.object({ amizade: z.number(), confianca: z.number(), carinho: z.number(), afinidade: z.number(), romance: z.number() }).partial(),
   mood: str(20).optional(),
+  romanceStage: z.enum(['nenhum', 'interesse', 'encontro', 'namoro']).optional(),
   memories: z.array(str(160)).max(25).default([]),
   storyFacts: z.array(str(200)).max(15).default([]),
   summary: str(1500).default(''),

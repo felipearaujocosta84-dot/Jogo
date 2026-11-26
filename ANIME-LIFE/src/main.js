@@ -4,10 +4,11 @@ import { UIManager } from './ui/UIManager.js';
 import { game } from './core/GameState.js';
 import { settings } from './save/Settings.js';
 import { Chat } from './smartphone/ChatSystem.js';
+import { audio } from './audio/AudioManager.js';
 
 const ui = new UIManager(document.getElementById('ui-root'), document.getElementById('game-root'));
 ui.boot();
 
 // Acesso para testes automatizados e depuração.
-window.__ANIME_LIFE__ = { ui, game, settings, chat: Chat };
+window.__ANIME_LIFE__ = { ui, game, settings, chat: Chat, audio };
 window.addEventListener('unhandledrejection', (e) => console.error('[Promise]', e.reason));

@@ -9,6 +9,7 @@ import { game } from '../core/GameState.js';
 import { Characters } from '../characters/CharacterRegistry.js';
 import { Relationships, STATS } from '../relationships/RelationshipManager.js';
 import { CHAPTERS } from '../story/chapters/index.js';
+import { EVENT_CHAPTER } from '../story/events/index.js';
 import { backgroundThumb } from '../scenes/backgrounds.js';
 import { AIClient, errorText } from '../smartphone/ai/AIClient.js';
 
@@ -172,7 +173,7 @@ export function openRelationships(ui) {
 export function openGallery(ui, { fromMenu = false, unlocked = null } = {}) {
   const got = new Set(unlocked || game.state?.gallery || []);
   const p = panel('🖼️ Galeria de cenas', `<p class="hint">Cenas concluídas ficam aqui. Toque para rever (rever não altera seu jogo).</p>
-    ${CHAPTERS.map((ch) => `<h3>Capítulo ${ch.number} — ${esc(ch.title)}</h3><div class="gallery">${ch.scenes.map((s) => got.has(s.id)
+    ${[...CHAPTERS, EVENT_CHAPTER].map((ch) => `<h3>${ch.isEvents ? '💗 Eventos especiais' : `Capítulo ${ch.number} — ${esc(ch.title)}`}</h3><div class="gallery">${ch.scenes.map((s) => got.has(s.id)
       ? `<button class="g-item" data-id="${s.id}"><img src="${backgroundThumb(s.thumb.bg, 320)}" alt=""><img class="g-char" src="${Characters.fullImage(s.thumb.char)}" alt=""><span>${esc(s.title)}</span></button>`
       : `<div class="g-item locked"><span>🔒 ???</span></div>`).join('')}</div>`).join('')}`, 'tall');
   const m = new Modal(ui, p, { wide: true });

@@ -5,7 +5,7 @@ import { Characters } from '../characters/CharacterRegistry.js';
 import { audio } from '../audio/AudioManager.js';
 import { CHAPTERS } from '../story/chapters/index.js';
 
-const VERSION = 'v0.4.0 beta — celular com IA';
+const VERSION = 'v0.5.0 beta — cenas e romance';
 const LINEUP = [
   { id: 'character_07', left: '0%', h: '86%' },
   { id: 'character_01', left: '30%', h: '94%' },

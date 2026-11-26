@@ -11,7 +11,8 @@ export class Cards {
     this.ui = ui;
     this.cover = h('<div id="cover"><div class="cv-inner"></div></div>');
     this.time = h('<div id="timecard"></div>');
-    ui.root.append(this.cover, this.time);
+    this.bars = h('<div id="letterbox"><i></i><i></i></div>');
+    ui.root.append(this.cover, this.time, this.bars);
   }
 
   async showCover(html, ms, { skippable = true } = {}) {
@@ -25,7 +26,18 @@ export class Cards {
     this.cover.removeEventListener('pointerup', onTap);
   }
 
-  hideCover() { this.cover.classList.remove('on'); }
+  hideCover() { this.cover.classList.remove('on'); this.cover.dataset.tone = ''; }
+
+  /** Faixas de cinema (narração cinematográfica). */
+  letterbox(on) { this.bars.classList.toggle('on', !!on); }
+
+  /** Transição discreta: tela escurece (ou clareia), mostra um texto curto e volta. */
+  async fadeScene(tone = 'black', text = '') {
+    this.cover.dataset.tone = tone;
+    await this.showCover(text ? `<div class="cv-fade">${esc(text)}</div>` : '', text ? 2600 : 1500);
+    this.hideCover();
+    await wait(this.ui.dialogue.skipping ? 0 : 500);
+  }
 
   async chapter(ch) {
     audio.sfx('sparkle');
@@ -33,7 +45,8 @@ export class Cards {
   }
 
   async scene(ch, sc, index) {
-    await this.showCover(`<div class="cv-scene">Cena ${index + 1}</div><div class="cv-stitle">${esc(sc.title)}</div>`, 1300);
+    const label = ch.isEvents ? '💗 Evento especial' : `Cena ${index + 1}`;
+    await this.showCover(`<div class="cv-scene">${label}</div><div class="cv-stitle">${esc(sc.title)}</div>`, 1300);
     // o cartão some enquanto a cena começa (o cenário entra por baixo)
     setTimeout(() => this.hideCover(), 350);
   }

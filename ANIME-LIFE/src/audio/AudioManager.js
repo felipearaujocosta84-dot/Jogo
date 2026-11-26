@@ -22,6 +22,11 @@ const THEMES = {
     chords: [[52, 55, 59, 62], [48, 52, 55, 59], [53, 57, 60, 64], [55, 59, 62, 66]], // Em7 Cmaj7 Fmaj7 G
     melody: [71, null, null, 67, null, null, 69, null, 64, null, null, null, 67, null, 66, null],
   },
+  romance: {
+    bpm: 60,
+    chords: [[53, 57, 60, 64], [55, 59, 62, 66], [52, 55, 59, 62], [57, 60, 64, 67]], // Fmaj7 Gmaj7 Em7 Am7
+    melody: [72, null, 76, null, 74, null, 72, 71, null, 69, null, null, 67, null, 69, null],
+  },
   home: {
     bpm: 66,
     chords: [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [55, 59, 62, 65]], // Fmaj7 Em7 Dm7 G7
@@ -140,6 +145,52 @@ class AudioManager {
     s.start(t);
   }
 
+  // ---------- som ambiente (contínuo, sintetizado) ----------
+  /** name: cidade | cafe | vento | grilos | null (silêncio). Troca com fade. */
+  ambient(name) {
+    if (!this.ctx || this.ambientName === name) return;
+    this.ambientName = name;
+    const c = this.ctx, t = c.currentTime;
+    if (this.amb) { const old = this.amb; old.gain.gain.setTargetAtTime(0, t, 0.6); setTimeout(() => old.stop(), 2500); this.amb = null; }
+    if (!name) return;
+    if (!this.longNoise) {
+      const b = c.createBuffer(1, c.sampleRate * 4, c.sampleRate), d = b.getChannelData(0);
+      let last = 0; for (let i = 0; i < d.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; } // ruído marrom (suave)
+      this.longNoise = b;
+    }
+    const gain = c.createGain(); gain.gain.value = 0; gain.connect(this.sfxBus);
+    const nodes = [];
+    const noise = (freq, q, vol, type = 'lowpass') => {
+      const src = c.createBufferSource(); src.buffer = this.longNoise; src.loop = true;
+      const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+      const g = c.createGain(); g.gain.value = vol;
+      src.connect(f); f.connect(g); g.connect(gain); src.start(); nodes.push(src);
+      return { src, f, g };
+    };
+    let timer = null;
+    if (name === 'cidade') { noise(300, 0.7, 0.5); noise(900, 1.2, 0.12, 'bandpass'); }
+    if (name === 'vento') { const w = noise(500, 0.6, 0.55, 'bandpass'); const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 0.13; lg.gain.value = 300; lfo.connect(lg); lg.connect(w.f.frequency); lfo.start(); nodes.push(lfo); }
+    if (name === 'cafe') {
+      noise(700, 0.9, 0.35, 'bandpass'); noise(250, 0.7, 0.25);
+      timer = setInterval(() => { if (Math.random() < 0.35) this.sfx('clink'); }, 2600);
+    }
+    if (name === 'grilos') {
+      noise(250, 0.7, 0.2);
+      timer = setInterval(() => { if (Math.random() < 0.7) this.chirp(gain); }, 900);
+    }
+    gain.gain.setTargetAtTime(0.5, t, 1.2);
+    this.amb = { gain, stop: () => { nodes.forEach((n) => { try { n.stop(); } catch {} }); clearInterval(timer); gain.disconnect(); } };
+  }
+
+  chirp(dest) {
+    const c = this.ctx, t = c.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = 4200 + Math.random() * 300; o.connect(g); g.connect(dest);
+      this.env(g, t + i * 0.07, 0.005, 0.025, 0.04); o.start(t + i * 0.07); o.stop(t + i * 0.07 + 0.08);
+    }
+  }
+
   // ---------- efeitos ----------
   sfx(name) {
     if (!this.ctx) return;
@@ -165,6 +216,13 @@ class AudioManager {
       case 'sparkle': [0, 0.06, 0.12].forEach((a, i) => tone(1320 * (1 + i * 0.25), 0.15, 'sine', 0.08, a)); break;
       case 'sleep': [523, 440, 349].forEach((f, i) => tone(f, 0.5, 'sine', 0.12, i * 0.25)); break;
       case 'door': tone(180, 0.15, 'square', 0.04); tone(120, 0.2, 'triangle', 0.1, 0.05); break;
+      case 'knock': [0, 0.22, 0.44].forEach((a) => { tone(95, 0.08, 'sine', 0.35, a, 0.6); tone(190, 0.04, 'triangle', 0.12, a); }); break;
+      case 'vibrate': for (let i = 0; i < 2; i++) tone(70, 0.28, 'sawtooth', 0.05, i * 0.45); break;
+      case 'bell': [1568, 2093].forEach((f, i) => tone(f, 0.9, 'sine', 0.08, i * 0.12)); break;
+      case 'keys': for (let i = 0; i < 5; i++) tone(2500 + Math.random() * 1500, 0.05, 'triangle', 0.03, i * 0.05); break;
+      case 'clink': tone(2800 + Math.random() * 600, 0.12, 'sine', 0.02); break;
+      case 'heart': [0, 0.18].forEach((a) => tone(60, 0.12, 'sine', 0.3, a, 0.8)); break;
+      case 'whoosh': tone(300, 0.5, 'sine', 0.06, 0, 0.3); break;
     }
   }
 }

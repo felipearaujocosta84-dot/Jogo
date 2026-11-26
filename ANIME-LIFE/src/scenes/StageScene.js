@@ -10,6 +10,7 @@ import { EMOTIONS } from '../cinematic/Emotions.js';
 import { LivingSprite, canAnimate } from '../animation/LivingSprite.js';
 import { CharacterAnimator } from '../animation/CharacterAnimator.js';
 import { settings } from '../save/Settings.js';
+import { AmbientFX } from './AmbientFX.js';
 
 const SLOTS = { farleft: 0.14, left: 0.27, center: 0.5, right: 0.73, farright: 0.86 };
 const EMOTE_COLORS = { happy: '#ff6fa8', surprised: '#ffb020', curious: '#9a7aff', angry: '#ff4060', sad: '#5aa0ff', hurt: '#5aa0ff', embarrassed: '#ff5a7a', serious: '#ffffff', love: '#ff5a9a' };
@@ -25,7 +26,11 @@ export class StageScene extends Phaser.Scene {
     this.chars = new Map(); // id -> { img, at, blush, emote }
     this.vignette = this.add.graphics().setDepth(50).setScrollFactor(0);
     this.camProxy = { x: 0, y: 0, z: 1 };
-    this.scale.on('resize', () => { this.layout(); if (this.currentShot) this.shot(this.currentShot, { instant: true }); });
+    this.ambient = new AmbientFX(this);
+    // camada de luz da cena (escurecer, brilho romântico, fades)
+    this.veil = this.add.rectangle(0, 0, 10, 10, 0x0a0620, 0).setOrigin(0).setDepth(48).setScrollFactor(0);
+    this.glow = this.add.rectangle(0, 0, 10, 10, 0xff8ab0, 0).setOrigin(0).setDepth(47).setScrollFactor(0).setBlendMode('ADD');
+    this.scale.on('resize', () => { this.layout(); this.ambient.relayout(); if (this.currentShot) this.shot(this.currentShot, { instant: true }); });
     this.layout();
     this.events.emit('stage-ready');
     this.game.events.emit('stage-ready', this);
@@ -39,6 +44,8 @@ export class StageScene extends Phaser.Scene {
     if (!this.currentShot) { this.camProxy = { x: this.W / 2, y: this.H / 2, z: 1 }; this.applyCam(); }
     for (const bg of [this.bgA, this.bgB]) this.cover(bg);
     for (const [, c] of this.chars) this.place(c, false);
+    // véus cobrem a tela inteira mesmo com zoom (compensam a escala da câmera)
+    for (const v of [this.veil, this.glow].filter(Boolean)) v.setSize(this.W * 3, this.H * 3).setPosition(-this.W, -this.H);
     this.vignette.clear();
     // escurece levemente a base da tela (legibilidade da caixa de diálogo)
     const g = this.vignette, steps = 12;
@@ -75,6 +82,7 @@ export class StageScene extends Phaser.Scene {
     const [front, back] = this.bgA.visible && this.bgA.depth > this.bgB.depth ? [this.bgA, this.bgB] : [this.bgB, this.bgA];
     back.setTexture(`bg_${key}`).setVisible(true).setAlpha(fx === 'cut' ? 1 : 0).setDepth(front.depth + 1);
     this.cover(back);
+    this.ambient.set(key, { level: settings.data.animations });
     if (fx === 'cut' || this.instant) { front.setVisible(false); back.setAlpha(1); return; }
     await new Promise((r) => this.tweens.add({ targets: back, alpha: 1, duration: 700, ease: 'Sine.easeInOut', onComplete: r }));
     front.setVisible(false);
@@ -121,6 +129,7 @@ export class StageScene extends Phaser.Scene {
     const existing = this.chars.get(id);
     if (existing) {
       existing.at = at; this.place(existing, !this.instant); this.express(id, expr);
+      if (existing.img.alpha < 1) this.fadeAlpha(existing.img, 1, 600); // volta de um corte
       if (existing.anim) existing.anim.side = SLOTS[at] < 0.5 ? 1 : -1;
       return;
     }
@@ -218,6 +227,7 @@ export class StageScene extends Phaser.Scene {
     this.instant = true; this.hideAll(); this.instant = false;
     this.bgA.setVisible(false); this.bgB.setVisible(false); this.bgKey = null;
     this.currentShot = null; this.clearShoulder(); this.camProxy = { x: this.W / 2, y: this.H / 2, z: 1 }; this.applyCam();
+    this.ambient.clear(); this.veil.setAlpha(0); this.glow.setAlpha(0);
   }
 
   // ------------------------------------------------------------------
@@ -310,6 +320,64 @@ export class StageScene extends Phaser.Scene {
   stopSpeaking() { for (const c of this.chars.values()) c.anim?.stopSpeaking(); }
 
   setAnimationLevel(level) { for (const c of this.chars.values()) if (c.anim) c.anim.level = level; }
+
+  // ------------------------------------------------------------------
+  // Direção de cena: luz, panorâmica, cortes, gestos e aproximação
+  // ------------------------------------------------------------------
+  /** Escurece (0..1) ou clareia a cena. */
+  dim(level, ms = 900) { this.tweens.add({ targets: this.veil, alpha: Math.max(0, Math.min(0.92, level)), duration: this.instant ? 0 : ms }); }
+  /** Brilho romântico suave (0..1). */
+  romanticGlow(level, ms = 1200) { this.tweens.add({ targets: this.glow, alpha: Math.max(0, Math.min(0.25, level * 0.18)), duration: this.instant ? 0 : ms }); }
+
+  lightsOn(sfx) { this.ambient.lightsOn(sfx); }
+
+  /** Panorâmica lenta pelo ambiente (narração sem personagens). */
+  pan(dir = 1, ms = 9000) {
+    this.currentShot = { type: 'pan' };
+    this.tweens.killTweensOf(this.camProxy);
+    const z = 1.22, half = this.W / z / 2;
+    const xs = [half, this.W - half];
+    if (dir < 0) xs.reverse();
+    Object.assign(this.camProxy, { x: xs[0], y: this.H / 2 - this.H * 0.04, z });
+    this.applyCam();
+    if (this.instant || this.skipping) return;
+    this.tweens.add({ targets: this.camProxy, x: xs[1], duration: ms, ease: 'Sine.easeInOut', onUpdate: () => this.applyCam() });
+  }
+
+  /** Corte para o céu/janela (ex.: no beijo, ou quando a cena passa uma noite): personagens somem, câmera sobe. */
+  async cutaway(ms = 2600) {
+    if (this.instant || this.skipping) return;
+    this.tweens.killTweensOf(this.camProxy);
+    for (const c of this.chars.values()) this.fadeAlpha(c.img, 0, 700);
+    await new Promise((r) => this.tweens.add({ targets: this.camProxy, y: this.H * 0.22, z: 1.6, duration: ms, ease: 'Sine.easeInOut', onUpdate: () => this.applyCam(), onComplete: r }));
+  }
+
+  /** Volta do corte: personagens reaparecem. */
+  uncut() { for (const c of this.chars.values()) if (c.img.alpha < 1) this.fadeAlpha(c.img, 1, 600); }
+
+  /** Transparência animada por um objeto à parte: as animações de expressão não a cancelam. */
+  fadeAlpha(img, to, ms) {
+    if (this.instant || !ms) { img.alpha = to; return; }
+    const p = { a: img.alpha };
+    this.tweens.add({ targets: p, a: to, duration: ms, onUpdate: () => { if (img.active !== false) img.alpha = p.a; } });
+  }
+
+  /** Personagem se aproxima (fica maior e mais perto da câmera) ou volta ao lugar (amount 0). */
+  approach(id, amount = 1) {
+    const c = this.chars.get(id); if (!c) return;
+    const k = 1 + 0.22 * amount;
+    const toX = amount > 0 ? c.img.x + (this.W * 0.5 - c.img.x) * Math.min(1, amount) : this.W * SLOTS[c.at];
+    this.tweens.add({ targets: c.img, scale: c.baseScale * k, y: c.baseY + this.H * 0.06 * amount, x: toX, duration: this.instant ? 0 : 1400, ease: 'Sine.easeInOut' });
+    c.near = amount;
+  }
+
+  /** Gestos: nod (assentir), shake (negar), sigh (suspirar), turn (virar o rosto), close_eyes / open_eyes. */
+  gesture(id, g) {
+    const c = this.chars.get(id); if (!c) return;
+    if (c.anim) c.anim.gesture(g);
+    else if (g === 'nod') this.tweens.add({ targets: c.img, y: c.baseY + 6, duration: 160, yoyo: true, repeat: 1 });
+    else if (g === 'shake') this.tweens.add({ targets: c.img, x: c.img.x + 6, duration: 90, yoyo: true, repeat: 3 });
+  }
 
   update(_t, dtMs) {
     const dt = Math.min(0.05, dtMs / 1000);

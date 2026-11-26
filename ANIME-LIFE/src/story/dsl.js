@@ -12,3 +12,4 @@ export const memory = (id, text) => ({ memory: [id, text] });
 export const contact = (id) => ({ contact: id });
 export const post = (id) => ({ post: id });
 export const route = (id, state) => ({ route: [id, state] });
+export const romance = (id, stage) => ({ romance: [id, stage] });

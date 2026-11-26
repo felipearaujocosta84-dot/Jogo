@@ -6,6 +6,7 @@
 // Uso: node tools/story-check.mjs   (V=1 mostra os caminhos)
 import { readFileSync } from 'fs';
 import { CHAPTERS } from '../src/story/chapters/index.js';
+import { EVENTS } from '../src/story/events/index.js';
 import { CONVERSATIONS } from '../src/story/phone/conversations.js';
 import { POSTS } from '../src/story/phone/posts.js';
 
@@ -22,6 +23,8 @@ const blank = () => ({ flags: {}, rel: {}, contacts: [], decisions: [], routes: 
 const clone = (s) => JSON.parse(JSON.stringify(s));
 const ctxOf = (s) => ({
   flag: (k) => s.flags[k], stat: (id, k) => s.rel[id]?.[k] ?? 0, route: (id) => s.routes[id] || null,
+  stage: (id) => s.romanceStage?.[id] || 'nenhum', mood: () => 'neutro',
+  comfort: (id) => { const r = s.rel[id] || {}; return (r.afinidade || 0) + (r.carinho || 0) + (r.confianca || 0) * 0.5 + (r.romance || 0) * 1.5; },
   contact: (id) => s.contacts.includes(id), chose: (d) => [...s.decisions].reverse().find((x) => x.id === d)?.value, pronouns: 'ele',
 });
 function apply(s, list = [], where) {
@@ -38,6 +41,7 @@ function apply(s, list = [], where) {
     if (e.contact && !s.contacts.includes(e.contact)) s.contacts.push(e.contact);
     if (e.route) s.routes[e.route[0]] = e.route[1];
     if (e.post && !POSTS[e.post]) err(`${where}: publicação inexistente ${e.post}`);
+    if (e.romance) { const c = byId[e.romance[0]]; if (!(c?.romanceable && c.age >= 18)) err(`${where}: etapa romântica com personagem não elegível ${e.romance[0]}`); (s.romanceStage ||= {})[e.romance[0]] = e.romance[1]; }
   }
 }
 function labelsOf(steps, where) {
@@ -109,6 +113,17 @@ for (const ch of CHAPTERS) {
     const uniq = new Map(next.map((s) => [JSON.stringify([s.flags, s.contacts, s.decisions.map((d) => d.value)]), s]));
     states = [...uniq.values()].slice(0, 400);
     console.log(`✔ ${sc.id} (${sc.title}): ${next.length} caminhos, ${states.length} estados distintos seguem`);
+  }
+}
+// eventos especiais: percorre todos os caminhos com relações baixas e altas (testa os dois lados do consentimento)
+for (const ev of EVENTS) {
+  const c = byId[ev.char];
+  if (!(c?.romanceable && c.age >= 18)) err(`evento ${ev.scene.id}: personagem não é adulto elegível`);
+  for (const level of [0, 12, 40]) {
+    const s0 = { ...blank(), rel: { [ev.char]: { amizade: level, confianca: level, carinho: level, afinidade: level, romance: level } }, romanceStage: { [ev.char]: ev.kind === 'noite' ? 'namoro' : 'interesse' } };
+    let n = 0;
+    walkSteps(ev.scene.steps, 0, ev.scene.id, () => { n++; paths++; }, s0);
+    console.log(`✔ evento ${ev.scene.id} (relação ${level}): ${n} caminhos`);
   }
 }
 for (const [id, p] of Object.entries(POSTS)) if (!byId[p.author]) err(`post ${id}: autor inexistente`);

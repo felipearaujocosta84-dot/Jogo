@@ -5,6 +5,29 @@ Feita com **Phaser 3 + JavaScript modular + Vite**, empacotável como app Androi
 
 > A versão anterior (exploração livre com joystick e mapa) foi removida a pedido. O código dela continua no histórico do git.
 
+## Novidade da v0.5.0 beta: cenas cinematográficas e relacionamentos adultos
+- **Narração vira cena** (`src/cinematic/SceneDirector.js`). O diretor de cena lê o roteiro e mostra o que o texto descreve, sem inventar nada:
+  - "alguém bate na porta" → batidas;
+  - "o celular vibra" → vibração;
+  - "as lâmpadas acendem uma por uma" → lâmpadas acendendo;
+  - "ela estende a caixa" → a personagem se aproxima;
+  - narração sem personagens → panorâmica lenta com faixas de cinema, e o texto entra depois de uma pausa.
+- **Cenários vivos** (`src/scenes/AmbientFX.js`), desenhados sobre a pintura original, sem substituí-la:
+  - janelas dos prédios piscando e faróis passando no teto à noite;
+  - poeira na luz da janela durante o dia;
+  - vapor do café;
+  - estrelas e lâmpadas do terraço.
+- **Som ambiente** sintetizado em cada cenário: cidade, café, vento, grilos.
+- **Relacionamentos adultos:** só com personagens de 18 anos ou mais, marcados como elegíveis.
+  - Etapas: interesse → encontro → namoro.
+  - **Consentimento:** o personagem aceita ou recusa convites conforme o conforto (relação + humor), e a recusa nunca é punida.
+  - Nos momentos íntimos, o personagem diz claramente que quer, e o jogador sempre pode desacelerar ou recusar.
+- **Rota da Rin**, com dois eventos especiais em `src/story/events/`:
+  - **"Terraço, só nós dois":** aproximar, segurar a mão, respeitar o espaço, abraçar e beijar, com o corte de câmera para o céu.
+  - **"Fica comigo":** a primeira noite. O momento íntimo é uma transição discreta para a tela preta, sem nada explícito, e a história continua na manhã seguinte, com consequências: o Kaito desconfia e aparece um post no Hoshigram.
+  - Os convites saem do celular: você convida pelo perfil, ou ela convida, com Aceitar/Recusar.
+  - Depois do evento, o jogo volta exatamente ao ponto da história principal.
+
 ## Novidade da v0.4.0 beta: celular com IA
 - **Smartphone** com Mensagens, Contatos, Perfis, Histórico, Notificações e Hoshigram, com transições entre os apps.
 - **Chat livre:** você digita o que quiser e cada personagem responde com a própria personalidade.
@@ -108,7 +131,9 @@ src/core/            Engine.js (Phaser), GameState.js (estado salvo + textos), E
 src/scenes/          StageScene.js (palco: cenário, personagens, câmera, transições), backgrounds.js (cenários pintados)
 src/animation/       LivingSprite.js + livingShader.js (anima a ilustração original), CharacterAnimator.js
 src/cinematic/       Emotions.js (emoção de cada fala), Director.js (planos de câmera), LipSync.js (boca pelo texto)
-src/story/           StoryEngine.js (intérprete), chapters/ (capítulos), phone/ (conversas e posts), dsl.js
+src/story/           StoryEngine.js (intérprete), chapters/ (capítulos), events/ (encontros e eventos românticos),
+                     phone/ (conversas e posts), dsl.js
+src/scenes/AmbientFX.js  vida dos cenários (luzes, poeira, vapor, estrelas, lâmpadas)
 src/choices/         ChoiceSystem.js (condições, bloqueios, efeitos, registro de decisões)
 src/characters/      characters.json + CharacterRegistry.js
 src/relationships/   RelationshipManager.js (4 atributos, regras de romance, rotas)

@@ -76,6 +76,14 @@ export class DialogueUI {
   setSkip(v) { this.skip = v; this.el.querySelector('[data-q=skip]').classList.toggle('on', v); if (v && this.resolveLine) this.tryFastForward(); }
   setHidden(v) { this.el.classList.toggle('ui-off', v); }
 
+  /** Limpa a caixa durante uma pausa cinematográfica (a cena "respira" antes do texto). */
+  clearForBeat() {
+    clearInterval(this.timer);
+    this.textEl.textContent = '';
+    this.nameEl.classList.add('hidden');
+    this.el.querySelector('.dl-ind').classList.remove('on');
+  }
+
   /** Mostra uma fala; resolve quando o jogador avança. */
   say({ speaker, text }, { read = false } = {}) {
     clearTimeout(this.autoTimer);
