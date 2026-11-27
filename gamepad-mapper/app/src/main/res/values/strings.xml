@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gamepad Mapper</string>
+    <string name="logo_title">GAMEPAD\nMAPPER</string>
+    <string name="tagline">Controles físicos em jogos de toque</string>
+
+    <string name="btn_connect">CONECTAR CONTROLE</string>
+    <string name="btn_my_games">MEUS JOGOS</string>
+    <string name="btn_create">CRIAR MAPEAMENTO</string>
+    <string name="btn_settings">CONFIGURAÇÕES</string>
+
+    <string name="status_title">STATUS</string>
+    <string name="status_service_on">Serviço de toque: ATIVO</string>
+    <string name="status_service_enabled_not_running">Serviço de toque: ativado, aguardando o sistema iniciar</string>
+    <string name="status_service_off">Serviço de toque: DESATIVADO — toque aqui para ativar</string>
+    <string name="status_no_controller">Controle: nenhum detectado</string>
+    <string name="status_controller">Controle: %1$s</string>
+    <string name="status_controllers">Controles: %1$d conectados</string>
+    <string name="status_profile">Perfil ativo: %1$s</string>
+    <string name="status_no_profile">Perfil ativo: nenhum</string>
+    <string name="status_paused">Mapeamento PAUSADO (SELECT + START para retomar)</string>
+
+    <string name="controller_title">CONECTAR CONTROLE</string>
+    <string name="controller_list_title">CONTROLES DETECTADOS</string>
+    <string name="controller_none">Nenhum controle detectado.\n\n• Bluetooth: coloque o controle em modo de pareamento e pareie em Configurações › Bluetooth.\n• USB: conecte com um adaptador OTG. O Android reconhece controles HID automaticamente.</string>
+    <string name="controller_pair_bt">PAREAR VIA BLUETOOTH</string>
+    <string name="controller_refresh">ATUALIZAR</string>
+    <string name="controller_test_title">TESTE DE BOTÕES</string>
+    <string name="controller_test_hint">Pressione os botões e mova os analógicos do controle.</string>
+    <string name="controller_pressed_none">Pressionado: —</string>
+    <string name="controller_pressed">Pressionado: %1$s</string>
+    <string name="controller_unknown_key">Tecla não padronizada: %1$s</string>
+
+    <string name="profiles_title">MEUS JOGOS</string>
+    <string name="profiles_new">NOVO PERFIL</string>
+    <string name="profiles_import">IMPORTAR</string>
+    <string name="profiles_empty">Nenhum perfil ainda. Crie um mapeamento para o seu jogo.</string>
+    <string name="profile_activate">ATIVAR</string>
+    <string name="profile_active">ATIVO</string>
+    <string name="profile_edit">EDITAR</string>
+    <string name="profile_more">MAIS</string>
+    <string name="profile_play">JOGAR</string>
+
+    <string name="settings_title">CONFIGURAÇÕES</string>
+    <string name="settings_service">SERVIÇO DE ACESSIBILIDADE</string>
+    <string name="settings_open_accessibility">ABRIR CONFIGURAÇÕES DE ACESSIBILIDADE</string>
+    <string name="settings_app_info">INFORMAÇÕES DO APP (configurações restritas)</string>
+    <string name="settings_restricted_help">Android 13+: se a opção do serviço estiver acinzentada, abra Informações do app › menu ⋮ › “Permitir configurações restritas” e tente novamente.</string>
+    <string name="settings_mapping">MAPEAMENTO</string>
+    <string name="settings_mapping_enabled">Mapeamento ativo</string>
+    <string name="settings_capture_analogs">Capturar analógicos (janela de foco)</string>
+    <string name="settings_capture_help">Necessário para os analógicos. O Android não envia movimentos de analógico ao serviço de acessibilidade, então uma pequena janela recebe o foco. Alguns jogos pausam ou ignoram isso.</string>
+    <string name="settings_indicator">Mostrar indicador na tela</string>
+    <string name="settings_auto_switch">Trocar perfil automaticamente ao abrir o jogo</string>
+    <string name="settings_pass_unmapped">Repassar botões não mapeados ao jogo/sistema</string>
+    <string name="settings_defaults">PADRÕES PARA NOVOS ANALÓGICOS</string>
+    <string name="settings_default_deadzone">Zona morta padrão: %1$d%%</string>
+    <string name="settings_default_sensitivity">Sensibilidade padrão: %1$.2fx</string>
+    <string name="settings_limits">COMPATIBILIDADE E LIMITAÇÕES</string>
+    <string name="settings_limits_text">• Os toques são gerados pelo serviço de acessibilidade (dispatchGesture). É a única forma permitida sem root. Requer ativação manual pelo usuário.\n\n• Botões funcionam com o jogo em primeiro plano (filtro de teclas da acessibilidade).\n\n• Analógicos exigem a janela de captura de foco. Jogos que pausam ao perder o foco ou que reagem a isso podem não funcionar com analógicos.\n\n• Jogos com anti-cheat ou que ignoram toques injetados (alguns competitivos online) podem bloquear o mapeamento ou banir contas. Use por sua conta e risco.\n\n• Apps marcados como seguros (bancos, telas protegidas) e a tela de bloqueio não aceitam gestos.\n\n• No máximo 10 toques simultâneos; latência típica de 16–40 ms por atualização.\n\n• Atalho: SELECT + START pausa/retoma o mapeamento.\n\n• Nada é enviado para a internet; os perfis ficam só no aparelho.</string>
+    <string name="settings_about">Gamepad Mapper %1$s</string>
+
+    <string name="editor_add_button">+ BOTÃO</string>
+    <string name="editor_add_stick">+ ANALÓGICO</string>
+    <string name="editor_background">FUNDO</string>
+    <string name="editor_save">SALVAR</string>
+    <string name="editor_exit">SAIR</string>
+    <string name="editor_hide">◂</string>
+    <string name="editor_show">▸ MENU</string>
+    <string name="editor_hint">Toque em um elemento para editar. Arraste para mover, use a alça ou pinça para redimensionar.</string>
+    <string name="editor_bind">ASSOCIAR BOTÃO FÍSICO</string>
+    <string name="editor_bind_wait">Pressione um botão ou mova um analógico no controle…</string>
+    <string name="editor_mode">MODO</string>
+    <string name="editor_delete">EXCLUIR</string>
+    <string name="editor_duplicate">DUPLICAR</string>
+    <string name="editor_close_panel">FECHAR</string>
+    <string name="editor_size">Tamanho: %1$d%%</string>
+    <string name="editor_sensitivity">Sensibilidade: %1$.2fx</string>
+    <string name="editor_deadzone">Zona morta: %1$d%%</string>
+    <string name="editor_invert_y">Inverter eixo vertical</string>
+    <string name="editor_saved">Layout salvo</string>
+    <string name="editor_unsaved_title">Alterações não salvas</string>
+    <string name="editor_unsaved_msg">Deseja salvar o layout antes de sair?</string>
+
+    <string name="dialog_save">Salvar</string>
+    <string name="dialog_discard">Descartar</string>
+    <string name="dialog_cancel">Cancelar</string>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_delete">Excluir</string>
+
+    <string name="accessibility_summary">Converte botões e analógicos do controle em toques na tela.</string>
+    <string name="accessibility_description">O Gamepad Mapper usa este serviço para: (1) ler os botões do controle enquanto um jogo está aberto e (2) executar toques na tela nas posições que você configurou. Ele também detecta qual app está aberto para trocar o perfil automaticamente. Nenhum conteúdo da tela é lido e nada é enviado para a internet.</string>
+</resources>

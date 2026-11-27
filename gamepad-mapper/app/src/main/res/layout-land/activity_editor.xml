@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark">
+
+    <com.gamepadmapper.ui.EditorView
+        android:id="@+id/editorView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <HorizontalScrollView
+        android:id="@+id/toolbar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/bg_panel"
+        android:scrollbars="none">
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="6dp">
+        <Button android:id="@+id/btnHideToolbar" style="@style/SmallButton" android:minWidth="40dp" android:paddingStart="8dp" android:paddingEnd="8dp" android:text="@string/editor_hide" />
+        <Button android:id="@+id/btnAddButton" style="@style/SmallButton" android:layout_marginStart="6dp" android:text="@string/editor_add_button" />
+        <Button android:id="@+id/btnAddStick" style="@style/SmallButton" android:layout_marginStart="6dp" android:text="@string/editor_add_stick" />
+        <Button android:id="@+id/btnBackground" style="@style/SmallButton" android:layout_marginStart="6dp" android:text="@string/editor_background" />
+        <Button android:id="@+id/btnSave" style="@style/SmallButton" android:layout_marginStart="6dp" android:textColor="@color/ok_green" android:text="@string/editor_save" />
+        <Button android:id="@+id/btnExit" style="@style/SmallButton" android:layout_marginStart="6dp" android:text="@string/editor_exit" />
+    </LinearLayout>
+    </HorizontalScrollView>
+
+    <Button
+        android:id="@+id/btnShowToolbar"
+        style="@style/SmallButton"
+        android:layout_gravity="top|start"
+        android:layout_margin="8dp"
+        android:visibility="gone"
+        android:text="@string/editor_show" />
+
+    <TextView
+        android:id="@+id/editorHint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_panel"
+        android:padding="8dp"
+        android:text="@string/editor_hint"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+
+    <ScrollView
+        android:id="@+id/propsPanel"
+        android:layout_width="300dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:layout_margin="8dp"
+        android:background="@drawable/bg_panel"
+        android:visibility="gone">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+                <TextView android:id="@+id/propTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/neon_blue" android:textSize="16sp" android:textStyle="bold" />
+                <Button android:id="@+id/propBind" style="@style/SmallButton" android:layout_width="match_parent" android:layout_marginTop="8dp" android:text="@string/editor_bind" />
+                <Button android:id="@+id/propMode" style="@style/SmallButton" android:layout_width="match_parent" android:layout_marginTop="8dp" android:text="@string/editor_mode" />
+                <TextView android:id="@+id/propSizeLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="@color/text_primary" android:textSize="13sp" />
+                <SeekBar android:id="@+id/propSize" android:layout_width="match_parent" android:layout_height="32dp" android:max="56" />
+                <LinearLayout android:id="@+id/stickProps" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                    <TextView android:id="@+id/propSensLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:textSize="13sp" />
+                    <SeekBar android:id="@+id/propSens" android:layout_width="match_parent" android:layout_height="32dp" android:max="290" />
+                    <TextView android:id="@+id/propDeadzoneLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:textSize="13sp" />
+                    <SeekBar android:id="@+id/propDeadzone" android:layout_width="match_parent" android:layout_height="32dp" android:max="90" />
+                    <Switch android:id="@+id/propInvertY" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/editor_invert_y" android:textColor="@color/text_primary" android:textSize="13sp" />
+                </LinearLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+                    <Button android:id="@+id/propDuplicate" style="@style/SmallButton" android:layout_width="0dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:minWidth="0dp" android:paddingStart="4dp" android:paddingEnd="4dp" android:textSize="11sp" android:text="@string/editor_duplicate" />
+                    <Button android:id="@+id/propDelete" style="@style/SmallButton" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:minWidth="0dp" android:paddingStart="4dp" android:paddingEnd="4dp" android:textColor="@color/danger_red" android:textSize="11sp" android:text="@string/editor_delete" />
+                    <Button android:id="@+id/propClose" style="@style/SmallButton" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="4dp" android:minWidth="0dp" android:paddingStart="4dp" android:paddingEnd="4dp" android:textSize="11sp" android:text="@string/editor_close_panel" />
+                </LinearLayout>
+            </LinearLayout>
+    </ScrollView>
+</FrameLayout>
