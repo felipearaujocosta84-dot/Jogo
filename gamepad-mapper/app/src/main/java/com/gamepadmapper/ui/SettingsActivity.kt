@@ -146,6 +146,11 @@ class SettingsActivity : BaseActivity() {
             p?.packageName?.let { append(" (jogo: ").append(it).append(")") }
             append("\nMapeamento agindo agora: ").append(if (svcNow.mappingActiveNow) "SIM" else "não")
             append("\nToques enviados: ").append(svcNow.gesturesDispatched)
+            append("\nAnalógicos: ").append(when {
+                svcNow.nativeMotionCapture -> "captura nativa (Android 14+), eventos: ${svcNow.motionEventsReceived}"
+                svcNow.isCapturingAnalogs -> "janela de foco (modo antigo)"
+                else -> "desligados"
+            })
         }
         val status = findViewById<TextView>(R.id.serviceStatus)
         val diag = findViewById<TextView>(R.id.serviceDiag)
@@ -156,7 +161,10 @@ class SettingsActivity : BaseActivity() {
                 status.setTextColor(getColor(R.color.ok_green))
                 diag.text = buildString {
                     append("Perfil em uso: ").append(svc.activeProfile?.name ?: "nenhum")
-                    append("\nCaptura de analógicos: ").append(if (svc.isCapturingAnalogs) "ativa" else "inativa (só fora deste app e com perfil ativo)")
+                    append("\nCaptura de analógicos: ").append(
+                        if (svc.nativeMotionCapture) "nativa do Android 14+ (não tira o foco do jogo)"
+                        else if (svc.isCapturingAnalogs) "janela de foco ativa"
+                        else "desligada (Android < 14: ligue a janela de foco abaixo, se o jogo aceitar)")
                     append("\nGestos enviados: ").append(svc.gesturesDispatched)
                     svc.engineError?.let { append("\nÚltimo aviso: ").append(it) }
                 }

@@ -84,6 +84,41 @@ class GamepadAccessibilityService : AccessibilityService() {
         return super.onUnbind(intent)
     }
 
+    /**
+     * Android 14+ (API 34): o servico de acessibilidade pode receber os MotionEvent do joystick
+     * diretamente (onMotionEvent), SEM janela focavel — o jogo continua com o foco e renderizando.
+     */
+    /** true se o aparelho suporta a captura nativa (Android 14+). */
+    var nativeMotionCapture = Build.VERSION.SDK_INT >= 34
+        private set
+    @Volatile var motionEventsReceived = 0L
+        private set
+    private var nativeSources = -1
+
+    /**
+     * Liga a captura so enquanto o mapeamento age no jogo; fora disso os analogicos voltam a ir
+     * normalmente para os apps (inclusive o teste de controle e o editor deste app).
+     */
+    private fun setNativeMotionCapture(on: Boolean) {
+        if (!nativeMotionCapture || Build.VERSION.SDK_INT < 34) return
+        val sources = if (on) android.view.InputDevice.SOURCE_JOYSTICK else 0
+        if (sources == nativeSources) return
+        try {
+            val info = serviceInfo
+            info.motionEventSources = sources
+            serviceInfo = info
+            nativeSources = sources
+        } catch (e: Exception) {
+            android.util.Log.w("GamepadMapper", "motionEventSources indisponivel", e)
+            nativeMotionCapture = false
+        }
+    }
+
+    override fun onMotionEvent(event: MotionEvent) {
+        motionEventsReceived++
+        if (GamepadEventParser.handleMotion(event, state) && isMappingActive()) refresh()
+    }
+
     private fun teardown() {
         if (MapperRuntime.service === this) MapperRuntime.service = null
         if (::repo.isInitialized) repo.removeListener(profileListener)
@@ -147,7 +182,10 @@ class GamepadAccessibilityService : AccessibilityService() {
     }
 
     private fun updateOverlay() {
-        val wantFocus = settings.captureAnalogs && isMappingActive()
+        // Janela focavel so como alternativa (Android < 14 ou se a captura nativa falhar):
+        // ela tira o foco do jogo e alguns jogos (ex.: Free Fire) ficam com a tela preta.
+        setNativeMotionCapture(isMappingActive())
+        val wantFocus = settings.captureAnalogs && !nativeMotionCapture && isMappingActive()
         val wantVisible = settings.showIndicator || wantFocus
         if (!wantVisible) { overlay?.remove(); overlay = null; return }
         val ov = overlay ?: InputCaptureOverlay(this) { e -> onCapturedMotion(e) }.also { overlay = it }

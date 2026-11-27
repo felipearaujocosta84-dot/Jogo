@@ -5,7 +5,7 @@ Bluetooth e USB OTG em jogos que só aceitam toque. Os botões e analógicos do 
 toques na tela, nas posições definidas pelo usuário em um editor visual.
 
 - `minSdk 26` (Android 8.0) · `targetSdk 34` · sem bibliotecas pagas e sem internet
-- APK pronto: [`apk/GamepadMapper-v1.1.0-debug.apk`](apk/GamepadMapper-v1.1.0-debug.apk) (assinado com chave de debug; instala por cima da 1.0.0 mantendo os perfis)
+- APK pronto: [`apk/GamepadMapper-v1.2.0-debug.apk`](apk/GamepadMapper-v1.2.0-debug.apk) (assinado com chave de debug; instala por cima da 1.0.0 mantendo os perfis)
 
 ## Como instalar e usar
 
@@ -19,6 +19,14 @@ toques na tela, nas posições definidas pelo usuário em um editor visual.
    - Adicione, arraste e redimensione os botões e as zonas de analógico. Depois toque em **SALVAR**.
 5. Abra o jogo (ou toque em **JOGAR** em *Meus jogos*). O perfil vinculado é ativado automaticamente.
 6. **SELECT + START** pausa ou retoma o mapeamento a qualquer momento.
+
+## Novidades da 1.2.0
+
+- **Correção da tela preta:** a janela de foco usada para os analógicos tirava o foco do jogo, e o Free Fire ficava com a tela preta.
+  - No **Android 14+**, os analógicos agora vêm direto pelo serviço de acessibilidade (`AccessibilityServiceInfo.setMotionEventSources(SOURCE_JOYSTICK)` + `onMotionEvent`), sem tirar o foco do jogo.
+  - A captura só fica ligada enquanto o mapeamento age no jogo. Assim, o teste de controle e o editor continuam recebendo os analógicos.
+- **Android 13 ou inferior:** a janela de foco virou opcional e vem **desligada**. Ela usa uma chave nova, então quem tinha a opção antiga ligada não fica preso nela.
+- **Diagnóstico:** mostra o modo de captura dos analógicos e quantos eventos de analógico chegaram.
 
 ## Novidades da 1.1.0
 
@@ -83,7 +91,7 @@ Analógico ► InputCaptureOverlay (janela focável, não tocável) ─┤
 |---|---|---|
 | Gerar toques | Serviço de acessibilidade ativado manualmente (`canPerformGestures`) | Única via sem root. Não funciona em telas seguras ou na tela de bloqueio. |
 | Ler botões com o jogo aberto | Mesmo serviço (`flagRequestFilterKeyEvents`) | Funciona com o jogo em foco. |
-| Ler analógicos com o jogo aberto | Janela de sobreposição focável (`TYPE_ACCESSIBILITY_OVERLAY`) | O Android **não** envia `MotionEvent` de analógico ao serviço de acessibilidade. A janela pega o foco de entrada, então o jogo perde o foco de janela. **Jogos que pausam ou ignoram a entrada sem foco não funcionarão com analógicos**; os botões continuam funcionando. Pode ser desligado nas Configurações. |
+| Ler analógicos com o jogo aberto | Android 14+: `onMotionEvent` do serviço (sem roubar foco). Android ≤13: janela focável opcional (`TYPE_ACCESSIBILITY_OVERLAY`) | O Android **não** envia `MotionEvent` de analógico ao serviço de acessibilidade. A janela pega o foco de entrada, então o jogo perde o foco de janela. **Jogos que pausam ou ignoram a entrada sem foco não funcionarão com analógicos**; os botões continuam funcionando. Pode ser desligado nas Configurações. |
 | Troca automática de perfil | Evento `TYPE_WINDOW_STATE_CHANGED` do mesmo serviço | Só o nome do pacote é lido. O conteúdo da tela não é lido. |
 | Listar jogos instalados | `<queries>` para apps com ícone | Não usa `QUERY_ALL_PACKAGES`. |
 

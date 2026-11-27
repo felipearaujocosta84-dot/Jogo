@@ -23,10 +23,14 @@ class AppSettings private constructor(context: Context) {
         get() = bool("mapping_enabled", true)
         set(v) = setBool("mapping_enabled", v)
 
-    /** Janela focavel invisivel para receber analogicos (MotionEvent nao passa pelo filtro de acessibilidade). */
+    /**
+     * Alternativa para Android < 14: janela focavel para receber os analogicos.
+     * Desligada por padrao: tira o foco do jogo e alguns jogos ficam com tela preta.
+     * (Chave nova para que a opcao antiga, ligada por padrao na 1.0/1.1, nao continue ativa.)
+     */
     var captureAnalogs: Boolean
-        get() = bool("capture_analogs", true)
-        set(v) = setBool("capture_analogs", v)
+        get() = bool("capture_focus_window", false)
+        set(v) = setBool("capture_focus_window", v)
 
     var showIndicator: Boolean
         get() = bool("show_indicator", true)

@@ -48,8 +48,8 @@
     <string name="settings_restricted_help">Android 13+: se a opção do serviço estiver acinzentada, abra Informações do app › menu ⋮ › “Permitir configurações restritas” e tente novamente.</string>
     <string name="settings_mapping">MAPEAMENTO</string>
     <string name="settings_mapping_enabled">Mapeamento ativo</string>
-    <string name="settings_capture_analogs">Capturar analógicos (janela de foco)</string>
-    <string name="settings_capture_help">Necessário para os analógicos. O Android não envia movimentos de analógico ao serviço de acessibilidade, então uma pequena janela recebe o foco. Alguns jogos pausam ou ignoram isso.</string>
+    <string name="settings_capture_analogs">Analógicos por janela de foco (Android 13 ou inferior)</string>
+    <string name="settings_capture_help">No Android 14 ou superior os analógicos funcionam automaticamente, sem tirar o foco do jogo, e esta opção é ignorada. Em versões anteriores, ela cria uma janela que recebe o foco: alguns jogos (como o Free Fire) ficam com a TELA PRETA. Se isso acontecer, deixe desligada.</string>
     <string name="settings_indicator">Mostrar indicador na tela</string>
     <string name="settings_auto_switch">Trocar perfil automaticamente ao abrir o jogo</string>
     <string name="settings_pass_unmapped">Repassar botões não mapeados ao jogo/sistema</string>
@@ -65,7 +65,7 @@
     <string name="settings_default_deadzone">Zona morta padrão: %1$d%%</string>
     <string name="settings_default_sensitivity">Sensibilidade padrão: %1$.2fx</string>
     <string name="settings_limits">COMPATIBILIDADE E LIMITAÇÕES</string>
-    <string name="settings_limits_text">• Os toques são gerados pelo serviço de acessibilidade (dispatchGesture). É a única forma permitida sem root. Requer ativação manual pelo usuário.\n\n• Botões funcionam com o jogo em primeiro plano (filtro de teclas da acessibilidade).\n\n• Analógicos exigem a janela de captura de foco. Jogos que pausam ao perder o foco ou que reagem a isso podem não funcionar com analógicos.\n\n• Jogos com anti-cheat ou que ignoram toques injetados (alguns competitivos online) podem bloquear o mapeamento ou banir contas. Use por sua conta e risco.\n\n• Apps marcados como seguros (bancos, telas protegidas) e a tela de bloqueio não aceitam gestos.\n\n• No máximo 10 toques simultâneos; latência típica de 16–40 ms por atualização.\n\n• Atalho: SELECT + START pausa/retoma o mapeamento.\n\n• Nada é enviado para a internet; os perfis ficam só no aparelho.</string>
+    <string name="settings_limits_text">• Os toques são gerados pelo serviço de acessibilidade (dispatchGesture). É a única forma permitida sem root. Requer ativação manual pelo usuário.\n\n• Botões funcionam com o jogo em primeiro plano (filtro de teclas da acessibilidade).\n\n• Analógicos: no Android 14+ são lidos direto pelo serviço de acessibilidade. No Android 13 ou inferior exigem a janela de foco, que deixa alguns jogos com tela preta.\n\n• Jogos com anti-cheat ou que ignoram toques injetados (alguns competitivos online) podem bloquear o mapeamento ou banir contas. Use por sua conta e risco.\n\n• Apps marcados como seguros (bancos, telas protegidas) e a tela de bloqueio não aceitam gestos.\n\n• No máximo 10 toques simultâneos; latência típica de 16–40 ms por atualização.\n\n• Atalho: SELECT + START pausa/retoma o mapeamento.\n\n• Nada é enviado para a internet; os perfis ficam só no aparelho.</string>
     <string name="settings_about">Gamepad Mapper %1$s</string>
 
     <string name="editor_add_button">+ BOTÃO</string>
