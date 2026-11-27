@@ -5,7 +5,7 @@ Bluetooth e USB OTG em jogos que só aceitam toque. Os botões e analógicos do 
 toques na tela, nas posições definidas pelo usuário em um editor visual.
 
 - `minSdk 26` (Android 8.0) · `targetSdk 34` · sem bibliotecas pagas e sem internet
-- APK pronto: [`apk/GamepadMapper-v1.0.0-debug.apk`](apk/GamepadMapper-v1.0.0-debug.apk) (assinado com chave de debug)
+- APK pronto: [`apk/GamepadMapper-v1.1.0-debug.apk`](apk/GamepadMapper-v1.1.0-debug.apk) (assinado com chave de debug; instala por cima da 1.0.0 mantendo os perfis)
 
 ## Como instalar e usar
 
@@ -19,6 +19,26 @@ toques na tela, nas posições definidas pelo usuário em um editor visual.
    - Adicione, arraste e redimensione os botões e as zonas de analógico. Depois toque em **SALVAR**.
 5. Abra o jogo (ou toque em **JOGAR** em *Meus jogos*). O perfil vinculado é ativado automaticamente.
 6. **SELECT + START** pausa ou retoma o mapeamento a qualquer momento.
+
+## Novidades da 1.1.0
+
+- **Correção:** o mapeamento desligava quando aparecia uma janela flutuante sobre o jogo, como o Game Booster da Samsung, o pop-up do Play Games ou o teclado. Agora só telas de verdade (Activities) mudam o "app em primeiro plano".
+- **Perfil ativo:** criar um perfil ou salvar no editor torna esse perfil o ativo.
+- **Modelo Free Fire:** 16 comandos com nome. As posições são aproximadas do HUD padrão; alinhe com um print do jogo.
+  - Andar: analógico esquerdo.
+  - Câmera e mira: analógico direito.
+  - Atirar: R2. Mira: L2.
+  - A: pular. B: agachar. R3: deitar. X: recarregar. Y: pegar.
+  - L1: gel. R1 e ←: armas.
+  - Direcional ↑: kit médico. →: granada. ↓: mochila.
+  - Select: mapa.
+- **Nome por botão no editor:** por exemplo "Atirar", "Pular".
+- **Diagnóstico em Configurações:**
+  - teste de toque simples e mantido, em que o app toca sozinho num botão-alvo;
+  - contador de botões do controle recebidos pelo serviço;
+  - último app detectado;
+  - mostra se o mapeamento está agindo agora.
+- **Modo de compatibilidade de toque:** cada aperto vira um toque curto. Serve para aparelhos ou jogos que ignoram toques mantidos.
 
 ## Arquitetura
 
@@ -88,12 +108,13 @@ O projeto usa AGP 8.7.3, Kotlin 2.0.21 e Gradle 8.14.3 (via wrapper). O app usa 
 
 **Implementado e verificado aqui:**
 - Compilação completa do APK. A assinatura v2/v3 foi verificada com `apksigner verify`. O manifesto e a config do serviço foram conferidos com `aapt dump`.
-- 20 testes unitários passando:
+- 23 testes unitários passando:
   - zona morta e sensibilidade;
   - modos de botão;
   - joystick e câmera;
   - limite de 10 toques;
-  - JSON dos perfis, com validação e limites de valores.
+  - JSON dos perfis, com validação e limites de valores;
+  - modelo Free Fire válido, sem botão físico repetido.
 - Checagem de API: compilado também contra o `android.jar` público da API 23. Só aparecem símbolos de API 24+ (com minSdk 26) ou protegidos por `SDK_INT`, ou seja, nenhum uso de API oculta.
 
 **Implementado, mas NÃO testado em aparelho real** (não havia emulador nem dispositivo neste ambiente):

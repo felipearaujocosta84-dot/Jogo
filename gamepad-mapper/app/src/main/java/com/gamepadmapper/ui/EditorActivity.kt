@@ -179,6 +179,7 @@ class EditorActivity : BaseActivity(), EditorView.Listener {
         propInvert = findViewById(R.id.propInvertY)
 
         propBind.setOnClickListener { editor.selected()?.let { showBindOptions(it) } }
+        findViewById<Button>(R.id.propName).setOnClickListener { editor.selected()?.let { renameDialog(it) } }
         propMode.setOnClickListener { editor.selected()?.let { showModeDialog(it) } }
         propSize.setOnSeekBarChangeListener(SimpleSeek { fromUser ->
             if (fromUser && !updatingPanel) editor.selected()?.let { editor.replace(it.copy(size = (4 + propSize.progress) / 100f)) }
@@ -218,6 +219,21 @@ class EditorActivity : BaseActivity(), EditorView.Listener {
                     if (which == 0) startBinding(e.id) else editor.replace(e.copy(stick = sources[which - 1]))
                 }.show()
         }
+    }
+
+    private fun renameDialog(e: MappingElement) {
+        val input = android.widget.EditText(this).apply {
+            setText(e.name ?: ""); hint = "Ex.: Atirar, Pular, Recarregar"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(24))
+            setSingleLine()
+        }
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val box = android.widget.FrameLayout(this).apply { setPadding(pad, pad / 2, pad, 0); addView(input) }
+        AlertDialog.Builder(this).setTitle("Nome da ação no jogo")
+            .setView(box)
+            .setPositiveButton(R.string.dialog_ok) { _, _ -> editor.replace(e.copy(name = input.text.toString().trim().ifBlank { null })) }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
     }
 
     private fun showModeDialog(e: MappingElement) {
@@ -261,7 +277,9 @@ class EditorActivity : BaseActivity(), EditorView.Listener {
         val e = editor.selected() ?: return
         updatingPanel = true
         val isStick = e.type == ElementType.STICK
-        propTitle.text = if (isStick) "Analógico: ${e.stick?.label}" else "Botão virtual: ${e.input?.label}"
+        propTitle.text = (e.name?.let { "$it — " } ?: "") +
+            if (isStick) "Analógico: ${e.stick?.label}" else "Botão virtual: ${e.input?.label}"
+        findViewById<Button>(R.id.propName).text = "NOME: " + (e.name ?: "(sem nome)")
         propBind.text = if (bindingFor == e.id) getString(R.string.editor_bind_wait)
         else if (isStick) "ANALÓGICO: ${e.stick?.label ?: "?"}" else "BOTÃO FÍSICO: ${e.input?.label ?: "?"}"
         propMode.text = "MODO: " + if (isStick) e.stickMode.label.substringBefore(" (") else e.buttonMode.label.substringBefore(" (")
@@ -360,6 +378,7 @@ class EditorActivity : BaseActivity(), EditorView.Listener {
 
     private fun save() {
         profile = repo.save(profile.copy(elements = editor.getElements()))
+        repo.activeProfileId = profile.id
         dirty = false
         Toast.makeText(this, R.string.editor_saved, Toast.LENGTH_SHORT).show()
     }

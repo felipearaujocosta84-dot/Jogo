@@ -153,7 +153,8 @@ class EditorView @JvmOverloads constructor(ctx: Context, attrs: AttributeSet? = 
                 textPaint.textSize = max(12f * density, r * 0.7f)
                 c.drawText(e.shortLabel, x, y + textPaint.textSize / 3, textPaint)
                 val modeTag = when (e.buttonMode) { ButtonMode.HOLD -> null; ButtonMode.TAP -> "toque"; ButtonMode.TOGGLE -> "alternar" }
-                modeTag?.let { c.drawText(it, x, y + r + 12f * density, smallText) }
+                listOfNotNull(e.name, modeTag).joinToString(" · ").takeIf { it.isNotEmpty() }
+                    ?.let { c.drawText(it, x, y + r + 12f * density, smallText) }
             }
             ElementType.STICK -> {
                 fillPaint.color = 0x2200D4FF
@@ -176,7 +177,7 @@ class EditorView @JvmOverloads constructor(ctx: Context, attrs: AttributeSet? = 
                 textPaint.textSize = max(12f * density, r * 0.25f)
                 c.drawText(e.shortLabel, kx, ky + textPaint.textSize / 3, textPaint)
                 val tag = if (e.stickMode == StickMode.CAMERA) "câmera" else "joystick"
-                c.drawText(tag, x, y + r + 12f * density, smallText)
+                c.drawText(listOfNotNull(e.name, tag).joinToString(" · "), x, y + r + 12f * density, smallText)
             }
         }
         if (sel) {

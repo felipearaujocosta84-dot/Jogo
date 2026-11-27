@@ -20,6 +20,14 @@
         </RadioGroup>
         <TextView android:id="@+id/formSensLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textColor="@color/text_secondary" android:textSize="12sp" />
         <SeekBar android:id="@+id/formSens" android:layout_width="match_parent" android:layout_height="36dp" android:max="290" />
-        <CheckBox android:id="@+id/formTemplate" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:checked="true" android:text="Começar com layout padrão (analógicos + A/B/X/Y)" android:textColor="@color/text_primary" />
+        <LinearLayout android:id="@+id/formTemplateBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Layout inicial" android:textColor="@color/text_secondary" android:textSize="12sp" />
+            <RadioGroup android:id="@+id/formTemplate" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <RadioButton android:id="@+id/tplDefault" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" android:text="Padrão (analógicos + A/B/X/Y)" android:textColor="@color/text_primary" />
+                <RadioButton android:id="@+id/tplFreeFire" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Free Fire (16 comandos prontos)" android:textColor="@color/text_primary" />
+                <RadioButton android:id="@+id/tplBlank" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Em branco" android:textColor="@color/text_primary" />
+            </RadioGroup>
+            <TextView android:id="@+id/formTemplateNote" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/warn_amber" android:textSize="12sp" android:visibility="gone" android:text="Posições aproximadas do HUD padrão: use FUNDO no editor com um print do jogo para alinhar.\nAviso: o Free Fire tem anti-cheat. O uso de ferramentas de terceiros pode violar os termos do jogo e levar a punições na conta." />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

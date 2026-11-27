@@ -25,6 +25,18 @@
             <TextView style="@style/BodyText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textSize="12sp" android:text="@string/settings_restricted_help" />
         </LinearLayout>
 
+        <TextView style="@style/SectionTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/settings_diag" />
+        <LinearLayout style="@style/Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView style="@style/BodyText" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:text="@string/settings_diag_help" />
+            <Button android:id="@+id/testTarget" style="@style/NeonButton" android:layout_width="match_parent" android:text="@string/settings_test_target" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <Button android:id="@+id/btnTestTap" style="@style/NeonButton" android:layout_width="0dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:textSize="12sp" android:text="@string/settings_test_tap" />
+                <Button android:id="@+id/btnTestHold" style="@style/NeonButton" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="6dp" android:textSize="12sp" android:text="@string/settings_test_hold" />
+            </LinearLayout>
+            <TextView android:id="@+id/testResult" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="@color/text_primary" android:textSize="14sp" android:textStyle="bold" />
+            <TextView android:id="@+id/liveDiag" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:fontFamily="monospace" android:textColor="@color/text_secondary" android:textSize="12sp" />
+        </LinearLayout>
+
         <TextView style="@style/SectionTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/settings_mapping" />
         <LinearLayout style="@style/Card" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
             <Switch android:id="@+id/swMapping" style="@style/NeonSwitch" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_mapping_enabled" />
@@ -33,6 +45,8 @@
             <Switch android:id="@+id/swIndicator" style="@style/NeonSwitch" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_indicator" />
             <Switch android:id="@+id/swAutoSwitch" style="@style/NeonSwitch" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_auto_switch" />
             <Switch android:id="@+id/swPassUnmapped" style="@style/NeonSwitch" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_pass_unmapped" />
+            <Switch android:id="@+id/swCompat" style="@style/NeonSwitch" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_compat" />
+            <TextView style="@style/BodyText" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:text="@string/settings_compat_help" />
         </LinearLayout>
 
         <TextView style="@style/SectionTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/settings_defaults" />

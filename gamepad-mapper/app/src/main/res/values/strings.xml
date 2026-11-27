@@ -53,6 +53,14 @@
     <string name="settings_indicator">Mostrar indicador na tela</string>
     <string name="settings_auto_switch">Trocar perfil automaticamente ao abrir o jogo</string>
     <string name="settings_pass_unmapped">Repassar botões não mapeados ao jogo/sistema</string>
+    <string name="settings_diag">DIAGNÓSTICO</string>
+    <string name="settings_diag_help">1) Toque em um dos testes: o app toca sozinho no botão ALVO. Se o alvo acender, os toques automáticos funcionam neste aparelho.
+2) Abra o jogo, aperte botões do controle e volte aqui: o contador de botões recebidos deve aumentar e o “último app” deve ser o jogo.</string>
+    <string name="settings_test_target">ALVO DO TESTE</string>
+    <string name="settings_test_tap">TESTAR TOQUE SIMPLES</string>
+    <string name="settings_test_hold">TESTAR TOQUE MANTIDO</string>
+    <string name="settings_compat">Modo de compatibilidade de toque</string>
+    <string name="settings_compat_help">Ligue se o teste de toque SIMPLES funciona mas o MANTIDO não, ou se o jogo ignora os botões. Cada aperto vira um toque curto (o modo “segurar” deixa de segurar; analógicos não mudam).</string>
     <string name="settings_defaults">PADRÕES PARA NOVOS ANALÓGICOS</string>
     <string name="settings_default_deadzone">Zona morta padrão: %1$d%%</string>
     <string name="settings_default_sensitivity">Sensibilidade padrão: %1$.2fx</string>

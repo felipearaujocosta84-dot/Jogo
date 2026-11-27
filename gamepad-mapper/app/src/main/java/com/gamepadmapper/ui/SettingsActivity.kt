@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import com.gamepadmapper.R
 import com.gamepadmapper.service.MapperRuntime
 import com.gamepadmapper.settings.AppSettings
@@ -34,6 +35,19 @@ class SettingsActivity : BaseActivity() {
         bindSwitch(R.id.swIndicator, { settings.showIndicator }) { settings.showIndicator = it }
         bindSwitch(R.id.swAutoSwitch, { settings.autoSwitchProfile }) { settings.autoSwitchProfile = it }
         bindSwitch(R.id.swPassUnmapped, { settings.passUnmappedButtons }) { settings.passUnmappedButtons = it }
+        bindSwitch(R.id.swCompat, { settings.compatTaps }) { settings.compatTaps = it }
+
+        val target = findViewById<Button>(R.id.testTarget)
+        target.setOnClickListener {
+            if (testPending) {
+                testPending = false
+                showTestResult(true)
+            } else {
+                Toast.makeText(this, "Este é o alvo: use os botões de teste abaixo", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnTestTap).setOnClickListener { runTouchTest(hold = false) }
+        findViewById<Button>(R.id.btnTestHold).setOnClickListener { runTouchTest(hold = true) }
 
         val dzLabel = findViewById<TextView>(R.id.defaultDeadzoneLabel)
         val dz = findViewById<SeekBar>(R.id.defaultDeadzone)
@@ -58,6 +72,50 @@ class SettingsActivity : BaseActivity() {
         findViewById<TextView>(R.id.aboutText).text = getString(R.string.settings_about, version)
     }
 
+    private var testPending = false
+    private var testHold = false
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun runTouchTest(hold: Boolean) {
+        val svc = MapperRuntime.service
+        val result = findViewById<TextView>(R.id.testResult)
+        if (svc == null) {
+            result.text = "✗ Serviço de acessibilidade desativado — ative-o primeiro."
+            result.setTextColor(getColor(R.color.danger_red))
+            return
+        }
+        val target = findViewById<Button>(R.id.testTarget)
+        val loc = IntArray(2)
+        target.getLocationOnScreen(loc)
+        val x = loc[0] + target.width / 2f
+        val y = loc[1] + target.height / 2f
+        testPending = true
+        testHold = hold
+        result.text = "Testando…"
+        result.setTextColor(getColor(R.color.text_secondary))
+        svc.testTouch(x, y, hold) { completed ->
+            handler.postDelayed({
+                if (testPending) {
+                    testPending = false
+                    showTestResult(false, if (completed) "o sistema executou o gesto, mas o toque não chegou ao alvo" else "o sistema cancelou/recusou o gesto")
+                }
+            }, 400)
+        }
+    }
+
+    private fun showTestResult(ok: Boolean, reason: String = "") {
+        val result = findViewById<TextView>(R.id.testResult)
+        val kind = if (testHold) "mantido" else "simples"
+        if (ok) {
+            result.text = "✓ Toque $kind funcionou neste aparelho."
+            result.setTextColor(getColor(R.color.ok_green))
+            findViewById<Button>(R.id.testTarget).text = "✓ ALVO TOCADO PELO APP"
+        } else {
+            result.text = "✗ Toque $kind falhou: $reason." + if (testHold) "\nLigue o “Modo de compatibilidade de toque”." else ""
+            result.setTextColor(getColor(R.color.danger_red))
+        }
+    }
+
     private fun bindSwitch(id: Int, get: () -> Boolean, set: (Boolean) -> Unit) {
         val sw = findViewById<Switch>(id)
         sw.isChecked = get()
@@ -77,6 +135,18 @@ class SettingsActivity : BaseActivity() {
     }
 
     private fun refreshServiceStatus() {
+        val live = findViewById<TextView>(R.id.liveDiag)
+        val svcNow = MapperRuntime.service
+        live.text = if (svcNow == null) "Serviço parado: sem diagnóstico ao vivo." else buildString {
+            append("Botões recebidos do controle: ").append(svcNow.keysReceived)
+            append("\nÚltimo botão: ").append(svcNow.lastKey ?: "—")
+            append("\nÚltimo app aberto: ").append(svcNow.foregroundPackage ?: "—")
+            val p = svcNow.activeProfile
+            append("\nPerfil ativo: ").append(p?.name ?: "nenhum")
+            p?.packageName?.let { append(" (jogo: ").append(it).append(")") }
+            append("\nMapeamento agindo agora: ").append(if (svcNow.mappingActiveNow) "SIM" else "não")
+            append("\nToques enviados: ").append(svcNow.gesturesDispatched)
+        }
         val status = findViewById<TextView>(R.id.serviceStatus)
         val diag = findViewById<TextView>(R.id.serviceDiag)
         val svc = MapperRuntime.service

@@ -67,6 +67,7 @@
                 android:orientation="vertical"
                 android:padding="12dp">
                 <TextView android:id="@+id/propTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/neon_blue" android:textSize="16sp" android:textStyle="bold" />
+                <Button android:id="@+id/propName" style="@style/SmallButton" android:layout_width="match_parent" android:layout_marginTop="8dp" android:text="NOME" />
                 <Button android:id="@+id/propBind" style="@style/SmallButton" android:layout_width="match_parent" android:layout_marginTop="8dp" android:text="@string/editor_bind" />
                 <Button android:id="@+id/propMode" style="@style/SmallButton" android:layout_width="match_parent" android:layout_marginTop="8dp" android:text="@string/editor_mode" />
                 <TextView android:id="@+id/propSizeLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="@color/text_primary" android:textSize="13sp" />

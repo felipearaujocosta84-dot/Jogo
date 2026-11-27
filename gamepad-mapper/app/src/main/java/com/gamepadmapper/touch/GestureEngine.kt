@@ -30,6 +30,10 @@ class GestureEngine(private val service: AccessibilityService) {
     private var dispatchSerial = 0
     private val maxStrokes = GestureDescription.getMaxStrokeCount()
 
+    /** Modo compatibilidade: botoes viram toques curtos independentes (ver AppSettings.compatTaps). */
+    var compatButtonTaps = false
+    private var compatPressed: Set<String> = emptySet()
+
     /** Chamado (com atraso) depois que o sistema cancela um gesto, para o servico reenviar os toques. */
     var onCancelled: (() -> Unit)? = null
 
@@ -43,7 +47,7 @@ class GestureEngine(private val service: AccessibilityService) {
         private set
 
     fun submit(desired: Map<String, TouchPoint>) {
-        if (desired.isEmpty() && active.isEmpty() && !inFlight) { pending = null; return }
+        if (desired.isEmpty() && active.isEmpty() && !inFlight) { pending = null; compatPressed = emptySet(); return }
         pending = desired
         if (!inFlight) dispatchNext()
     }
@@ -63,7 +67,7 @@ class GestureEngine(private val service: AccessibilityService) {
         // 1) Dedos ja pressionados: continuam (movendo) ou levantam.
         for ((id, a) in active) {
             val d = desired[id]
-            val keep = d != null && d.generation == a.generation
+            val keep = d != null && d.generation == a.generation && !(compatButtonTaps && d.isButton)
             val tx = if (keep) d!!.x else a.x
             val ty = if (keep) d!!.y else a.y
             val path = Path().apply { moveTo(a.x, a.y); lineTo(tx, ty) }
@@ -78,7 +82,17 @@ class GestureEngine(private val service: AccessibilityService) {
         }
 
         // 2) Novos dedos.
+        val nowPressed = HashSet<String>()
         for ((id, d) in desired) {
+            if (compatButtonTaps && d.isButton) {
+                nowPressed += id
+                if (id in compatPressed || strokes >= maxStrokes) continue
+                val tap = try {
+                    GestureDescription.StrokeDescription(Path().apply { moveTo(d.x, d.y) }, 0, COMPAT_TAP_MS, false)
+                } catch (e: Exception) { lastError = "tap: ${e.message}"; null } ?: continue
+                builder.addStroke(tap); strokes++
+                continue
+            }
             if (active.containsKey(id)) continue
             if (strokes >= maxStrokes) break
             val path = Path().apply { moveTo(d.downX, d.downY); lineTo(d.x, d.y) }
@@ -91,6 +105,7 @@ class GestureEngine(private val service: AccessibilityService) {
             next[id] = ActiveStroke(d.generation, d.x, d.y, stroke)
         }
 
+        compatPressed = nowPressed
         if (strokes == 0) { active = HashMap(); return }
 
         val gesture = try { builder.build() } catch (e: Exception) {
@@ -114,6 +129,36 @@ class GestureEngine(private val service: AccessibilityService) {
         if (restartLater && pending == null) pending = desired
     }
 
+    /**
+     * Toque de teste isolado (diagnostico). Com [hold], usa o mesmo mecanismo de toque mantido
+     * (continueStroke) dos botoes no modo "segurar".
+     */
+    fun test(x: Float, y: Float, hold: Boolean, onResult: (Boolean) -> Unit) {
+        val path = Path().apply { moveTo(x, y) }
+        fun send(stroke: GestureDescription.StrokeDescription, done: (Boolean) -> Unit) {
+            val ok = service.dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(),
+                object : AccessibilityService.GestureResultCallback() {
+                    override fun onCompleted(g: GestureDescription?) = done(true)
+                    override fun onCancelled(g: GestureDescription?) = done(false)
+                }, handler)
+            if (!ok) done(false)
+        }
+        try {
+            if (!hold) {
+                send(GestureDescription.StrokeDescription(path, 0, 60, false), onResult)
+            } else {
+                val first = GestureDescription.StrokeDescription(path, 0, 80, true)
+                send(first) { ok ->
+                    if (!ok) onResult(false)
+                    else send(first.continueStroke(Path().apply { moveTo(x, y) }, 0, 80, false), onResult)
+                }
+            }
+        } catch (e: Exception) {
+            lastError = "teste: ${e.message}"
+            onResult(false)
+        }
+    }
+
     private fun onFinished(serial: Int, cancelled: Boolean) {
         if (serial != dispatchSerial) return
         inFlight = false
@@ -134,5 +179,6 @@ class GestureEngine(private val service: AccessibilityService) {
         /** Duracao de cada segmento do gesto (ms). */
         const val SEGMENT_MS = 16L
         const val RETRY_AFTER_CANCEL_MS = 120L
+        const val COMPAT_TAP_MS = 50L
     }
 }

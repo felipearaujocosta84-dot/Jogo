@@ -9,7 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.Button
-import android.widget.CheckBox
+import android.widget.RadioGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -20,6 +20,7 @@ import android.widget.Toast
 import com.gamepadmapper.R
 import com.gamepadmapper.profile.Profile
 import com.gamepadmapper.profile.ProfileRepository
+import com.gamepadmapper.profile.ProfileTemplate
 import com.gamepadmapper.profile.ScreenOrientation
 import com.gamepadmapper.settings.AppSettings
 
@@ -40,7 +41,17 @@ object ProfileForm {
         val portrait = view.findViewById<RadioButton>(R.id.formPortrait)
         val sensLabel = view.findViewById<TextView>(R.id.formSensLabel)
         val sens = view.findViewById<SeekBar>(R.id.formSens)
-        val template = view.findViewById<CheckBox>(R.id.formTemplate)
+        val template = view.findViewById<RadioGroup>(R.id.formTemplate)
+        val templateNote = view.findViewById<TextView>(R.id.formTemplateNote)
+        fun selectedTemplate() = when (template.checkedRadioButtonId) {
+            R.id.tplFreeFire -> ProfileTemplate.FREE_FIRE
+            R.id.tplBlank -> ProfileTemplate.BLANK
+            else -> ProfileTemplate.DEFAULT
+        }
+        template.setOnCheckedChangeListener { _, _ ->
+            templateNote.visibility = if (selectedTemplate() == ProfileTemplate.FREE_FIRE) View.VISIBLE else View.GONE
+            if (selectedTemplate() == ProfileTemplate.FREE_FIRE) landscape.isChecked = true
+        }
 
         var pkg: String? = existing?.packageName
         var appLabel: String? = existing?.appLabel
@@ -55,12 +66,16 @@ object ProfileForm {
         fun updateSens() { sensLabel.text = String.format("Sensibilidade geral do perfil: %.2fx", 0.1f + sens.progress / 100f) }
         updateSens()
         sens.setOnSeekBarChangeListener(SimpleSeek { updateSens() })
-        template.visibility = if (existing == null) View.VISIBLE else View.GONE
+        view.findViewById<View>(R.id.formTemplateBox).visibility = if (existing == null) View.VISIBLE else View.GONE
 
         pick.setOnClickListener {
             pickApp(activity) { entry ->
                 pkg = entry?.packageName; appLabel = entry?.label
                 if (entry != null && name.text.isBlank()) name.setText(entry.label)
+                // Jogo com modelo pronto: seleciona o modelo automaticamente.
+                if (existing == null && ProfileTemplate.forPackage(entry?.packageName) == ProfileTemplate.FREE_FIRE) {
+                    template.check(R.id.tplFreeFire)
+                }
                 updatePick()
             }
         }
@@ -80,13 +95,11 @@ object ProfileForm {
                 val orientation = if (portrait.isChecked) ScreenOrientation.PORTRAIT else ScreenOrientation.LANDSCAPE
                 val gs = 0.1f + sens.progress / 100f
                 val saved = if (existing == null) {
-                    val elements = if (template.isChecked) {
-                        val base = Profile.defaultElements(settings.defaultDeadzone, settings.defaultSensitivity)
-                        if (orientation == ScreenOrientation.PORTRAIT) base.map { it.copy(x = it.x, y = 0.55f + it.y * 0.45f) } else base
-                    } else emptyList()
+                    val elements = selectedTemplate().elements(orientation, settings.defaultDeadzone, settings.defaultSensitivity)
                     val p = repo.save(Profile(name = n, packageName = pkg, appLabel = appLabel,
                         orientation = orientation, globalSensitivity = gs, elements = elements))
-                    if (repo.activeProfileId == null) repo.activeProfileId = p.id
+                    // O perfil recem-criado passa a ser o ativo (evita "botoes nao funcionam" por perfil errado).
+                    repo.activeProfileId = p.id
                     p
                 } else {
                     repo.save(existing.copy(name = n, packageName = pkg, appLabel = appLabel,

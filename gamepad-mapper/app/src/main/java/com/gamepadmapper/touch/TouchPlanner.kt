@@ -19,6 +19,8 @@ data class TouchPoint(
     val downX: Float = x,
     val downY: Float = y,
     val generation: Int = 0,
+    /** true para botoes virtuais (pontos fixos); false para analogicos. */
+    val isButton: Boolean = false,
 )
 
 /**
@@ -62,7 +64,7 @@ class TouchPlanner {
             val radius = e.size * minSide / 2f
             when (e.type) {
                 ElementType.BUTTON -> planButton(e, state, nowMs)?.let {
-                    out[e.id] = TouchPoint(cx.clamp(maxX), cy.clamp(maxY))
+                    out[e.id] = TouchPoint(cx.clamp(maxX), cy.clamp(maxY), isButton = true)
                 }
                 ElementType.STICK -> planStick(e, profile, state, cx, cy, radius, dt)?.let { p ->
                     out[e.id] = p.copy(

@@ -44,6 +44,8 @@ data class MappingElement(
     val sensitivity: Float = 1f,
     val deadzone: Float = 0.15f,
     val invertY: Boolean = false,
+    /** Nome da acao no jogo (ex.: "Atirar"), exibido no editor. Opcional. */
+    val name: String? = null,
 ) {
     val shortLabel: String
         get() = when (type) {

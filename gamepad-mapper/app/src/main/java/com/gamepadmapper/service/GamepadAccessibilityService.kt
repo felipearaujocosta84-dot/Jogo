@@ -130,6 +130,7 @@ class GamepadAccessibilityService : AccessibilityService() {
 
     private fun applySettings() {
         paused = !settings.mappingEnabled
+        engine.compatButtonTaps = settings.compatTaps
         updateOverlay()
         refresh()
         MapperRuntime.notifyChanged()
@@ -166,8 +167,10 @@ class GamepadAccessibilityService : AccessibilityService() {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         if (pkg in IGNORED_PACKAGES) return
-        // Janelas do proprio servico (sobreposicao) nao sao "troca de app"; so as telas do app contam.
-        if (pkg == packageName && event.className?.toString()?.startsWith("$packageName.ui.") != true) return
+        // So uma Activity muda o app em primeiro plano. Paineis flutuantes (Game Booster da Samsung,
+        // pop-up do Play Games, teclado, nossa propria sobreposicao) NAO podem desligar o mapeamento.
+        val cls = event.className?.toString() ?: return
+        if (!isActivity(pkg, cls)) return
         if (pkg == foregroundPackage) return
         foregroundPackage = pkg
         if (settings.autoSwitchProfile && pkg != packageName) {
@@ -183,8 +186,31 @@ class GamepadAccessibilityService : AccessibilityService() {
         MapperRuntime.notifyChanged()
     }
 
+    private val activityCache = HashMap<String, Boolean>()
+
+    private fun isActivity(pkg: String, cls: String): Boolean = activityCache.getOrPut("$pkg/$cls") {
+        try {
+            packageManager.getActivityInfo(android.content.ComponentName(pkg, cls), 0)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Diagnostico exibido em Configuracoes. */
+    @Volatile var keysReceived = 0L
+        private set
+    @Volatile var lastKey: String? = null
+        private set
+    val mappingActiveNow: Boolean get() = isMappingActive()
+
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (!GamepadEventParser.isGamepadKey(event)) return false
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            keysReceived++
+            lastKey = GamepadEventParser.keyName(event.keyCode)
+            MapperRuntime.notifyChanged()
+        }
         val input = GamepadEventParser.keyToInput(event.keyCode) ?: return false
         if (event.repeatCount > 0) return isMappingActive() && input in usedInputs
 
@@ -211,6 +237,14 @@ class GamepadAccessibilityService : AccessibilityService() {
         if (!GamepadEventParser.handleMotion(event, state)) return false
         if (isMappingActive()) refresh()
         return true
+    }
+
+    /**
+     * Teste de diagnostico: toca em (x, y) da tela usando o mesmo mecanismo do mapeamento.
+     * [hold] = usa toque mantido (continueStroke), como os botoes no modo "segurar".
+     */
+    fun testTouch(x: Float, y: Float, hold: Boolean, onResult: (Boolean) -> Unit) {
+        engine.test(x, y, hold, onResult)
     }
 
     // ---------------------------------------------------------------- planejamento

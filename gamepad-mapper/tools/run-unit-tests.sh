@@ -12,7 +12,7 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 # Apenas fontes sem dependencia do Android: compilar sem android.jar garante essa separacao.
 PURE=(
   "$SRC/input/PhysicalInput.kt" "$SRC/input/ControllerState.kt"
-  "$SRC/profile/Profile.kt" "$SRC/profile/ProfileJson.kt"
+  "$SRC/profile/Profile.kt" "$SRC/profile/ProfileJson.kt" "$SRC/profile/ProfileTemplates.kt"
   "$SRC/touch/StickMath.kt" "$SRC/touch/TouchPlanner.kt"
 )
 kotlinc -nowarn -classpath "$CP" -d "$OUT" "${PURE[@]}" $(find "$ROOT/app/src/test/java" -name '*.kt') 2>&1 | grep -v '^Picked up' || true

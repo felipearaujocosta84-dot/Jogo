@@ -41,6 +41,14 @@ class AppSettings private constructor(context: Context) {
         get() = bool("pass_unmapped", true)
         set(v) = setBool("pass_unmapped", v)
 
+    /**
+     * Compatibilidade: botoes viram toques curtos independentes (sem toque mantido/continueStroke).
+     * Para jogos ou aparelhos que ignoram toques mantidos injetados. "Segurar" deixa de segurar.
+     */
+    var compatTaps: Boolean
+        get() = bool("compat_taps", false)
+        set(v) = setBool("compat_taps", v)
+
     var defaultDeadzone: Float
         get() = float("default_deadzone", 0.15f)
         set(v) = setFloat("default_deadzone", v)

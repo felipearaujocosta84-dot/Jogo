@@ -34,6 +34,7 @@ object ProfileJson {
         put("sensitivity", e.sensitivity.toDouble())
         put("deadzone", e.deadzone.toDouble())
         put("invertY", e.invertY)
+        e.name?.let { put("name", it) }
     }
 
     /** @throws IllegalArgumentException se o JSON nao for um perfil valido. */
@@ -76,6 +77,7 @@ object ProfileJson {
             sensitivity = o.optDouble("sensitivity", 1.0).toFloat().coerceIn(0.1f, 3f),
             deadzone = o.optDouble("deadzone", 0.15).toFloat().coerceIn(0f, 0.9f),
             invertY = o.optBoolean("invertY", false),
+            name = o.optString("name", "").trim().take(24).ifBlank { null },
         )
     }
 }
